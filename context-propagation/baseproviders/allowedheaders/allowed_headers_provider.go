@@ -21,11 +21,33 @@ func init() {
 }
 
 type allowedHeaderProvider struct {
-	allowedHeaders []string
+	allowedHeaders allowedHeaderSet
+}
+
+// allowedHeaderSet provides methods to work with header names in case-insensitive way
+// It stores allowed headers in lowered header format for future comparison
+type allowedHeaderSet map[string]struct{}
+
+// add method is using to build initial set of headers formatted to lowered format
+func (s allowedHeaderSet) add(allowedHeader string) {
+	s[strings.ToLower(allowedHeader)] = struct{}{}
+}
+
+// isAllowedHeader using to check if header name is allowed by comparison lowered format
+func (s allowedHeaderSet) isAllowedHeader(header string) bool {
+	_, ok := s[strings.ToLower(header)]
+	return ok
 }
 
 func NewAllowedHeaderProvider() allowedHeaderProvider {
-	return allowedHeaderProvider{allowedHeaders: strings.Split(strings.ReplaceAll(configloader.GetOrDefaultString(HEADERS_PROPERTY, ""), " ", ""), ",")}
+	allowedHeadersRaw := strings.Split(strings.ReplaceAll(configloader.GetOrDefaultString(HEADERS_PROPERTY, ""), " ", ""), ",")
+	allowedHeaders := allowedHeaderSet{}
+	for _, header := range allowedHeadersRaw {
+		allowedHeaders.add(header)
+	}
+	return allowedHeaderProvider{
+		allowedHeaders: allowedHeaders,
+	}
 }
 
 func (allowedHeaderProvider allowedHeaderProvider) InitLevel() int {
@@ -38,12 +60,14 @@ func (allowedHeaderProvider allowedHeaderProvider) ContextName() string {
 
 func (allowedHeaderProvider allowedHeaderProvider) Provide(ctx context.Context, incomingData map[string]interface{}) context.Context {
 	var allowedRequestHeaders = make(map[string]string)
-	for _, headerName := range allowedHeaderProvider.allowedHeaders {
-		if incomingData[headerName] != nil {
-			allowedRequestHeaders[headerName] = incomingData[headerName].(string)
+
+	for headerName, value := range incomingData {
+		if allowedHeaderProvider.allowedHeaders.isAllowedHeader(headerName) {
+			allowedRequestHeaders[headerName] = value.(string)
 			logger.Debug("context object=" + headerName + " provided to context.Context")
 		}
 	}
+
 	return context.WithValue(ctx, ALLOWED_HEADER_CONTEX_NAME, NewAllowedHeaderContextObject(allowedRequestHeaders))
 }
 
@@ -53,9 +77,9 @@ func (allowedHeaderProvider allowedHeaderProvider) Set(ctx context.Context, allo
 		return ctx, errors.New("incorrect type to set allowedHeaders")
 	}
 	var allowedRequestHeaders = make(map[string]string)
-	for _, headerName := range allowedHeaderProvider.allowedHeaders {
-		if allowedHeaders.header[headerName] != "" {
-			allowedRequestHeaders[headerName] = allowedHeaders.header[headerName]
+	for headerName, value := range allowedHeaders.header {
+		if allowedHeaderProvider.allowedHeaders.isAllowedHeader(headerName) {
+			allowedRequestHeaders[headerName] = value
 			logger.Debug("context object=" + headerName + " set to context.Context")
 		}
 	}
