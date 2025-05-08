@@ -4,8 +4,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/netcracker/qubership-core-lib-go/v3/context-propagation/ctxmanager"
 	"strings"
+
+	"github.com/netcracker/qubership-core-lib-go/v3/context-propagation/ctxmanager"
 )
 
 type allowedHeaderContextObject struct {
@@ -16,8 +17,31 @@ func NewAllowedHeaderContextObject(headers map[string]string) allowedHeaderConte
 	return allowedHeaderContextObject{header: headers}
 }
 
+// Deprecated: GetHeaders returns raw map of headers with values. Keys in map are case-sensitive.
+// Use GetHeader to get header value in case-insentitive way
+// Use GetHeaderNames to get list of available custom headers in context
 func (allowedHeaderContextObject allowedHeaderContextObject) GetHeaders() map[string]string {
 	return allowedHeaderContextObject.header
+}
+
+// GetHeader method returns value by header name and true if exists
+// It works in case-insensitive way
+func (allowedHeaderContextObject allowedHeaderContextObject) GetHeader(header string) (string, bool) {
+	for headerName, value := range allowedHeaderContextObject.header {
+		if strings.ToLower(headerName) == strings.ToLower(header) {
+			return value, true
+		}
+	}
+	return "", false
+}
+
+// GetHeaderNames method returns slice of available headers in context
+func (allowedHeaderContextObject allowedHeaderContextObject) GetHeaderNames() []string {
+	headerNames := make([]string, 0, len(allowedHeaderContextObject.header))
+	for headerName := range allowedHeaderContextObject.header {
+		headerNames = append(headerNames, headerName)
+	}
+	return headerNames
 }
 
 func (allowedHeaderContextObject allowedHeaderContextObject) GetLogValue() string {

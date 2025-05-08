@@ -4,11 +4,13 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 
 	"github.com/netcracker/qubership-core-lib-go/v3/configloader"
 	"github.com/netcracker/qubership-core-lib-go/v3/context-propagation/ctxmanager"
-	"github.com/stretchr/testify/assert"
 )
 
 const CUSTOM_HEADER_2 = "Custom-header-2"
@@ -27,28 +29,27 @@ func TestAllowedHeaderCtx(t *testing.T) {
 	contextData, err := ctxmanager.GetContextObject(ctx, ALLOWED_HEADER_CONTEX_NAME)
 	assert.NotNil(t, contextData)
 	assert.Nil(t, err)
-	allowedHeaders, _ := Of(ctx)
+	allowedHeaders, err := Of(ctx)
+	assert.NoError(t, err)
 
-	assert.Equal(t, CUSTOM_HEADER_VALUE, allowedHeaders.header[CUSTOM_HEADER])
-	assert.Equal(t, CUSTOM_HEADER_VALUE_2, allowedHeaders.header[CUSTOM_HEADER_2])
-	os.Unsetenv("headers.allowed")
-
+	header, exists := allowedHeaders.GetHeader(CUSTOM_HEADER)
+	assert.True(t, exists)
+	assert.Equal(t, CUSTOM_HEADER_VALUE, header)
+	header, exists = allowedHeaders.GetHeader(CUSTOM_HEADER_2)
+	assert.True(t, exists)
+	assert.Equal(t, CUSTOM_HEADER_VALUE_2, header)
+	_ = os.Unsetenv("headers.allowed")
 }
 
-func TestPanicWrongAllowedHeaderCtx(t *testing.T) {
-	//check panic
-	defer func() {
-		if r := recover(); r == nil {
-			t.Errorf("The code did not panic")
-		}
-	}()
-
+func TestWrongAllowedHeaderCtx(t *testing.T) {
 	ctx := ctxmanager.InitContext(context.Background(), getIncomingRequestHeaders())
 	contextData, err := ctxmanager.GetContextObject(ctx, ALLOWED_HEADER_CONTEX_NAME)
 	assert.NotNil(t, contextData)
 	assert.Nil(t, err)
 	allowedHeaders, _ := Of(ctx)
-	assert.Empty(t, allowedHeaders.header["SomeContext"][0]) // here must be panic
+
+	_, headerExists := allowedHeaders.GetHeader("SomeContext")
+	assert.False(t, headerExists)
 }
 
 func TestSetAllowedHeadersProvider(t *testing.T) {
@@ -56,14 +57,63 @@ func TestSetAllowedHeadersProvider(t *testing.T) {
 
 	allowedHeaders, _ := Of(ctx)
 
-	assert.Equal(t, CUSTOM_HEADER_VALUE, allowedHeaders.header[CUSTOM_HEADER])
+	header, exists := allowedHeaders.GetHeader(CUSTOM_HEADER)
+	assert.True(t, exists)
+	assert.Equal(t, CUSTOM_HEADER_VALUE, header)
 
 	var err error
 	ctx, err = ctxmanager.SetContextObject(ctx, ALLOWED_HEADER_CONTEX_NAME, NewAllowedHeaderContextObject(map[string]string{CUSTOM_HEADER: "new_custom_value"}))
 	assert.Nil(t, err)
 	secondAllowedHeaders, _ := Of(ctx)
-	assert.Equal(t, "new_custom_value", secondAllowedHeaders.header[CUSTOM_HEADER])
+
+	header, exists = secondAllowedHeaders.GetHeader(CUSTOM_HEADER)
+	assert.True(t, exists)
+	assert.Equal(t, "new_custom_value", header)
+
+	_, exists = secondAllowedHeaders.GetHeader(CUSTOM_HEADER_2)
+	assert.False(t, exists)
+}
+
+func TestAllowedHeadersCaseInsensitiveProvider(t *testing.T) {
+	ctx := ctxmanager.InitContext(context.Background(), getIncomingRequestHeaders())
+
+	allowedHeaders, _ := Of(ctx)
+
+	header, exists := allowedHeaders.GetHeader(strings.ToLower(CUSTOM_HEADER))
+	assert.True(t, exists)
+	assert.Equal(t, CUSTOM_HEADER_VALUE, header)
+	// check that header key stayed as-is
+	assert.Equal(t, CUSTOM_HEADER_VALUE, allowedHeaders.header[CUSTOM_HEADER])
+
+	header, exists = allowedHeaders.GetHeader(strings.ToUpper(CUSTOM_HEADER_2))
+	assert.True(t, exists)
+	assert.Equal(t, CUSTOM_HEADER_VALUE_2, header)
+	// check that header key stayed as-is
 	assert.Equal(t, CUSTOM_HEADER_VALUE_2, allowedHeaders.header[CUSTOM_HEADER_2])
+}
+
+func TestAllowedHeadersProviderSerialization(t *testing.T) {
+	ctx := ctxmanager.InitContext(context.Background(), getIncomingRequestHeaders())
+
+	allowedHeaders, err := Of(ctx)
+	assert.NoError(t, err)
+
+	serialized, err := allowedHeaders.Serialize()
+	assert.NoError(t, err)
+	assert.Equal(t, CUSTOM_HEADER_VALUE, serialized[CUSTOM_HEADER])
+	assert.Equal(t, CUSTOM_HEADER_VALUE_2, serialized[CUSTOM_HEADER_2])
+}
+
+func TestAllowedHeadersProviderListHeaderNames(t *testing.T) {
+	ctx := ctxmanager.InitContext(context.Background(), getIncomingRequestHeaders())
+
+	allowedHeaders, err := Of(ctx)
+	assert.NoError(t, err)
+
+	headers := allowedHeaders.GetHeaderNames()
+	assert.Len(t, headers, 2)
+	assert.Contains(t, headers, CUSTOM_HEADER)
+	assert.Contains(t, headers, CUSTOM_HEADER_2)
 }
 
 func TestErrorSetAcceptLanguageProvider(t *testing.T) {
