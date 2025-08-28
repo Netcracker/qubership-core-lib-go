@@ -4,7 +4,7 @@ go 1.23
 
 require (
 	github.com/golang-jwt/jwt v3.2.2+incompatible
-	github.com/knadh/koanf/maps v0.1.1
+	github.com/knadh/koanf/maps v0.1.2
 	github.com/knadh/koanf/parsers/json v0.1.0
 	github.com/knadh/koanf/parsers/yaml v0.1.0
 	github.com/knadh/koanf/providers/env v1.0.0
