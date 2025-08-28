@@ -13,7 +13,7 @@ import (
 
 const serviceAccountDir = "/var/run/secrets/kubernetes.io/serviceaccount"
 
-var logger = logging.GetLogger("oidc.fileTokenSource")
+var logger = logging.GetLogger("tokensource")
 
 type TokenSource interface {
 	Token() (string, error)
