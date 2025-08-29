@@ -13,7 +13,7 @@ import (
 
 const serviceAccountDir = "/var/run/secrets/kubernetes.io/serviceaccount"
 
-var logger = logging.GetLogger("tokensource")
+var logger = logging.GetLogger("token-file-storage")
 
 type TokenSource interface {
 	Token() (string, error)
@@ -21,7 +21,6 @@ type TokenSource interface {
 
 type fileTokenSource struct {
 	mu       sync.RWMutex
-	logger   logging.Logger
 	token    string
 	tokenDir string
 }
@@ -35,7 +34,6 @@ func New(ctx context.Context, tokenDir string) (*fileTokenSource, error) {
 		tokenDir = serviceAccountDir
 	}
 	ts := &fileTokenSource{
-		logger:   logger,
 		tokenDir: tokenDir,
 	}
 	err := ts.refreshToken()
@@ -70,16 +68,16 @@ func (f *fileTokenSource) listenFs(ctx context.Context, events chan fsnotify.Eve
 		case ev := <-events:
 			// we look for event "..data file created". kubernetes updates the token by updating the "..data" symlink token file points to.
 			if path.Base(ev.Name) == "..data" && ev.Op.Has(fsnotify.Create) {
-				f.logger.Infof("volume mounted token updated, refreshing token at dir %s", f.tokenDir)
+				logger.Infof("volume mounted token updated, refreshing token at dir %s", f.tokenDir)
 				err := f.refreshToken()
 				if err != nil {
-					f.logger.Errorf("watching volume token at dir %s: %w", f.tokenDir, err)
+					logger.Errorf("watching volume token at dir %s: %w", f.tokenDir, err)
 				}
 			}
 		case err := <-errs:
-			f.logger.Errorf("error at volume mounted token watcher at path %s: %w", f.tokenDir, err)
+			logger.Errorf("error at volume mounted token watcher at path %s: %w", f.tokenDir, err)
 		case <-ctx.Done():
-			f.logger.Infof("token watcher at %s shutdown", f.tokenDir)
+			logger.Infof("token watcher at %s shutdown", f.tokenDir)
 			return
 		}
 	}
