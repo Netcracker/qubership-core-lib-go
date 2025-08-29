@@ -11,12 +11,41 @@ import (
 	"github.com/netcracker/qubership-core-lib-go/v3/logging"
 )
 
-const serviceAccountDir = "/var/run/secrets/kubernetes.io/serviceaccount"
+const (
+	serviceAccountDir = "/var/run/secrets/kubernetes.io/serviceaccount"
+	secretsDir        = "/var/run/secrets"
+)
 
-var logger = logging.GetLogger("token-file-storage")
+var (
+	logger   = logging.GetLogger("token-file-storage")
+	launched = sync.Map{}
+)
 
 type TokenSource interface {
 	Token() (string, error)
+}
+
+func GetToken(ctx context.Context, audience string) (string, error) {
+	tokenSource, ok := launched.Load(audience)
+	if ok {
+		return tokenSource.(TokenSource).Token()
+	}
+	entries, err := os.ReadDir(secretsDir)
+	if err != nil {
+		return "", fmt.Errorf("failed to get entries of dir %s: %w", secretsDir, err)
+	}
+	for _, entry := range entries {
+		if entry.Name() != audience {
+			continue
+		}
+		ts, err := New(ctx, fmt.Sprintf("%s/%s/token", secretsDir, audience))
+		if err != nil {
+			return "", fmt.Errorf("failed to create a tokensource for token with audience %s: %w", audience, err)
+		}
+		launched.Store(audience, ts)
+		return ts.Token()
+	}
+	return "", fmt.Errorf("token with audience %s not found in %s", audience, secretsDir)
 }
 
 type fileTokenSource struct {
