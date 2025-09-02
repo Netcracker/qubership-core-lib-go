@@ -18,7 +18,8 @@ const (
 
 var (
 	logger   = logging.GetLogger("token-file-storage")
-	launched = sync.Map{}
+	mu       sync.RWMutex
+	launched = make(map[string]TokenSource)
 )
 
 type TokenSource interface {
@@ -26,10 +27,20 @@ type TokenSource interface {
 }
 
 func GetToken(ctx context.Context, audience string) (string, error) {
-	tokenSource, ok := launched.Load(audience)
+	mu.RLock()
+	tokenSource, ok := launched[audience]
+	mu.RUnlock()
 	if ok {
-		return tokenSource.(TokenSource).Token()
+		return tokenSource.Token()
 	}
+
+	mu.Lock()
+	defer mu.Unlock()
+	tokenSource, ok = launched[audience]
+	if ok {
+		return tokenSource.Token()
+	}
+
 	entries, err := os.ReadDir(secretsDir)
 	if err != nil {
 		return "", fmt.Errorf("failed to get entries of dir %s: %w", secretsDir, err)
@@ -38,11 +49,11 @@ func GetToken(ctx context.Context, audience string) (string, error) {
 		if entry.Name() != audience {
 			continue
 		}
-		ts, err := New(ctx, fmt.Sprintf("%s/%s/token", secretsDir, audience))
+		ts, err := newFileTokenSource(ctx, fmt.Sprintf("%s/%s/token", secretsDir, audience))
 		if err != nil {
 			return "", fmt.Errorf("failed to create a tokensource for token with audience %s: %w", audience, err)
 		}
-		launched.Store(audience, ts)
+		launched[audience] = ts
 		return ts.Token()
 	}
 	return "", fmt.Errorf("token with audience %s not found in %s", audience, secretsDir)
@@ -60,8 +71,9 @@ func NewDefault(ctx context.Context) (*fileTokenSource, error) {
 
 func New(ctx context.Context, tokenDir string) (*fileTokenSource, error) {
 	if tokenDir == "" {
-		tokenDir = serviceAccountDir
+		return nil, fmt.Errorf("tokenDir is an empty string, use NewDefault if default service account dir needed or specify tokenDir")
 	}
+
 	ts := &fileTokenSource{
 		tokenDir: tokenDir,
 	}
@@ -83,6 +95,8 @@ func New(ctx context.Context, tokenDir string) (*fileTokenSource, error) {
 
 	return ts, nil
 }
+
+var newFileTokenSource = New
 
 func (f *fileTokenSource) Token() (string, error) {
 	f.mu.RLock()
