@@ -19,12 +19,8 @@ const (
 var (
 	logger   = logging.GetLogger("token-file-storage")
 	mu       sync.RWMutex
-	launched = make(map[string]TokenSource)
+	launched = make(map[string]*fileTokenSource)
 )
-
-type TokenSource interface {
-	Token() (string, error)
-}
 
 func GetToken(ctx context.Context, audience string) (string, error) {
 	mu.RLock()
@@ -61,6 +57,7 @@ func GetToken(ctx context.Context, audience string) (string, error) {
 
 type fileTokenSource struct {
 	mu       sync.RWMutex
+	err      error
 	token    string
 	tokenDir string
 }
@@ -102,7 +99,7 @@ func (f *fileTokenSource) Token() (string, error) {
 	f.mu.RLock()
 	defer f.mu.RUnlock()
 
-	return f.token, nil
+	return f.token, f.err
 }
 
 func (f *fileTokenSource) listenFs(ctx context.Context, events chan fsnotify.Event, errs chan error) {
@@ -114,10 +111,15 @@ func (f *fileTokenSource) listenFs(ctx context.Context, events chan fsnotify.Eve
 				logger.Infof("volume mounted token updated, refreshing token at dir %s", f.tokenDir)
 				err := f.refreshToken()
 				if err != nil {
+					f.setError(err)
 					logger.Errorf("watching volume token at dir %s: %w", f.tokenDir, err)
 				}
+				f.setError(nil)
 			}
 		case err := <-errs:
+			f.mu.Lock()
+			f.err = err
+			f.mu.Unlock()
 			logger.Errorf("error at volume mounted token watcher at path %s: %w", f.tokenDir, err)
 		case <-ctx.Done():
 			logger.Infof("token watcher at %s shutdown", f.tokenDir)
@@ -136,4 +138,10 @@ func (f *fileTokenSource) refreshToken() error {
 	}
 	f.token = string(freshToken)
 	return nil
+}
+
+func (f *fileTokenSource) setError(err error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.err = err
 }
