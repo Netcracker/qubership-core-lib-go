@@ -110,6 +110,10 @@ func (f *fileTokenSource) Token() (string, error) {
 	return f.token, f.err
 }
 
+func (f *fileTokenSource) Close() error {
+	return f.watcher.Close()
+}
+
 func (f *fileTokenSource) listenFs(ctx context.Context, events chan fsnotify.Event, errs chan error) {
 	for {
 		select {
@@ -119,15 +123,14 @@ func (f *fileTokenSource) listenFs(ctx context.Context, events chan fsnotify.Eve
 				logger.Infof("volume mounted token updated, refreshing token at dir %s", f.tokenDir)
 				err := f.refreshToken()
 				if err != nil {
-					msg := "watching volume token at dir %s: %w"
+					msg := "watching volume token at dir %s: %v"
 					f.setError(fmt.Errorf(msg, f.tokenDir, err))
 					logger.Errorf(msg, f.tokenDir, err)
 				}
 				f.setError(nil)
 			}
 		case err := <-errs:
-			f.watcher.Close()
-			msg := "error at volume mounted token watcher at path %s: %w"
+			msg := "error at volume mounted token watcher at path %s: %v"
 			f.setError(fmt.Errorf(msg, f.tokenDir, err))
 			logger.Errorf(msg, f.tokenDir, err)
 		case <-ctx.Done():

@@ -40,6 +40,7 @@ func TestFileTokenSource(t *testing.T) {
 	if err != nil {
 		assert.NoError(t, err)
 	}
+	defer fts.Close()
 	token, err := fts.Token()
 	if err != nil {
 		assert.NoError(t, err)
@@ -71,6 +72,9 @@ func TestFileTokenSource(t *testing.T) {
 }
 
 func TestFileTokenSourceRace(t *testing.T) {
+	ctx, cancelCtx := context.WithTimeout(context.Background(), time.Minute)
+	defer cancelCtx()
+
 	tokenDir := t.TempDir()
 	tokenFilePath := tokenDir + "/token"
 	dataSymlinkPath := tokenDir + "/..data"
@@ -98,10 +102,8 @@ func TestFileTokenSourceRace(t *testing.T) {
 	for range 10 {
 		wg.Add(1)
 		go func() {
-			_, err = getToken(context.Background(), path.Base(tokenDir), path.Dir(tokenDir))
-			if err != nil {
-				panic(err)
-			}
+			_, err = getToken(ctx, path.Base(tokenDir), path.Dir(tokenDir))
+			assert.NoError(t, err)
 			wg.Done()
 		}()
 	}
