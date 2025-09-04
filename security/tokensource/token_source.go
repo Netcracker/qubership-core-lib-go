@@ -130,9 +130,11 @@ func (f *fileTokenSource) listenFs(ctx context.Context, events chan fsnotify.Eve
 				f.setError(nil)
 			}
 		case err := <-errs:
-			msg := "error at volume mounted token watcher at path %s: %v"
-			f.setError(fmt.Errorf(msg, f.tokenDir, err))
-			logger.Errorf(msg, f.tokenDir, err)
+			if err != nil {
+				msg := "error at volume mounted token watcher at path %s: %v"
+				f.setError(fmt.Errorf(msg, f.tokenDir, err))
+				logger.Errorf(msg, f.tokenDir, err)
+			}
 		case <-ctx.Done():
 			f.watcher.Close()
 			logger.Infof("token watcher at %s shutdown", f.tokenDir)
