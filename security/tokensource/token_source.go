@@ -57,6 +57,7 @@ func GetToken(ctx context.Context, audience string) (string, error) {
 
 type fileTokenSource struct {
 	mu       sync.RWMutex
+	watcher  *fsnotify.Watcher
 	err      error
 	token    string
 	tokenDir string
@@ -83,8 +84,11 @@ func New(ctx context.Context, tokenDir string) (*fileTokenSource, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize file watcher: %w", err)
 	}
+	ts.watcher = watcher
+
 	err = watcher.Add(ts.tokenDir + "/")
 	if err != nil {
+		watcher.Close()
 		return nil, fmt.Errorf("failed to add path %s to file watcher: %w", ts.tokenDir, err)
 	}
 
@@ -111,17 +115,19 @@ func (f *fileTokenSource) listenFs(ctx context.Context, events chan fsnotify.Eve
 				logger.Infof("volume mounted token updated, refreshing token at dir %s", f.tokenDir)
 				err := f.refreshToken()
 				if err != nil {
-					f.setError(err)
-					logger.Errorf("watching volume token at dir %s: %w", f.tokenDir, err)
+					msg := "watching volume token at dir %s: %w"
+					f.setError(fmt.Errorf(msg, f.tokenDir, err))
+					logger.Errorf(msg, f.tokenDir, err)
 				}
 				f.setError(nil)
 			}
 		case err := <-errs:
-			f.mu.Lock()
-			f.err = err
-			f.mu.Unlock()
-			logger.Errorf("error at volume mounted token watcher at path %s: %w", f.tokenDir, err)
+			f.watcher.Close()
+			msg := "error at volume mounted token watcher at path %s: %w"
+			f.setError(fmt.Errorf(msg, f.tokenDir, err))
+			logger.Errorf(msg, f.tokenDir, err)
 		case <-ctx.Done():
+			f.watcher.Close()
 			logger.Infof("token watcher at %s shutdown", f.tokenDir)
 			return
 		}

@@ -7,6 +7,8 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestFileTokenSource(t *testing.T) {
@@ -15,58 +17,56 @@ func TestFileTokenSource(t *testing.T) {
 	dataSymlinkPath := tokenDir + "/..data"
 	tokenFile, err := os.CreateTemp(tokenDir, "")
 	if err != nil {
-		t.Fatal(err)
+		assert.NoError(t, err)
 	}
 	defer tokenFile.Close()
 	err = os.Symlink(tokenFile.Name(), dataSymlinkPath)
 	if err != nil {
-		t.Fatal(err)
+		assert.NoError(t, err)
 	}
 	err = os.Symlink(dataSymlinkPath, tokenFilePath)
 	if err != nil {
-		t.Fatal(err)
+		assert.NoError(t, err)
 	}
 
 	firstValidToken := "first_valid_token"
 	_, err = tokenFile.Write([]byte(firstValidToken))
 	if err != nil {
-		t.Fatal(err)
+		assert.NoError(t, err)
 	}
 
 	fts, err := New(context.Background(), tokenDir)
 	if err != nil {
-		t.Fatal(err)
+		assert.NoError(t, err)
 	}
 	token, err := fts.Token()
 	if err != nil {
-		t.Fatal(err)
+		assert.NoError(t, err)
 	}
-	if firstValidToken != token {
-		t.Errorf("expected token %s, got %s", firstValidToken, token)
-	}
+
+	assert.Equal(t, firstValidToken, token)
 
 	secondValidToken := "second_valid_token"
 	_, err = tokenFile.WriteAt([]byte(secondValidToken), 0)
 	if err != nil {
-		t.Fatal(err)
+		assert.NoError(t, err)
 	}
 	err = os.Remove(dataSymlinkPath)
 	if err != nil {
-		t.Fatal(err)
+		assert.NoError(t, err)
 	}
 	err = os.Symlink(tokenFile.Name(), dataSymlinkPath)
 	if err != nil {
-		t.Fatal(err)
+		assert.NoError(t, err)
 	}
 
 	time.Sleep(time.Millisecond * 50)
 	token, err = fts.Token()
 	if err != nil {
-		t.Fatal(err)
+		assert.NoError(t, err)
 	}
-	if secondValidToken != token {
-		t.Errorf("expected token %s, got %s", secondValidToken, token)
-	}
+
+	assert.Equal(t, secondValidToken, token)
 }
 
 func TestFileTokenSourceRace(t *testing.T) {
@@ -75,16 +75,16 @@ func TestFileTokenSourceRace(t *testing.T) {
 	dataSymlinkPath := tokenDir + "/..data"
 	tokenFile, err := os.CreateTemp(tokenDir, "")
 	if err != nil {
-		t.Fatal(err)
+		assert.NoError(t, err)
 	}
 	defer tokenFile.Close()
 	err = os.Symlink(tokenFile.Name(), dataSymlinkPath)
 	if err != nil {
-		t.Fatal(err)
+		assert.NoError(t, err)
 	}
 	err = os.Symlink(dataSymlinkPath, tokenFilePath)
 	if err != nil {
-		t.Fatal(err)
+		assert.NoError(t, err)
 	}
 
 	var newCalledCount atomic.Int32
@@ -106,7 +106,5 @@ func TestFileTokenSourceRace(t *testing.T) {
 	}
 	wg.Wait()
 
-	if count := newCalledCount.Load(); count > 1 {
-		t.Fatalf("expected newFileTokenSource to be called only 1 time, got %d", count)
-	}
+	assert.Less(t, 1, newCalledCount.Load())
 }
