@@ -23,6 +23,10 @@ var (
 )
 
 func GetToken(ctx context.Context, audience string) (string, error) {
+	return getToken(ctx, audience, secretsDir)
+}
+
+func getToken(ctx context.Context, audience string, dir string) (string, error) {
 	mu.RLock()
 	tokenSource, ok := launched[audience]
 	mu.RUnlock()
@@ -37,22 +41,22 @@ func GetToken(ctx context.Context, audience string) (string, error) {
 		return tokenSource.Token()
 	}
 
-	entries, err := os.ReadDir(secretsDir)
+	entries, err := os.ReadDir(dir)
 	if err != nil {
-		return "", fmt.Errorf("failed to get entries of dir %s: %w", secretsDir, err)
+		return "", fmt.Errorf("failed to get entries of dir %s: %w", dir, err)
 	}
 	for _, entry := range entries {
 		if entry.Name() != audience {
 			continue
 		}
-		ts, err := newFileTokenSource(ctx, fmt.Sprintf("%s/%s/token", secretsDir, audience))
+		ts, err := newFileTokenSource(ctx, fmt.Sprintf("%s/%s/token", dir, audience))
 		if err != nil {
 			return "", fmt.Errorf("failed to create a tokensource for token with audience %s: %w", audience, err)
 		}
 		launched[audience] = ts
 		return ts.Token()
 	}
-	return "", fmt.Errorf("token with audience %s not found in %s", audience, secretsDir)
+	return "", fmt.Errorf("token with audience %s not found in %s", audience, dir)
 }
 
 type fileTokenSource struct {

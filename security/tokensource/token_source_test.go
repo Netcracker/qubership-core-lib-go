@@ -3,6 +3,7 @@ package tokensource
 import (
 	"context"
 	"os"
+	"path"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -97,7 +98,7 @@ func TestFileTokenSourceRace(t *testing.T) {
 	for range 10 {
 		wg.Add(1)
 		go func() {
-			_, err = New(context.Background(), tokenDir)
+			_, err = getToken(context.Background(), path.Base(tokenDir), path.Dir(tokenDir))
 			if err != nil {
 				panic(err)
 			}
@@ -106,5 +107,5 @@ func TestFileTokenSourceRace(t *testing.T) {
 	}
 	wg.Wait()
 
-	assert.LessOrEqual(t, newCalledCount.Load(), int32(1))
+	assert.Equal(t, int32(1), newCalledCount.Load())
 }
