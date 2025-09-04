@@ -106,5 +106,5 @@ func TestFileTokenSourceRace(t *testing.T) {
 	}
 	wg.Wait()
 
-	assert.Less(t, 1, newCalledCount.Load())
+	assert.LessOrEqual(t, newCalledCount.Load(), int32(1))
 }
