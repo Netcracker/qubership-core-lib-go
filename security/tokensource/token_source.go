@@ -23,6 +23,9 @@ var (
 )
 
 func GetToken(ctx context.Context, audience string) (string, error) {
+	if audience == "" {
+		return "", fmt.Errorf("GetToken: empty audience")
+	}
 	return getToken(ctx, audience, secretsDir)
 }
 
@@ -127,6 +130,7 @@ func (f *fileTokenSource) listenFs(ctx context.Context, events <-chan fsnotify.E
 					msg := "watching volume token at dir %s: %v"
 					f.setError(fmt.Errorf(msg, f.tokenDir, err))
 					logger.Errorf(msg, f.tokenDir, err)
+					break
 				}
 				f.setError(nil)
 			}

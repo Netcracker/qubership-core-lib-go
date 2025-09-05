@@ -55,6 +55,13 @@ func TestFileTokenSource(t *testing.T) {
 	assert.Equal(t, secondValidToken, token)
 }
 
+func TestGetToken(t *testing.T) {
+	ctx, cancelCtx := context.WithCancel(context.Background())
+	defer cancelCtx()
+	_, err := GetToken(ctx, "")
+	assert.Error(t, err)
+}
+
 func TestFileTokenSourceRace(t *testing.T) {
 	ctx, cancelCtx := context.WithTimeout(context.Background(), time.Minute)
 	defer cancelCtx()
@@ -124,15 +131,36 @@ func TestErrChannel(t *testing.T) {
 	freshToken := "valid_token"
 	_, err = tokenFile.Write([]byte(freshToken))
 	assert.NoError(t, err)
-	err = os.Remove(dataSymlinkPath)
-	assert.NoError(t, err)
-	err = os.Symlink(tokenFile.Name(), dataSymlinkPath)
+	err = refreshDataSymlink(tokenFile.Name(), dataSymlinkPath)
 	assert.NoError(t, err)
 
 	time.Sleep(time.Millisecond * 50)
 
 	token, err := fts.Token()
 	assert.NoError(t, err)
-
 	assert.Equal(t, freshToken, token)
+
+	fts.setError(nil)
+
+	err = os.Remove(tokenFilePath)
+	assert.NoError(t, err)
+
+	err = refreshDataSymlink(tokenFile.Name(), dataSymlinkPath)
+	assert.NoError(t, err)
+
+	time.Sleep(time.Millisecond * 50)
+
+	assert.Error(t, fts.err)
+}
+
+func refreshDataSymlink(tokenFile, dataSymlinkPath string) error {
+	err := os.Remove(dataSymlinkPath)
+	if err != nil {
+		return err
+	}
+	err = os.Symlink(tokenFile, dataSymlinkPath)
+	if err != nil {
+		return err
+	}
+	return nil
 }
