@@ -65,6 +65,7 @@ type fileTokenSource struct {
 	err      error
 	token    string
 	tokenDir string
+	cancel   context.CancelFunc
 }
 
 func NewDefault(ctx context.Context) (*fileTokenSource, error) {
@@ -84,19 +85,19 @@ func New(ctx context.Context, tokenDir string) (*fileTokenSource, error) {
 		return nil, err
 	}
 
-	watcher, err := fsnotify.NewWatcher()
+	ts.watcher, err = fsnotify.NewWatcher()
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize file watcher: %w", err)
 	}
-	ts.watcher = watcher
 
-	err = watcher.Add(ts.tokenDir + "/")
+	err = ts.watcher.Add(ts.tokenDir + "/")
 	if err != nil {
-		watcher.Close()
+		ts.watcher.Close()
 		return nil, fmt.Errorf("failed to add path %s to file watcher: %w", ts.tokenDir, err)
 	}
 
-	go ts.listenFs(ctx, watcher.Events, watcher.Errors)
+	ctx, ts.cancel = context.WithCancel(ctx)
+	go ts.listenFs(ctx, ts.watcher.Events, ts.watcher.Errors)
 
 	return ts, nil
 }
@@ -110,11 +111,11 @@ func (f *fileTokenSource) Token() (string, error) {
 	return f.token, f.err
 }
 
-func (f *fileTokenSource) Close() error {
-	return f.watcher.Close()
+func (f *fileTokenSource) Close() {
+	f.cancel()
 }
 
-func (f *fileTokenSource) listenFs(ctx context.Context, events chan fsnotify.Event, errs chan error) {
+func (f *fileTokenSource) listenFs(ctx context.Context, events <-chan fsnotify.Event, errs <-chan error) {
 	for {
 		select {
 		case ev := <-events:
