@@ -5,11 +5,11 @@ import (
 	"errors"
 	"os"
 	"path"
-	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
 
+	"github.com/netcracker/qubership-core-lib-go/v3/utils"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -63,7 +63,7 @@ func TestGetToken(t *testing.T) {
 }
 
 func TestFileTokenSourceRace(t *testing.T) {
-	ctx, cancelCtx := context.WithTimeout(context.Background(), time.Minute)
+	ctx, cancelCtx := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancelCtx()
 
 	tokenDir := t.TempDir()
@@ -77,8 +77,9 @@ func TestFileTokenSourceRace(t *testing.T) {
 		newCalledCount.Add(1)
 		return &fileTokenSource{}, nil
 	}
+	defer func() { newFileTokenSource = New }()
 
-	var wg sync.WaitGroup
+	var wg utils.WaitGroup
 	for range 10 {
 		wg.Add(1)
 		go func() {
@@ -88,22 +89,8 @@ func TestFileTokenSourceRace(t *testing.T) {
 		}()
 	}
 
-	select {
-	case <-wait(wg.Wait):
-	case <-ctx.Done():
-		t.Fatal("context timed out waiting for parallel getToken() calls")
-	}
-
+	assert.NoError(t, wg.Wait(ctx))
 	assert.Equal(t, int32(1), newCalledCount.Load())
-}
-
-func wait(f func()) chan struct{} {
-	ch := make(chan struct{})
-	go func() {
-		f()
-		ch <- struct{}{}
-	}()
-	return ch
 }
 
 func TestErrChannel(t *testing.T) {
@@ -151,6 +138,19 @@ func TestErrChannel(t *testing.T) {
 	time.Sleep(time.Millisecond * 50)
 
 	assert.Error(t, fts.err)
+}
+
+func TestWrongDirectoryStructure(t *testing.T) {
+	ctx, cancelCtx := context.WithTimeout(context.Background(), time.Minute)
+	defer cancelCtx()
+
+	tokenDir := t.TempDir()
+	tokenFilePath := tokenDir + "/test-audience"
+	testFile, err := os.Create(tokenFilePath)
+	defer testFile.Close()
+	assert.NoError(t, err)
+	_, err = getToken(ctx, "test-audience", tokenDir)
+	assert.Error(t, err)
 }
 
 func refreshDataSymlink(tokenFile, dataSymlinkPath string) error {
