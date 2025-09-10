@@ -3,7 +3,7 @@ module github.com/netcracker/qubership-core-lib-go/v3
 go 1.23
 
 require (
-	github.com/fsnotify/fsnotify v1.7.0
+	github.com/fsnotify/fsnotify v1.9.0
 	github.com/golang-jwt/jwt v3.2.2+incompatible
 	github.com/knadh/koanf/maps v0.1.2
 	github.com/knadh/koanf/parsers/json v0.1.0
