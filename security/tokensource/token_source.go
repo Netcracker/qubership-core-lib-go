@@ -13,7 +13,7 @@ import (
 
 const (
 	serviceAccountDir = "/var/run/secrets/kubernetes.io/serviceaccount"
-	secretsDir        = "/var/run/secrets"
+	secretsDir        = "/var/run/secrets/tokens"
 )
 
 var (
