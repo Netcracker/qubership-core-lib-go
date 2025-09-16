@@ -2,7 +2,7 @@ package security
 
 import (
 	"context"
-	"github.com/golang-jwt/jwt"
+	"github.com/golang-jwt/jwt/v5"
 
 	"github.com/netcracker/qubership-core-lib-go/v3/logging"
 )
@@ -11,7 +11,7 @@ var logger logging.Logger
 
 type TokenProvider interface {
 	GetToken(ctx context.Context) (string, error)
-	ValidateToken(ctx context.Context, token string) (*jwt.Token, error) 
+	ValidateToken(ctx context.Context, token string) (*jwt.Token, error)
 	GetClaimValue(token *jwt.Token, key string) (interface{}, error)
 	GetTokenAttribute(ctx context.Context, claim string) (string, error)
 }
@@ -37,7 +37,7 @@ func (s *DummyToken) GetClaimValue(token *jwt.Token, key string) (interface{}, e
 	return nil, nil
 }
 
-func (s *DummyToken) ValidateToken(ctx context.Context, token string) (*jwt.Token, error)  {
+func (s *DummyToken) ValidateToken(ctx context.Context, token string) (*jwt.Token, error) {
 	logger.Info("DummyToken parsed unverified")
 	parser := jwt.Parser{}
 	parsedToken, _, _ := parser.ParseUnverified(token, jwt.MapClaims{})
