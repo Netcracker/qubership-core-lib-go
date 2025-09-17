@@ -7,7 +7,7 @@ on:
 
 jobs:
   build:
-    uses: netcracker/qubership-core-infra/.github/workflows/go-build-with-sonar.yaml@v1.0.7
+    uses: netcracker/qubership-core-infra/.github/workflows/go-build-with-sonar.yaml@v1.0.9
     with:
       actor: ${{ github.actor }}
       sonar-project-key: ${{ vars.SONAR_PROJECT_KEY }}
