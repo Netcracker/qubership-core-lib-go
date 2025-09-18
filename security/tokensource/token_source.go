@@ -22,6 +22,12 @@ var (
 	launched = make(map[string]*fileTokenSource)
 )
 
+type TokenSource interface {
+	Token() (string, error)
+}
+
+var _ TokenSource = &fileTokenSource{}
+
 func GetToken(ctx context.Context, audience string) (string, error) {
 	if audience == "" {
 		return "", fmt.Errorf("GetToken: empty audience")
@@ -69,10 +75,6 @@ type fileTokenSource struct {
 	token    string
 	tokenDir string
 	cancel   context.CancelFunc
-}
-
-func NewDefault(ctx context.Context) (*fileTokenSource, error) {
-	return New(ctx, serviceAccountDir)
 }
 
 func New(ctx context.Context, tokenDir string) (*fileTokenSource, error) {
