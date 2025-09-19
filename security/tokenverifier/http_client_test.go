@@ -39,7 +39,7 @@ func TestNewHttpClient(t *testing.T) {
 	}
 	transport.base = mockTransport
 
-	_, err =client.Get("/test")
+	_, err = client.Get("/test")
 	if err != nil {
 		t.Fatalf("expected nil err, got err: %v", err)
 	}

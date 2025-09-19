@@ -40,7 +40,7 @@ type verifier struct {
 	oidcVerifier *oidc.IDTokenVerifier
 }
 
-func NewDefault(ctx context.Context, audience string) (Verifier, error) {
+func NewDefault(ctx context.Context, audience string) (*verifier, error) {
 	fts, err := tokensource.New(ctx, oidcTokenDir)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize a file token source for oidcVerifier: %w", err)
@@ -48,7 +48,7 @@ func NewDefault(ctx context.Context, audience string) (Verifier, error) {
 	return New(ctx, audience, fts)
 }
 
-func New(ctx context.Context, audience string, tokenSource tokensource.TokenSource) (Verifier, error) {
+func New(ctx context.Context, audience string, tokenSource tokensource.TokenSource) (*verifier, error) {
 	c, err := newSecureHttpClient(tokenSource)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create secure http client: %w", err)
@@ -75,7 +75,7 @@ func (vf *verifier) Verify(ctx context.Context, rawToken string) (*Claims, error
 	if err != nil {
 		return nil, fmt.Errorf("failed to verify token: %w", err)
 	}
-	var claims Claims
+	claims := Claims{}
 	err = token.Claims(&claims)
 	if err != nil {
 		return nil, fmt.Errorf("required claims not present: %w", err)
@@ -92,7 +92,7 @@ func getIssuer(ts tokensource.TokenSource) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("invalid jwt: %w", err)
 	}
-	var claims Claims
+	claims := Claims{}
 	err = token.UnsafeClaimsWithoutVerification(&claims)
 	if err != nil {
 		return "", fmt.Errorf("invalid jwt: %w", err)
