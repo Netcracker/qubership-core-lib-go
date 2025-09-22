@@ -29,7 +29,10 @@ func (m *mockRoundTripper) RoundTrip(r *http.Request) (*http.Response, error) {
 
 func TestNewHttpClient(t *testing.T) {
 	validToken := "valid_token"
-	client, err := newSecureHttpClient(mockTokenSource{token: validToken})
+	mockTs := mockTokenSource{token: validToken}
+	client, err := newSecureHttpClient(func() (string, error) {
+		return mockTs.Token()
+	})
 	if err != nil {
 		t.Fatalf("expected secure http client created succesfully, got err: %v", err)
 	}

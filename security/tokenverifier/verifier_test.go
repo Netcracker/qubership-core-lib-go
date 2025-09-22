@@ -1,4 +1,4 @@
-package tokenverifier_test
+package tokenverifier
 
 import (
 	"context"
@@ -9,16 +9,15 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
-	"path"
+	"path/filepath"
 	"testing"
 	"time"
 
 	openid "github.com/coreos/go-oidc/v3/oidc"
 	"github.com/go-jose/go-jose/v4"
 	"github.com/go-jose/go-jose/v4/jwt"
-	"github.com/netcracker/qubership-core-lib-go/v3/logging"
+	"github.com/netcracker/qubership-core-lib-go/v3/configloader"
 	"github.com/netcracker/qubership-core-lib-go/v3/security/tokensource"
-	tv "github.com/netcracker/qubership-core-lib-go/v3/security/tokenverifier"
 )
 
 const (
@@ -29,16 +28,14 @@ const (
 	uuid      = "test-uuid"
 )
 
-var logger = logging.GetLogger("server")
-
 var tests = []struct {
 	name   string
-	claims tv.Claims
+	claims Claims
 	ok     bool
 }{
 	{
 		name: "valid token",
-		claims: tv.Claims{
+		claims: Claims{
 			Claims: jwt.Claims{
 				Subject:   sub,
 				Audience:  jwt.Audience{aud},
@@ -46,9 +43,9 @@ var tests = []struct {
 				NotBefore: jwt.NewNumericDate(time.Now()),
 				IssuedAt:  jwt.NewNumericDate(time.Now()),
 			},
-			Kubernetes: tv.K8sClaims{
+			Kubernetes: K8sClaims{
 				Namespace: namespace,
-				ServiceAccount: tv.ServiceAccount{
+				ServiceAccount: ServiceAccount{
 					Name: sa,
 					Uid:  uuid,
 				},
@@ -58,7 +55,7 @@ var tests = []struct {
 	},
 	{
 		name: "expired token",
-		claims: tv.Claims{
+		claims: Claims{
 			Claims: jwt.Claims{
 				Subject:   sub,
 				Audience:  jwt.Audience{aud},
@@ -66,9 +63,9 @@ var tests = []struct {
 				NotBefore: jwt.NewNumericDate(time.Now()),
 				IssuedAt:  jwt.NewNumericDate(time.Now()),
 			},
-			Kubernetes: tv.K8sClaims{
+			Kubernetes: K8sClaims{
 				Namespace: namespace,
-				ServiceAccount: tv.ServiceAccount{
+				ServiceAccount: ServiceAccount{
 					Name: sa,
 					Uid:  uuid,
 				},
@@ -78,7 +75,7 @@ var tests = []struct {
 	},
 	{
 		name: "wrong audience",
-		claims: tv.Claims{
+		claims: Claims{
 			Claims: jwt.Claims{
 				Subject:   sub,
 				Audience:  jwt.Audience{"some-other-aud"},
@@ -86,9 +83,9 @@ var tests = []struct {
 				NotBefore: jwt.NewNumericDate(time.Now()),
 				IssuedAt:  jwt.NewNumericDate(time.Now()),
 			},
-			Kubernetes: tv.K8sClaims{
+			Kubernetes: K8sClaims{
 				Namespace: namespace,
-				ServiceAccount: tv.ServiceAccount{
+				ServiceAccount: ServiceAccount{
 					Name: sa,
 					Uid:  uuid,
 				},
@@ -98,7 +95,7 @@ var tests = []struct {
 	},
 	{
 		name: "wrong issuer",
-		claims: tv.Claims{
+		claims: Claims{
 			Claims: jwt.Claims{
 				Subject:   sub,
 				Issuer:    "https://accounts.google.com",
@@ -107,9 +104,9 @@ var tests = []struct {
 				NotBefore: jwt.NewNumericDate(time.Now()),
 				IssuedAt:  jwt.NewNumericDate(time.Now()),
 			},
-			Kubernetes: tv.K8sClaims{
+			Kubernetes: K8sClaims{
 				Namespace: namespace,
-				ServiceAccount: tv.ServiceAccount{
+				ServiceAccount: ServiceAccount{
 					Name: sa,
 					Uid:  uuid,
 				},
@@ -139,7 +136,7 @@ func TestVerifier(t *testing.T) {
 	}
 	defer server.Close()
 
-	clientToken, err := generateJwt(signer, tv.Claims{
+	clientToken, err := generateJwt(signer, Claims{
 		Claims: jwt.Claims{
 			Issuer:    server.URL,
 			Subject:   "system:serviceaccount:default:default",
@@ -148,9 +145,9 @@ func TestVerifier(t *testing.T) {
 			NotBefore: jwt.NewNumericDate(time.Now()),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
 		},
-		Kubernetes: tv.K8sClaims{
+		Kubernetes: K8sClaims{
 			Namespace: "default",
-			ServiceAccount: tv.ServiceAccount{
+			ServiceAccount: ServiceAccount{
 				Name: "default",
 				Uid:  "12345678-1234-1234-1234-1234567890ab",
 			},
@@ -163,7 +160,7 @@ func TestVerifier(t *testing.T) {
 
 	ctx := openid.ClientContext(context.Background(), server.Client())
 
-	tokenFile, err := os.Create(t.TempDir() + "/token")
+	tokenFile, err := os.Create(filepath.Join(t.TempDir(), "token"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -172,12 +169,20 @@ func TestVerifier(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	fts, err := tokensource.New(ctx, path.Dir(tokenFile.Name()))
+
+	tokenDir := filepath.Dir(tokenFile.Name())
+	testAudience := filepath.Base(tokenDir)
+	testTokenDir := filepath.Dir(tokenDir)
+
+	err = os.Setenv(tokensource.TokenDirPropertyEnv, testTokenDir)
 	if err != nil {
 		t.Fatal(err)
 	}
+	configloader.Init(configloader.EnvPropertySource())
 
-	v, err := tv.New(ctx, aud, fts)
+	v, err := New(ctx, aud, func() (string, error) {
+		return tokensource.GetToken(ctx, testAudience)
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -199,7 +204,7 @@ func TestVerifier(t *testing.T) {
 	}
 }
 
-func generateJwt(signer jose.Signer, claims tv.Claims) (string, error) {
+func generateJwt(signer jose.Signer, claims Claims) (string, error) {
 	return jwt.Signed(signer).Claims(claims).Serialize()
 }
 

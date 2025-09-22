@@ -5,39 +5,37 @@ import (
 	"fmt"
 	"os"
 	"path"
+	"path/filepath"
 	"sync"
 
 	"github.com/fsnotify/fsnotify"
+	"github.com/netcracker/qubership-core-lib-go/v3/configloader"
 	"github.com/netcracker/qubership-core-lib-go/v3/logging"
 )
 
 const (
-	serviceAccountDir = "/var/run/secrets/kubernetes.io/serviceaccount"
-	secretsDir        = "/var/run/secrets/tokens"
+	defaultTokenDir     = "/var/run/secrets/tokens"
+	TokenDirProperty    = "kubernetes.tokens.dir"
+	TokenDirPropertyEnv = "KUBERNETES_TOKENS_DIR"
 )
 
 var (
-	logger   = logging.GetLogger("token-file-storage")
-	mu       sync.RWMutex
-	launched = make(map[string]*fileTokenSource)
+	logger       = logging.GetLogger("token-file-storage")
+	mu           sync.RWMutex
+	tokenSources = make(map[string]*fileTokenSource)
 )
-
-type TokenSource interface {
-	Token() (string, error)
-}
-
-var _ TokenSource = &fileTokenSource{}
 
 func GetToken(ctx context.Context, audience string) (string, error) {
 	if audience == "" {
 		return "", fmt.Errorf("GetToken: empty audience")
 	}
-	return getToken(ctx, audience, secretsDir)
+	tokenDir := configloader.GetOrDefaultString(TokenDirProperty, defaultTokenDir)
+	return getToken(ctx, audience, tokenDir)
 }
 
 func getToken(ctx context.Context, audience string, dir string) (string, error) {
 	mu.RLock()
-	tokenSource, ok := launched[audience]
+	tokenSource, ok := tokenSources[audience]
 	mu.RUnlock()
 	if ok {
 		return tokenSource.Token()
@@ -45,7 +43,7 @@ func getToken(ctx context.Context, audience string, dir string) (string, error) 
 
 	mu.Lock()
 	defer mu.Unlock()
-	tokenSource, ok = launched[audience]
+	tokenSource, ok = tokenSources[audience]
 	if ok {
 		return tokenSource.Token()
 	}
@@ -58,11 +56,11 @@ func getToken(ctx context.Context, audience string, dir string) (string, error) 
 		if entry.Name() != audience {
 			continue
 		}
-		ts, err := newFileTokenSource(ctx, fmt.Sprintf("%s/%s/token", dir, audience))
+		ts, err := newFileTokenSource(ctx, fmt.Sprintf("%s/%s", dir, audience))
 		if err != nil {
 			return "", fmt.Errorf("failed to create a tokensource for token with audience %s: %w", audience, err)
 		}
-		launched[audience] = ts
+		tokenSources[audience] = ts
 		return ts.Token()
 	}
 	return "", fmt.Errorf("token with audience %s not found in %s", audience, dir)
@@ -77,7 +75,7 @@ type fileTokenSource struct {
 	cancel   context.CancelFunc
 }
 
-func New(ctx context.Context, tokenDir string) (*fileTokenSource, error) {
+func newFileTokenSource(ctx context.Context, tokenDir string) (*fileTokenSource, error) {
 	if tokenDir == "" {
 		return nil, fmt.Errorf("tokenDir is an empty string, use NewDefault if default service account dir needed or specify tokenDir")
 	}
@@ -106,8 +104,6 @@ func New(ctx context.Context, tokenDir string) (*fileTokenSource, error) {
 
 	return ts, nil
 }
-
-var newFileTokenSource = New
 
 func (f *fileTokenSource) Token() (string, error) {
 	f.mu.RLock()
@@ -154,9 +150,10 @@ func (f *fileTokenSource) refreshToken() error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 
-	freshToken, err := os.ReadFile(f.tokenDir + "/token")
+	tokenFilePath := filepath.Join(f.tokenDir, "/token")
+	freshToken, err := os.ReadFile(tokenFilePath)
 	if err != nil {
-		return fmt.Errorf("failed to refresh token at path %s: %w", f.tokenDir+"/token", err)
+		return fmt.Errorf("failed to refresh token at path %s: %w", tokenFilePath, err)
 	}
 	f.token = string(freshToken)
 	return nil

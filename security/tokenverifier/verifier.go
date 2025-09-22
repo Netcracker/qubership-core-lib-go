@@ -12,7 +12,7 @@ import (
 )
 
 const (
-	oidcTokenDir = "/var/run/secrets/oidc-token"
+	oidcTokenAud = "oidc-token"
 )
 
 var logger = logging.GetLogger("oidc")
@@ -40,22 +40,26 @@ type verifier struct {
 	oidcVerifier *oidc.IDTokenVerifier
 }
 
+type getTokenFunc func() (string, error)
+
 func NewDefault(ctx context.Context, audience string) (*verifier, error) {
-	fts, err := tokensource.New(ctx, oidcTokenDir)
-	if err != nil {
-		return nil, fmt.Errorf("failed to initialize a file token source for oidcVerifier: %w", err)
-	}
-	return New(ctx, audience, fts)
+	return New(ctx, audience, func() (string, error) {
+		return tokensource.GetToken(ctx, oidcTokenAud)
+	})
 }
 
-func New(ctx context.Context, audience string, tokenSource tokensource.TokenSource) (*verifier, error) {
-	c, err := newSecureHttpClient(tokenSource)
+func New(ctx context.Context, audience string, getToken getTokenFunc) (*verifier, error) {
+	c, err := newSecureHttpClient(getToken)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create secure http client: %w", err)
 	}
 	ctx = oidc.ClientContext(ctx, c)
 
-	issuer, err := getIssuer(tokenSource)
+	rawToken, err := getToken()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get oidc token: %w", err)
+	}
+	issuer, err := getIssuer(rawToken)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get issuer from the jwt token: %w", err)
 	}
@@ -83,11 +87,7 @@ func (vf *verifier) Verify(ctx context.Context, rawToken string) (*Claims, error
 	return &claims, nil
 }
 
-func getIssuer(ts tokensource.TokenSource) (string, error) {
-	rawToken, err := ts.Token()
-	if err != nil {
-		return "", fmt.Errorf("failed to get oidc token: %w", err)
-	}
+func getIssuer(rawToken string) (string, error) {
 	token, err := jwt.ParseSigned(rawToken, []jose.SignatureAlgorithm{jose.RS256, "none"})
 	if err != nil {
 		return "", fmt.Errorf("invalid jwt: %w", err)
