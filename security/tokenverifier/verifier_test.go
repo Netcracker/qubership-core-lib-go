@@ -18,6 +18,8 @@ import (
 	"github.com/go-jose/go-jose/v4/jwt"
 	"github.com/netcracker/qubership-core-lib-go/v3/configloader"
 	"github.com/netcracker/qubership-core-lib-go/v3/security/tokensource"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 const (
@@ -118,22 +120,16 @@ var tests = []struct {
 
 func TestVerifier(t *testing.T) {
 	key, err := rsa.GenerateKey(rand.Reader, 2048)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	signer, err := jose.NewSigner(jose.SigningKey{
 		Algorithm: jose.RS256,
 		Key:       key,
 	}, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
 	var tvClientToken string
 	server, err := setupServer(key.Public(), &tvClientToken)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	defer server.Close()
 
 	clientToken, err := generateJwt(signer, Claims{
@@ -153,53 +149,44 @@ func TestVerifier(t *testing.T) {
 			},
 		},
 	})
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	tvClientToken = clientToken
 
 	ctx := openid.ClientContext(context.Background(), server.Client())
 
 	tokenFile, err := os.Create(filepath.Join(t.TempDir(), "token"))
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	defer tokenFile.Close()
 	_, err = tokenFile.Write([]byte(tvClientToken))
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
 	tokenDir := filepath.Dir(tokenFile.Name())
 	testAudience := filepath.Base(tokenDir)
 	testTokenDir := filepath.Dir(tokenDir)
 
 	err = os.Setenv(tokensource.TokenDirPropertyEnv, testTokenDir)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	configloader.Init(configloader.EnvPropertySource())
 
 	v, err := New(ctx, aud, func() (string, error) {
 		return tokensource.GetToken(ctx, testAudience)
 	})
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
 	for _, test := range tests {
 		if test.claims.Issuer == "" {
 			test.claims.Issuer = server.URL
 		}
 		rawToken, err := generateJwt(signer, test.claims)
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
 		claims, err := v.Verify(context.Background(), rawToken)
-		if (err == nil) != test.ok {
-			t.Errorf("test %q: expected valid token: %t, got %t: err: %v: claims: %+v", test.name, test.ok, err == nil, err, test.claims)
-		} else if err == nil && test.claims.Kubernetes != claims.Kubernetes {
-			t.Errorf("test %q: expected claims: %+v, got %+v", test.name, test.name, *claims)
+		if test.ok {
+			assert.NoError(t, err, "test %q: expected no error, got: %v", test.name, err)
+			if assert.NotNil(t, claims, "test %q: expected claims, got nil", test.name) {
+				assert.Equal(t, test.claims.Kubernetes, claims.Kubernetes, "test %q: unexpected Kubernetes claim", test.name)
+			}
+		} else {
+			assert.Error(t, err, "test %q: expected error, got none", test.name)
 		}
 	}
 }

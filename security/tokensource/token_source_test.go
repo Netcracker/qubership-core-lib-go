@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestFileTokenSource(t *testing.T) {
@@ -18,36 +19,36 @@ func TestFileTokenSource(t *testing.T) {
 	tokenFilePath := tokenDir + "/token"
 	dataSymlinkPath := tokenDir + "/..data"
 	tokenFile, err := os.CreateTemp(tokenDir, "")
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer tokenFile.Close()
 	err = os.Symlink(tokenFile.Name(), dataSymlinkPath)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	err = os.Symlink(dataSymlinkPath, tokenFilePath)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	firstValidToken := "first_valid_token"
 	_, err = tokenFile.Write([]byte(firstValidToken))
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	fts, err := newFileTokenSource(ctx, tokenDir)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer fts.Close()
 	token, err := fts.Token()
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	assert.Equal(t, firstValidToken, token)
 
 	secondValidToken := "second_valid_token"
 	_, err = tokenFile.WriteAt([]byte(secondValidToken), 0)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	err = os.Remove(dataSymlinkPath)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	err = os.Symlink(tokenFile.Name(), dataSymlinkPath)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	time.Sleep(time.Millisecond * 50)
 	token, err = fts.Token()
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	assert.Equal(t, secondValidToken, token)
 }
@@ -66,7 +67,7 @@ func TestGetToken(t *testing.T) {
 // 	tokenDir := t.TempDir()
 // 	tokenFilePath := tokenDir + "/token"
 // 	tokenFile, err := os.Create(tokenFilePath)
-// 	assert.NoError(t, err)
+// 	require.NoError(t, err)
 // 	defer tokenFile.Close()
 //
 // 	var newCalledCount atomic.Int32
@@ -81,12 +82,12 @@ func TestGetToken(t *testing.T) {
 // 		wg.Add(1)
 // 		go func() {
 // 			_, err = getToken(ctx, path.Base(tokenDir), path.Dir(tokenDir))
-// 			assert.NoError(t, err)
+// 			require.NoError(t, err)
 // 			wg.Done()
 // 		}()
 // 	}
 //
-// 	assert.NoError(t, wg.Wait(ctx))
+// 	require.NoError(t, wg.Wait(ctx))
 // 	assert.Equal(t, int32(1), newCalledCount.Load())
 // }
 
@@ -98,15 +99,15 @@ func TestErrChannel(t *testing.T) {
 	tokenFilePath := tokenDir + "/token"
 	dataSymlinkPath := tokenDir + "/..data"
 	tokenFile, err := os.CreateTemp(tokenDir, "")
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer tokenFile.Close()
 	err = os.Symlink(tokenFile.Name(), dataSymlinkPath)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	err = os.Symlink(dataSymlinkPath, tokenFilePath)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	fts, err := newFileTokenSource(ctx, tokenDir)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer fts.Close()
 
 	fts.watcher.Errors <- errors.New("mock error to see if the watcher doesn't stop after an error")
@@ -114,23 +115,23 @@ func TestErrChannel(t *testing.T) {
 
 	freshToken := "valid_token"
 	_, err = tokenFile.Write([]byte(freshToken))
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	err = refreshDataSymlink(tokenFile.Name(), dataSymlinkPath)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	time.Sleep(time.Millisecond * 50)
 
 	token, err := fts.Token()
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, freshToken, token)
 
 	fts.setError(nil)
 
 	err = os.Remove(tokenFilePath)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	err = refreshDataSymlink(tokenFile.Name(), dataSymlinkPath)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	time.Sleep(time.Millisecond * 50)
 
@@ -144,7 +145,7 @@ func TestWrongDirectoryStructure(t *testing.T) {
 	tokenDir := t.TempDir()
 	tokenFilePath := tokenDir + "/test-audience"
 	testFile, err := os.Create(tokenFilePath)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer testFile.Close()
 	_, err = getToken(ctx, "test-audience", tokenDir)
 	assert.Error(t, err)
