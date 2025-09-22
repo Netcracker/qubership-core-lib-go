@@ -48,22 +48,12 @@ func getToken(ctx context.Context, audience string, dir string) (string, error) 
 		return tokenSource.Token()
 	}
 
-	entries, err := os.ReadDir(dir)
+	tokenSource, err := newFileTokenSource(ctx, filepath.Join(dir, audience))
 	if err != nil {
-		return "", fmt.Errorf("failed to get entries of dir %s: %w", dir, err)
+		return "", fmt.Errorf("failed to create a tokensource for token with audience %s: %w", audience, err)
 	}
-	for _, entry := range entries {
-		if entry.Name() != audience {
-			continue
-		}
-		ts, err := newFileTokenSource(ctx, fmt.Sprintf("%s/%s", dir, audience))
-		if err != nil {
-			return "", fmt.Errorf("failed to create a tokensource for token with audience %s: %w", audience, err)
-		}
-		tokenSources[audience] = ts
-		return ts.Token()
-	}
-	return "", fmt.Errorf("token with audience %s not found in %s", audience, dir)
+	tokenSources[audience] = tokenSource
+	return tokenSource.Token()
 }
 
 type fileTokenSource struct {
@@ -93,7 +83,7 @@ func newFileTokenSource(ctx context.Context, tokenDir string) (*fileTokenSource,
 		return nil, fmt.Errorf("failed to initialize file watcher: %w", err)
 	}
 
-	err = ts.watcher.Add(ts.tokenDir + "/")
+	err = ts.watcher.Add(ts.tokenDir)
 	if err != nil {
 		ts.watcher.Close()
 		return nil, fmt.Errorf("failed to add path %s to file watcher: %w", ts.tokenDir, err)
