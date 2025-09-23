@@ -4,9 +4,11 @@ import (
 	"context"
 	"errors"
 	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
+	"github.com/netcracker/qubership-core-lib-go/v3/utils"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -60,36 +62,29 @@ func TestGetToken(t *testing.T) {
 	assert.Error(t, err)
 }
 
-// func TestFileTokenSourceRace(t *testing.T) {
-// 	ctx, cancelCtx := context.WithTimeout(context.Background(), 2*time.Second)
-// 	defer cancelCtx()
-//
-// 	tokenDir := t.TempDir()
-// 	tokenFilePath := tokenDir + "/token"
-// 	tokenFile, err := os.Create(tokenFilePath)
-// 	require.NoError(t, err)
-// 	defer tokenFile.Close()
-//
-// 	var newCalledCount atomic.Int32
-// 	newFileTokenSource = func(ctx context.Context, tokenDir string) (*fileTokenSource, error) {
-// 		newCalledCount.Add(1)
-// 		return &fileTokenSource{}, nil
-// 	}
-// 	defer func() { newFileTokenSource = New }()
-//
-// 	var wg utils.WaitGroup
-// 	for range 10 {
-// 		wg.Add(1)
-// 		go func() {
-// 			_, err = getToken(ctx, path.Base(tokenDir), path.Dir(tokenDir))
-// 			require.NoError(t, err)
-// 			wg.Done()
-// 		}()
-// 	}
-//
-// 	require.NoError(t, wg.Wait(ctx))
-// 	assert.Equal(t, int32(1), newCalledCount.Load())
-// }
+func TestFileTokenSourceRace(t *testing.T) {
+	ctx, cancelCtx := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancelCtx()
+
+	tokenDir := t.TempDir()
+	tokenFilePath := tokenDir + "/token"
+	tokenFile, err := os.Create(tokenFilePath)
+	require.NoError(t, err)
+	defer tokenFile.Close()
+
+	var wg utils.WaitGroup
+	for range 10 {
+		wg.Add(1)
+		go func() {
+			_, err = getToken(ctx, filepath.Base(tokenDir), filepath.Dir(tokenDir))
+			require.NoError(t, err)
+			wg.Done()
+		}()
+	}
+	require.NoError(t, wg.Wait(ctx))
+
+	assert.Equal(t, 1, len(tokenSources))
+}
 
 func TestErrChannel(t *testing.T) {
 	ctx, cancelCtx := context.WithTimeout(context.Background(), time.Minute)
