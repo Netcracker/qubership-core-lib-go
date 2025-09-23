@@ -164,7 +164,7 @@ func TestVerifier(t *testing.T) {
 	testAudience := filepath.Base(tokenDir)
 	testTokenDir := filepath.Dir(tokenDir)
 
-	err = os.Setenv(tokensource.TokenDirPropertyEnv, testTokenDir)
+	err = os.Setenv("KUBERNETES_TOKENS_DIR", testTokenDir)
 	require.NoError(t, err)
 	configloader.Init(configloader.EnvPropertySource())
 

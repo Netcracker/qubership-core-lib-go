@@ -14,8 +14,6 @@ import (
 
 const (
 	defaultTokenDir     = "/var/run/secrets/tokens"
-	TokenDirProperty    = "kubernetes.tokens.dir"
-	TokenDirPropertyEnv = "KUBERNETES_TOKENS_DIR"
 )
 
 var (
@@ -24,12 +22,12 @@ var (
 	tokenSources = make(map[string]*fileTokenSource)
 )
 
-// Get token by audience. Token is always up to date. Default tokens directory can be overrided using config value TokenDirProperty
+// GetToken gets token by audience. Token is always up to date. Default tokens directory can be overrided using config property kubernetes.tokens.dir
 func GetToken(ctx context.Context, audience string) (string, error) {
 	if audience == "" {
 		return "", fmt.Errorf("GetToken: empty audience")
 	}
-	tokenDir := configloader.GetOrDefaultString(TokenDirProperty, defaultTokenDir)
+	tokenDir := configloader.GetOrDefaultString("kubernetes.tokens.dir", defaultTokenDir)
 	return getToken(ctx, audience, tokenDir)
 }
 
@@ -140,7 +138,7 @@ func (f *fileTokenSource) refreshToken() error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 
-	tokenFilePath := filepath.Join(f.tokenDir, "/token")
+	tokenFilePath := filepath.Join(f.tokenDir, "token")
 	freshToken, err := os.ReadFile(tokenFilePath)
 	if err != nil {
 		return fmt.Errorf("failed to refresh token at path %s: %w", tokenFilePath, err)
