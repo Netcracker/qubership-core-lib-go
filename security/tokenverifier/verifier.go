@@ -42,13 +42,13 @@ type verifier struct {
 
 type getTokenFunc func() (string, error)
 
-func NewDefault(ctx context.Context, audience string) (*verifier, error) {
-	return New(ctx, audience, func() (string, error) {
+func New(ctx context.Context, audience string) (*verifier, error) {
+	return newVerifier(ctx, audience, func() (string, error) {
 		return tokensource.GetToken(ctx, oidcTokenAud)
 	})
 }
 
-func New(ctx context.Context, audience string, getToken getTokenFunc) (*verifier, error) {
+func newVerifier(ctx context.Context, audience string, getToken getTokenFunc) (*verifier, error) {
 	c, err := newSecureHttpClient(getToken)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create secure http client: %w", err)

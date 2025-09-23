@@ -168,7 +168,7 @@ func TestVerifier(t *testing.T) {
 	require.NoError(t, err)
 	configloader.Init(configloader.EnvPropertySource())
 
-	v, err := New(ctx, aud, func() (string, error) {
+	v, err := newVerifier(ctx, aud, func() (string, error) {
 		return tokensource.GetToken(ctx, testAudience)
 	})
 	require.NoError(t, err)

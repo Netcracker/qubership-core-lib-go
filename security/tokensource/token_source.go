@@ -25,6 +25,7 @@ var (
 	tokenSources = make(map[string]*fileTokenSource)
 )
 
+// Get token by audience. Token is always up to date. Default tokens directory can be overrided using config value TokenDirProperty
 func GetToken(ctx context.Context, audience string) (string, error) {
 	if audience == "" {
 		return "", fmt.Errorf("GetToken: empty audience")
