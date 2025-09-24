@@ -5,7 +5,10 @@ import (
 	"crypto"
 	"crypto/rand"
 	"crypto/rsa"
+	"encoding/base64"
 	"encoding/json"
+	"fmt"
+	"math/big"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -14,8 +17,7 @@ import (
 	"time"
 
 	openid "github.com/coreos/go-oidc/v3/oidc"
-	"github.com/go-jose/go-jose/v4"
-	"github.com/go-jose/go-jose/v4/jwt"
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/netcracker/qubership-core-lib-go/v3/configloader"
 	"github.com/netcracker/qubership-core-lib-go/v3/security/tokensource"
 	"github.com/stretchr/testify/assert"
@@ -38,10 +40,10 @@ var tests = []struct {
 	{
 		name: "valid token",
 		claims: Claims{
-			Claims: jwt.Claims{
+			RegisteredClaims: jwt.RegisteredClaims{
 				Subject:   sub,
-				Audience:  jwt.Audience{aud},
-				Expiry:    jwt.NewNumericDate(time.Now().Add(1 * time.Hour)),
+				Audience:  jwt.ClaimStrings{aud},
+				ExpiresAt: jwt.NewNumericDate(time.Now().Add(1 * time.Hour)),
 				NotBefore: jwt.NewNumericDate(time.Now()),
 				IssuedAt:  jwt.NewNumericDate(time.Now()),
 			},
@@ -58,10 +60,10 @@ var tests = []struct {
 	{
 		name: "expired token",
 		claims: Claims{
-			Claims: jwt.Claims{
+			RegisteredClaims: jwt.RegisteredClaims{
 				Subject:   sub,
-				Audience:  jwt.Audience{aud},
-				Expiry:    jwt.NewNumericDate(time.Now().Add(-1 * time.Minute)),
+				Audience:  jwt.ClaimStrings{aud},
+				ExpiresAt: jwt.NewNumericDate(time.Now().Add(-1 * time.Minute)),
 				NotBefore: jwt.NewNumericDate(time.Now()),
 				IssuedAt:  jwt.NewNumericDate(time.Now()),
 			},
@@ -78,10 +80,10 @@ var tests = []struct {
 	{
 		name: "wrong audience",
 		claims: Claims{
-			Claims: jwt.Claims{
+			RegisteredClaims: jwt.RegisteredClaims{
 				Subject:   sub,
-				Audience:  jwt.Audience{"some-other-aud"},
-				Expiry:    jwt.NewNumericDate(time.Now().Add(1 * time.Hour)),
+				Audience:  jwt.ClaimStrings{"some-other-aud"},
+				ExpiresAt: jwt.NewNumericDate(time.Now().Add(1 * time.Hour)),
 				NotBefore: jwt.NewNumericDate(time.Now()),
 				IssuedAt:  jwt.NewNumericDate(time.Now()),
 			},
@@ -98,11 +100,11 @@ var tests = []struct {
 	{
 		name: "wrong issuer",
 		claims: Claims{
-			Claims: jwt.Claims{
+			RegisteredClaims: jwt.RegisteredClaims{
 				Subject:   sub,
 				Issuer:    "https://accounts.google.com",
-				Audience:  jwt.Audience{aud},
-				Expiry:    jwt.NewNumericDate(time.Now().Add(1 * time.Hour)),
+				Audience:  jwt.ClaimStrings{aud},
+				ExpiresAt: jwt.NewNumericDate(time.Now().Add(1 * time.Hour)),
 				NotBefore: jwt.NewNumericDate(time.Now()),
 				IssuedAt:  jwt.NewNumericDate(time.Now()),
 			},
@@ -121,23 +123,18 @@ var tests = []struct {
 func TestVerifier(t *testing.T) {
 	key, err := rsa.GenerateKey(rand.Reader, 2048)
 	require.NoError(t, err)
-	signer, err := jose.NewSigner(jose.SigningKey{
-		Algorithm: jose.RS256,
-		Key:       key,
-	}, nil)
-	require.NoError(t, err)
 
 	var tvClientToken string
-	server, err := setupServer(key.Public(), &tvClientToken)
+	server, err := setupServer(&key.PublicKey, &tvClientToken)
 	require.NoError(t, err)
 	defer server.Close()
 
-	clientToken, err := generateJwt(signer, Claims{
-		Claims: jwt.Claims{
+	clientToken, err := generateJwt(key, Claims{
+		RegisteredClaims: jwt.RegisteredClaims{
 			Issuer:    server.URL,
 			Subject:   "system:serviceaccount:default:default",
-			Audience:  jwt.Audience{"kubernetes.default.svc"},
-			Expiry:    jwt.NewNumericDate(time.Now().Add(1 * time.Hour)),
+			Audience:  jwt.ClaimStrings{"kubernetes.default.svc"},
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(1 * time.Hour)),
 			NotBefore: jwt.NewNumericDate(time.Now()),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
 		},
@@ -177,7 +174,7 @@ func TestVerifier(t *testing.T) {
 		if test.claims.Issuer == "" {
 			test.claims.Issuer = server.URL
 		}
-		rawToken, err := generateJwt(signer, test.claims)
+		rawToken, err := generateJwt(key, test.claims)
 		require.NoError(t, err)
 		claims, err := v.Verify(context.Background(), rawToken)
 		if test.ok {
@@ -191,23 +188,42 @@ func TestVerifier(t *testing.T) {
 	}
 }
 
-func generateJwt(signer jose.Signer, claims Claims) (string, error) {
-	return jwt.Signed(signer).Claims(claims).Serialize()
+func generateJwt(key crypto.PrivateKey, claims Claims) (string, error) {
+	token := jwt.NewWithClaims(jwt.SigningMethodRS256, claims)
+	rawToken, err := token.SignedString(key)
+	if err != nil {
+		return "", err
+	}
+	return rawToken, nil
 }
 
-func setupServer(key crypto.PublicKey, clientToken *string) (*httptest.Server, error) {
-	jwks := jose.JSONWebKeySet{
-		Keys: []jose.JSONWebKey{{
-			Key:       key,
+type jsonWebKey struct {
+	KeyType   string `json:"kty"`
+	KeyID     string `json:"kid"`
+	Algorithm string `json:"alg"`
+	Use       string `json:"use"`
+	N         string `json:"n"`
+	E         string `json:"e"`
+}
+
+func setupServer(key *rsa.PublicKey, clientToken *string) (*httptest.Server, error) {
+	jwks := struct {
+		Keys []jsonWebKey `json:"keys"`
+	}{
+		Keys: []jsonWebKey{{
+			KeyType:   "RSA",
 			KeyID:     "key-1",
-			Algorithm: string(jose.RS256),
+			Algorithm: string(jwt.SigningMethodRS256.Alg()),
 			Use:       "sig",
+			N:         toHexBase64(key.N),
+			E:         toHexBase64(big.NewInt(int64(key.E))),
 		}},
 	}
 	rawJwks, err := json.Marshal(jwks)
 	if err != nil {
 		return nil, err
 	}
+	fmt.Println(string(rawJwks))
 	openidConf := struct {
 		JwksUri string `json:"jwks_uri"`
 		Issuer  string `json:"issuer"`
@@ -239,4 +255,8 @@ func setupServer(key crypto.PublicKey, clientToken *string) (*httptest.Server, e
 		}
 	}))
 	return server, nil
+}
+
+func toHexBase64(a *big.Int) string {
+	return base64.RawURLEncoding.EncodeToString(a.Bytes())
 }

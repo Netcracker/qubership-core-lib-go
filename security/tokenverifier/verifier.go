@@ -5,8 +5,7 @@ import (
 	"fmt"
 
 	"github.com/coreos/go-oidc/v3/oidc"
-	"github.com/go-jose/go-jose/v4"
-	"github.com/go-jose/go-jose/v4/jwt"
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/netcracker/qubership-core-lib-go/v3/logging"
 	"github.com/netcracker/qubership-core-lib-go/v3/security/tokensource"
 )
@@ -18,7 +17,7 @@ const (
 var logger = logging.GetLogger("oidc")
 
 type Claims struct {
-	jwt.Claims
+	jwt.RegisteredClaims
 	Kubernetes K8sClaims `json:"kubernetes.io"`
 }
 
@@ -88,12 +87,8 @@ func (vf *verifier) Verify(ctx context.Context, rawToken string) (*Claims, error
 }
 
 func getIssuer(rawToken string) (string, error) {
-	token, err := jwt.ParseSigned(rawToken, []jose.SignatureAlgorithm{jose.RS256, jose.RS384, jose.RS512, jose.ES256, jose.ES384, jose.ES512, jose.PS256, jose.PS384, jose.PS512, "none"})
-	if err != nil {
-		return "", fmt.Errorf("invalid jwt: %w", err)
-	}
-	claims := Claims{}
-	err = token.UnsafeClaimsWithoutVerification(&claims)
+	claims := jwt.RegisteredClaims{}
+	_, _, err := jwt.NewParser().ParseUnverified(rawToken, &claims)
 	if err != nil {
 		return "", fmt.Errorf("invalid jwt: %w", err)
 	}

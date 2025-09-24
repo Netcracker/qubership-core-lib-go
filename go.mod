@@ -5,7 +5,6 @@ go 1.25.1
 require (
 	github.com/coreos/go-oidc/v3 v3.15.0
 	github.com/fsnotify/fsnotify v1.9.0
-	github.com/go-jose/go-jose/v4 v4.1.2
 	github.com/golang-jwt/jwt/v5 v5.3.0
 	github.com/knadh/koanf/maps v0.1.2
 	github.com/knadh/koanf/parsers/json v0.1.0
@@ -21,6 +20,7 @@ require (
 
 require (
 	github.com/davecgh/go-spew v1.1.1 // indirect
+	github.com/go-jose/go-jose/v4 v4.1.2 // indirect
 	github.com/go-viper/mapstructure/v2 v2.4.0 // indirect
 	github.com/mitchellh/copystructure v1.2.0 // indirect
 	github.com/mitchellh/reflectwalk v1.0.2 // indirect
