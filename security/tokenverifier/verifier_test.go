@@ -7,7 +7,6 @@ import (
 	"crypto/rsa"
 	"encoding/base64"
 	"encoding/json"
-	"fmt"
 	"math/big"
 	"net/http"
 	"net/http/httptest"
@@ -223,7 +222,6 @@ func setupServer(key *rsa.PublicKey, clientToken *string) (*httptest.Server, err
 	if err != nil {
 		return nil, err
 	}
-	fmt.Println(string(rawJwks))
 	openidConf := struct {
 		JwksUri string `json:"jwks_uri"`
 		Issuer  string `json:"issuer"`
