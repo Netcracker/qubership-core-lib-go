@@ -4,34 +4,36 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"path"
+	"path/filepath"
 	"sync"
 
 	"github.com/fsnotify/fsnotify"
+	"github.com/netcracker/qubership-core-lib-go/v3/configloader"
 	"github.com/netcracker/qubership-core-lib-go/v3/logging"
 )
 
 const (
-	serviceAccountDir = "/var/run/secrets/kubernetes.io/serviceaccount"
-	secretsDir        = "/var/run/secrets/tokens"
+	defaultTokenDir     = "/var/run/secrets/tokens"
 )
 
 var (
-	logger   = logging.GetLogger("token-file-storage")
-	mu       sync.RWMutex
-	launched = make(map[string]*fileTokenSource)
+	logger       = logging.GetLogger("token-file-storage")
+	mu           sync.RWMutex
+	tokenSources = make(map[string]*fileTokenSource)
 )
 
+// GetToken gets token by audience. Token is always up to date. Default tokens directory can be overrided using config property kubernetes.tokens.dir
 func GetToken(ctx context.Context, audience string) (string, error) {
 	if audience == "" {
 		return "", fmt.Errorf("GetToken: empty audience")
 	}
-	return getToken(ctx, audience, secretsDir)
+	tokenDir := configloader.GetOrDefaultString("kubernetes.tokens.dir", defaultTokenDir)
+	return getToken(ctx, audience, tokenDir)
 }
 
 func getToken(ctx context.Context, audience string, dir string) (string, error) {
 	mu.RLock()
-	tokenSource, ok := launched[audience]
+	tokenSource, ok := tokenSources[audience]
 	mu.RUnlock()
 	if ok {
 		return tokenSource.Token()
@@ -39,27 +41,17 @@ func getToken(ctx context.Context, audience string, dir string) (string, error) 
 
 	mu.Lock()
 	defer mu.Unlock()
-	tokenSource, ok = launched[audience]
+	tokenSource, ok = tokenSources[audience]
 	if ok {
 		return tokenSource.Token()
 	}
 
-	entries, err := os.ReadDir(dir)
+	tokenSource, err := newFileTokenSource(ctx, filepath.Join(dir, audience))
 	if err != nil {
-		return "", fmt.Errorf("failed to get entries of dir %s: %w", dir, err)
+		return "", fmt.Errorf("failed to create a tokensource for token with audience %s: %w", audience, err)
 	}
-	for _, entry := range entries {
-		if entry.Name() != audience {
-			continue
-		}
-		ts, err := newFileTokenSource(ctx, fmt.Sprintf("%s/%s/token", dir, audience))
-		if err != nil {
-			return "", fmt.Errorf("failed to create a tokensource for token with audience %s: %w", audience, err)
-		}
-		launched[audience] = ts
-		return ts.Token()
-	}
-	return "", fmt.Errorf("token with audience %s not found in %s", audience, dir)
+	tokenSources[audience] = tokenSource
+	return tokenSource.Token()
 }
 
 type fileTokenSource struct {
@@ -71,11 +63,7 @@ type fileTokenSource struct {
 	cancel   context.CancelFunc
 }
 
-func NewDefault(ctx context.Context) (*fileTokenSource, error) {
-	return New(ctx, serviceAccountDir)
-}
-
-func New(ctx context.Context, tokenDir string) (*fileTokenSource, error) {
+func newFileTokenSource(ctx context.Context, tokenDir string) (*fileTokenSource, error) {
 	if tokenDir == "" {
 		return nil, fmt.Errorf("tokenDir is an empty string, use NewDefault if default service account dir needed or specify tokenDir")
 	}
@@ -93,7 +81,7 @@ func New(ctx context.Context, tokenDir string) (*fileTokenSource, error) {
 		return nil, fmt.Errorf("failed to initialize file watcher: %w", err)
 	}
 
-	err = ts.watcher.Add(ts.tokenDir + "/")
+	err = ts.watcher.Add(ts.tokenDir)
 	if err != nil {
 		ts.watcher.Close()
 		return nil, fmt.Errorf("failed to add path %s to file watcher: %w", ts.tokenDir, err)
@@ -104,8 +92,6 @@ func New(ctx context.Context, tokenDir string) (*fileTokenSource, error) {
 
 	return ts, nil
 }
-
-var newFileTokenSource = New
 
 func (f *fileTokenSource) Token() (string, error) {
 	f.mu.RLock()
@@ -123,8 +109,7 @@ func (f *fileTokenSource) listenFs(ctx context.Context, events <-chan fsnotify.E
 		select {
 		case ev := <-events:
 			// we look for event "..data file created". kubernetes updates the token by updating the "..data" symlink token file points to.
-			if path.Base(ev.Name) == "..data" && ev.Op.Has(fsnotify.Create) {
-				logger.Infof("volume mounted token updated, refreshing token at dir %s", f.tokenDir)
+			if filepath.Base(ev.Name) == "..data" && ev.Op.Has(fsnotify.Create) {
 				err := f.refreshToken()
 				if err != nil {
 					msg := "watching volume token at dir %s: %v"
@@ -152,9 +137,10 @@ func (f *fileTokenSource) refreshToken() error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 
-	freshToken, err := os.ReadFile(f.tokenDir + "/token")
+	tokenFilePath := filepath.Join(f.tokenDir, "token")
+	freshToken, err := os.ReadFile(tokenFilePath)
 	if err != nil {
-		return fmt.Errorf("failed to refresh token at path %s: %w", f.tokenDir+"/token", err)
+		return fmt.Errorf("failed to refresh token at path %s: %w", tokenFilePath, err)
 	}
 	f.token = string(freshToken)
 	return nil
