@@ -110,7 +110,6 @@ func (f *fileTokenSource) listenFs(ctx context.Context, events <-chan fsnotify.E
 		case ev := <-events:
 			// we look for event "..data file created". kubernetes updates the token by updating the "..data" symlink token file points to.
 			if filepath.Base(ev.Name) == "..data" && ev.Op.Has(fsnotify.Create) {
-				logger.Infof("volume mounted token updated, refreshing token at dir %s", f.tokenDir)
 				err := f.refreshToken()
 				if err != nil {
 					msg := "watching volume token at dir %s: %v"
