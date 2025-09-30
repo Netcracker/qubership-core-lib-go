@@ -18,8 +18,8 @@ func TestFileTokenSource(t *testing.T) {
 	defer cancelCtx()
 
 	tokenDir := t.TempDir()
-	tokenFilePath := tokenDir + "/token"
-	dataSymlinkPath := tokenDir + "/..data"
+	tokenFilePath := filepath.Join(tokenDir, tokenFileName)
+	dataSymlinkPath := filepath.Join(tokenDir, "..data")
 	tokenFile, err := os.CreateTemp(tokenDir, "")
 	require.NoError(t, err)
 	defer tokenFile.Close()
@@ -67,7 +67,7 @@ func TestFileTokenSourceRace(t *testing.T) {
 	defer cancelCtx()
 
 	tokenDir := t.TempDir()
-	tokenFilePath := tokenDir + "/token"
+	tokenFilePath := filepath.Join(tokenDir, tokenFileName)
 	tokenFile, err := os.Create(tokenFilePath)
 	require.NoError(t, err)
 	defer tokenFile.Close()
@@ -91,8 +91,8 @@ func TestErrChannel(t *testing.T) {
 	defer cancelCtx()
 
 	tokenDir := t.TempDir()
-	tokenFilePath := tokenDir + "/token"
-	dataSymlinkPath := tokenDir + "/..data"
+	tokenFilePath := filepath.Join(tokenDir, tokenFileName)
+	dataSymlinkPath := filepath.Join(tokenDir, "..data")
 	tokenFile, err := os.CreateTemp(tokenDir, "")
 	require.NoError(t, err)
 	defer tokenFile.Close()
@@ -138,7 +138,7 @@ func TestWrongDirectoryStructure(t *testing.T) {
 	defer cancelCtx()
 
 	tokenDir := t.TempDir()
-	tokenFilePath := tokenDir + "/test-audience"
+	tokenFilePath := filepath.Join(tokenDir, "test-audience")
 	testFile, err := os.Create(tokenFilePath)
 	require.NoError(t, err)
 	defer testFile.Close()

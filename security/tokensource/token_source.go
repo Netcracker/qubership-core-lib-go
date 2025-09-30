@@ -13,7 +13,8 @@ import (
 )
 
 const (
-	defaultTokenDir     = "/var/run/secrets/tokens"
+	defaultTokenDir = "/var/run/secrets/tokens"
+	tokenFileName   = "token"
 )
 
 var (
@@ -137,7 +138,7 @@ func (f *fileTokenSource) refreshToken() error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 
-	tokenFilePath := filepath.Join(f.tokenDir, "token")
+	tokenFilePath := filepath.Join(f.tokenDir, tokenFileName)
 	freshToken, err := os.ReadFile(tokenFilePath)
 	if err != nil {
 		return fmt.Errorf("failed to refresh token at path %s: %w", tokenFilePath, err)
