@@ -3,8 +3,11 @@ package tokenverifier
 import (
 	"context"
 	"fmt"
+	"net/http"
+	"time"
 
 	"github.com/coreos/go-oidc/v3/oidc"
+	"github.com/failsafe-go/failsafe-go/failsafehttp"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/netcracker/qubership-core-lib-go/v3/logging"
 	"github.com/netcracker/qubership-core-lib-go/v3/security/tokensource"
@@ -48,11 +51,15 @@ func New(ctx context.Context, audience string) (*verifier, error) {
 }
 
 func newVerifier(ctx context.Context, audience string, getToken getTokenFunc) (*verifier, error) {
-	c, err := newSecureHttpClient(getToken)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create secure http client: %w", err)
+	secureTransport := newSecureTransport(getToken)
+	policy := failsafehttp.NewRetryPolicyBuilder().
+		WithMaxAttempts(5).
+		WithBackoff(time.Millisecond*500, time.Second*15).
+		Build()
+	secureClient := http.Client{
+		Transport: failsafehttp.NewRoundTripper(secureTransport, policy),
 	}
-	ctx = oidc.ClientContext(ctx, c)
+	ctx = oidc.ClientContext(ctx, &secureClient)
 
 	rawToken, err := getToken()
 	if err != nil {

@@ -6,24 +6,20 @@ import (
 	"time"
 )
 
-func newSecureHttpClient(getToken getTokenFunc) (*http.Client, error) {
+type secureTransport struct {
+	base     http.RoundTripper
+	getToken getTokenFunc
+}
+
+func newSecureTransport(getToken getTokenFunc) *secureTransport {
 	base := &http.Transport{
 		MaxIdleConns:          100,
 		IdleConnTimeout:       90 * time.Second,
 		TLSHandshakeTimeout:   10 * time.Second,
 		ExpectContinueTimeout: 1 * time.Second,
 	}
-	return &http.Client{Transport: newSecureTransport(base, getToken)}, nil
-}
-
-type secureTransport struct {
-	base http.RoundTripper
-	getToken   getTokenFunc
-}
-
-func newSecureTransport(base http.RoundTripper, getToken getTokenFunc) *secureTransport {
 	return &secureTransport{
-		base: base,
+		base:     base,
 		getToken: getToken,
 	}
 }

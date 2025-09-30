@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"net/http"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 type mockTokenSource struct {
@@ -30,24 +32,19 @@ func (m *mockRoundTripper) RoundTrip(r *http.Request) (*http.Response, error) {
 func TestNewHttpClient(t *testing.T) {
 	validToken := "valid_token"
 	mockTs := mockTokenSource{token: validToken}
-	client, err := newSecureHttpClient(func() (string, error) {
+	transport := newSecureTransport(func() (string, error) {
 		return mockTs.Token()
 	})
-	if err != nil {
-		t.Fatalf("expected secure http client created succesfully, got err: %v", err)
-	}
-	transport := client.Transport.(*secureTransport)
 	mockTransport := &mockRoundTripper{
 		token: validToken,
 	}
 	transport.base = mockTransport
 
-	_, err = client.Get("/test")
-	if err != nil {
-		t.Fatalf("expected nil err, got err: %v", err)
+	client := http.Client{
+		Transport: transport,
 	}
+	_, err := client.Get("/test")
+	require.NoError(t, err, "expected nil err, got err: %v", err)
 
-	if !mockTransport.called {
-		t.Fatalf("expected mockTransport to be called be the client")
-	}
+	require.True(t, mockTransport.called, "expected mockTransport to be called be the client")
 }
