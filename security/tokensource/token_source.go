@@ -13,7 +13,7 @@ import (
 )
 
 const (
-	defaultTokenDir = "/var/run/secrets/tokens"
+	defaultTokensDir = "/var/run/secrets/tokens"
 	tokenFileName   = "token"
 )
 
@@ -28,11 +28,11 @@ func GetToken(ctx context.Context, audience string) (string, error) {
 	if audience == "" {
 		return "", fmt.Errorf("GetToken: empty audience")
 	}
-	tokenDir := configloader.GetOrDefaultString("kubernetes.tokens.dir", defaultTokenDir)
-	return getToken(ctx, audience, tokenDir)
+	tokensDir := configloader.GetOrDefaultString("kubernetes.tokens.dir", defaultTokensDir)
+	return getToken(ctx, audience, tokensDir)
 }
 
-func getToken(ctx context.Context, audience string, dir string) (string, error) {
+func getToken(ctx context.Context, audience string, tokensDir string) (string, error) {
 	mu.RLock()
 	tokenSource, ok := tokenSources[audience]
 	mu.RUnlock()
@@ -47,7 +47,7 @@ func getToken(ctx context.Context, audience string, dir string) (string, error) 
 		return tokenSource.Token()
 	}
 
-	tokenSource, err := newFileTokenSource(ctx, filepath.Join(dir, audience))
+	tokenSource, err := newFileTokenSource(ctx, filepath.Join(tokensDir, audience))
 	if err != nil {
 		return "", fmt.Errorf("failed to create a tokensource for token with audience %s: %w", audience, err)
 	}
