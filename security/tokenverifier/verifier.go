@@ -67,7 +67,7 @@ func newVerifier(ctx context.Context, audience string, getToken getTokenFunc) (*
 	}
 	issuer, err := getIssuer(rawToken)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get issuer from the jwt token: %w", err)
+		return nil, fmt.Errorf("failed to get issuer from the k8s projected volume token: %w", err)
 	}
 	provider, err := oidc.NewProvider(ctx, issuer)
 	if err != nil {
