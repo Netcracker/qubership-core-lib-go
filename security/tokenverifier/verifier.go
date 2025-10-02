@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"net/url"
 	"time"
 
 	"github.com/coreos/go-oidc/v3/oidc"
@@ -61,6 +62,7 @@ func newVerifier(ctx context.Context, audience string, getToken getTokenFunc) (*
 		WithMaxAttempts(retryMaxAttempts).
 		WithBackoff(retryBackoffDelay, retryBackoffMaxDelay).
 		WithJitter(retryJitter).
+		HandleIf(decideRetry).
 		Build()
 	secureClient := http.Client{
 		Transport: failsafehttp.NewRoundTripper(secureTransport, policy),
@@ -109,4 +111,26 @@ func getIssuer(rawToken string) (string, error) {
 		return "", fmt.Errorf("jwt token does not have issuer value: %w", err)
 	}
 	return claims.Issuer, nil
+}
+
+func decideRetry(r *http.Response, err error) bool {
+	_, isUrlErr := err.(*url.Error)
+	switch {
+	case isUrlErr:
+		return false
+	case err != nil:
+		return true
+	case isStatus5xx(r.StatusCode):
+		return true
+	default:
+		return false
+	}
+}
+
+func isStatus5xx(code int) bool {
+	statusGroup := code / 100
+	if statusGroup == 5 {
+		return true
+	}
+	return false
 }
