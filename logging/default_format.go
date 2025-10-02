@@ -13,8 +13,10 @@ const (
 	timeFormat           = "2006-01-02T15:04:05.000"
 	CallerPropertyName   = "caller"
 	valuePlaceholder     = "-"
-	RequestIdContextName = "X-Request-Id"   // see implementation in github.com/netcracker/qubership-core-lib-go/v3/context-propagation/xrequestid
+	RequestIdContextName = "X-Request-Id" // see implementation in github.com/netcracker/qubership-core-lib-go/v3/context-propagation/xrequestid
 	TenantContextName    = "Tenant-Context"
+
+	DefaultFormatString = "[%s] [%s] [request_id=%s] [tenant_id=%s] [thread=-] [class=%s] %s"
 )
 
 var (
@@ -56,7 +58,7 @@ func (format *defaultFormat) logFormat(r *Record, b *bytes.Buffer, color int, lv
 	if format.messageFormat != nil {
 		return format.messageFormat(r, b, color, lvl)
 	}
-	return fmt.Fprintf(b, "[%s] [%s] [request_id=%s] [tenant_id=%s] [thread=-] [class=%s] %s",
+	return fmt.Fprintf(b, DefaultFormatString,
 		r.Time.Format(timeFormat),
 		lvl,
 		getValueOrPlaceholder(r.Ctx, RequestIdContextName),
