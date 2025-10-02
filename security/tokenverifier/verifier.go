@@ -67,7 +67,7 @@ func newVerifier(ctx context.Context, audience string, getToken getTokenFunc) (*
 
 	rawToken, err := getToken()
 	if err != nil {
-		return nil, fmt.Errorf("failed to get k8s projected volume token: %w", err)
+		return nil, fmt.Errorf("failed to get k8s projected volume token (possibly projected volume token misconfigured in k8s deployment): %w", err)
 	}
 	issuer, err := getIssuer(rawToken)
 	if err != nil {
