@@ -49,7 +49,7 @@ func getToken(ctx context.Context, audience string, tokensDir string) (string, e
 
 	tokenSource, err := newFileTokenSource(ctx, filepath.Join(tokensDir, audience))
 	if err != nil {
-		return "", fmt.Errorf("failed to create a tokensource for token with audience %s: %w", audience, err)
+		return "", fmt.Errorf("failed to create a tokensource for k8s projected volume token with audience %s: %w", audience, err)
 	}
 	tokenSources[audience] = tokenSource
 	return tokenSource.Token()
