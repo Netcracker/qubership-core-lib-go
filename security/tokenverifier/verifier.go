@@ -15,6 +15,10 @@ import (
 
 const (
 	oidcTokenAud = "oidc-token"
+
+	retryMaxAttempts     = 5
+	retryBackoffDelay    = time.Millisecond * 500
+	retryBackoffMaxDelay = time.Second * 15
 )
 
 var logger = logging.GetLogger("oidc")
@@ -53,8 +57,8 @@ func New(ctx context.Context, audience string) (*verifier, error) {
 func newVerifier(ctx context.Context, audience string, getToken getTokenFunc) (*verifier, error) {
 	secureTransport := newSecureTransport(getToken)
 	policy := failsafehttp.NewRetryPolicyBuilder().
-		WithMaxAttempts(5).
-		WithBackoff(time.Millisecond*500, time.Second*15).
+		WithMaxAttempts(retryMaxAttempts).
+		WithBackoff(retryBackoffDelay, retryBackoffMaxDelay).
 		Build()
 	secureClient := http.Client{
 		Transport: failsafehttp.NewRoundTripper(secureTransport, policy),
