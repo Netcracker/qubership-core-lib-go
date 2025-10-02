@@ -19,6 +19,7 @@ const (
 	retryMaxAttempts     = 5
 	retryBackoffDelay    = time.Millisecond * 500
 	retryBackoffMaxDelay = time.Second * 15
+	retryJitter          = time.Millisecond * 100
 )
 
 var logger = logging.GetLogger("oidc")
@@ -59,6 +60,7 @@ func newVerifier(ctx context.Context, audience string, getToken getTokenFunc) (*
 	policy := failsafehttp.NewRetryPolicyBuilder().
 		WithMaxAttempts(retryMaxAttempts).
 		WithBackoff(retryBackoffDelay, retryBackoffMaxDelay).
+		WithJitter(retryJitter).
 		Build()
 	secureClient := http.Client{
 		Transport: failsafehttp.NewRoundTripper(secureTransport, policy),
