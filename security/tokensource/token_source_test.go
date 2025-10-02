@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -72,6 +73,14 @@ func TestFileTokenSourceRace(t *testing.T) {
 	require.NoError(t, err)
 	defer tokenFile.Close()
 
+	var newCalled atomic.Int32
+	newFileTokenSource = func(ctx context.Context, tokenDir string) (*fileTokenSource, error) {
+		newCalled.Add(1)
+		return &fileTokenSource{
+			cancel: func() {},
+		}, nil
+	}
+
 	var wg utils.WaitGroup
 	for range 10 {
 		wg.Add(1)
@@ -83,7 +92,8 @@ func TestFileTokenSourceRace(t *testing.T) {
 	}
 	require.NoError(t, wg.Wait(ctx))
 
-	assert.Equal(t, 1, len(tokenSources))
+	assert.Equal(t, int32(1), newCalled.Load())
+	newFileTokenSource = createFileTokenSource
 }
 
 func TestErrChannel(t *testing.T) {

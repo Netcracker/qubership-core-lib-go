@@ -14,7 +14,7 @@ import (
 
 const (
 	defaultTokensDir = "/var/run/secrets/tokens"
-	tokenFileName   = "token"
+	tokenFileName    = "token"
 )
 
 var (
@@ -64,7 +64,7 @@ type fileTokenSource struct {
 	cancel   context.CancelFunc
 }
 
-func newFileTokenSource(ctx context.Context, tokenDir string) (*fileTokenSource, error) {
+func createFileTokenSource(ctx context.Context, tokenDir string) (*fileTokenSource, error) {
 	if tokenDir == "" {
 		return nil, fmt.Errorf("tokenDir is an empty string, use NewDefault if default service account dir needed or specify tokenDir")
 	}
@@ -93,6 +93,8 @@ func newFileTokenSource(ctx context.Context, tokenDir string) (*fileTokenSource,
 
 	return ts, nil
 }
+
+var newFileTokenSource = createFileTokenSource
 
 func (f *fileTokenSource) Token() (string, error) {
 	f.mu.RLock()
