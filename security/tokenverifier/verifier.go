@@ -103,8 +103,7 @@ func (vf *verifier) Verify(ctx context.Context, rawToken string) (*Claims, error
 
 func getIssuer(rawToken string) (string, error) {
 	claims := jwt.RegisteredClaims{}
-	//NOSONAR
-	_, _, err := jwt.NewParser().ParseUnverified(rawToken, &claims)
+	_, _, err := jwt.NewParser().ParseUnverified(rawToken, &claims) // NOSONAR
 	if err != nil {
 		return "", fmt.Errorf("invalid jwt: %w", err)
 	}
