@@ -15,8 +15,6 @@ import (
 )
 
 const (
-	oidcTokenAud = "oidc-token"
-
 	retryMaxAttempts     = 5
 	retryBackoffDelay    = time.Millisecond * 500
 	retryBackoffMaxDelay = time.Second * 15
@@ -52,7 +50,7 @@ type getTokenFunc func() (string, error)
 
 func New(ctx context.Context, audience string) (*verifier, error) {
 	return newVerifier(ctx, audience, func() (string, error) {
-		return tokensource.GetToken(ctx, oidcTokenAud)
+		return tokensource.GetTokenDefault(ctx)
 	})
 }
 

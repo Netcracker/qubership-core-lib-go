@@ -18,7 +18,6 @@ import (
 	openid "github.com/coreos/go-oidc/v3/oidc"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/netcracker/qubership-core-lib-go/v3/configloader"
-	"github.com/netcracker/qubership-core-lib-go/v3/security/tokensource"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -157,16 +156,15 @@ func TestVerifier(t *testing.T) {
 	require.NoError(t, err)
 
 	tokenDir := filepath.Dir(tokenFile.Name())
-	testAudience := filepath.Base(tokenDir)
 	testTokenDir := filepath.Dir(tokenDir)
 
 	err = os.Setenv("KUBERNETES_TOKENS_DIR", testTokenDir)
 	require.NoError(t, err)
+	err = os.Setenv("KUBERNETES_SERVICEACCOUNT_DIR", tokenDir)
+	require.NoError(t, err)
 	configloader.Init(configloader.EnvPropertySource())
 
-	v, err := newVerifier(ctx, aud, func() (string, error) {
-		return tokensource.GetToken(ctx, testAudience)
-	})
+	v, err := New(ctx, aud, )
 	require.NoError(t, err)
 
 	for _, test := range tests {

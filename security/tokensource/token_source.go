@@ -13,8 +13,9 @@ import (
 )
 
 const (
-	defaultTokensDir = "/var/run/secrets/tokens"
-	tokenFileName    = "token"
+	defaultTokensDir         = "/var/run/secrets/tokens"
+	defaultServiceAccountDir = "/var/run/secrets/kubernetes.io/serviceaccount"
+	tokenFileName            = "token"
 )
 
 var (
@@ -29,10 +30,17 @@ func GetToken(ctx context.Context, audience string) (string, error) {
 		return "", fmt.Errorf("GetToken: empty audience")
 	}
 	tokensDir := configloader.GetOrDefaultString("kubernetes.tokens.dir", defaultTokensDir)
-	return getToken(ctx, audience, tokensDir)
+	return getToken(ctx, audience, filepath.Join(tokensDir, audience))
 }
 
-func getToken(ctx context.Context, audience string, tokensDir string) (string, error) {
+// GetTokenDefault gets the default serviceaccount token. Token is always up to date. Default serviceaccount dir can be overrided using config property kubernetes.serviceaccount.dir
+func GetTokenDefault(ctx context.Context) (string, error) {
+	saDir := configloader.GetOrDefaultString("kubernetes.serviceaccount.dir", defaultServiceAccountDir)
+	return getToken(ctx, "kubernetes.io/serviceaccount", saDir)
+}
+
+// getToken gets fresh token from a cached fileTokenSource if fileTokenSource with audience is alraedy created. Otherwise it creates new fileTokenSource that watches token in tokenDir. ctx is passed to the newly created fileTokenSource
+func getToken(ctx context.Context, audience string, tokenDir string) (string, error) {
 	mu.RLock()
 	tokenSource, ok := tokenSources[audience]
 	mu.RUnlock()
@@ -47,7 +55,7 @@ func getToken(ctx context.Context, audience string, tokensDir string) (string, e
 		return tokenSource.Token()
 	}
 
-	tokenSource, err := newFileTokenSource(ctx, filepath.Join(tokensDir, audience))
+	tokenSource, err := newFileTokenSource(ctx, tokenDir)
 	if err != nil {
 		return "", fmt.Errorf("failed to create a tokensource for k8s projected volume token with audience %s: %w", audience, err)
 	}
