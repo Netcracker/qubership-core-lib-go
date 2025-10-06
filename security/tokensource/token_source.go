@@ -15,6 +15,7 @@ import (
 const (
 	defaultTokensDir         = "/var/run/secrets/tokens"
 	defaultServiceAccountDir = "/var/run/secrets/kubernetes.io/serviceaccount"
+	oidcTokenAud             = "oidc"
 	tokenFileName            = "token"
 )
 
@@ -33,10 +34,10 @@ func GetToken(ctx context.Context, audience string) (string, error) {
 	return getToken(ctx, audience, filepath.Join(tokensDir, audience))
 }
 
-// GetTokenDefault gets the default serviceaccount token. Token is always up to date. Default serviceaccount dir can be overrided using config property kubernetes.serviceaccount.dir
+// GetTokenDefault gets the default token used to make OIDC discovery to Kubernetes. Default dir for this token can be overrided using config property kubernetes.serviceaccount.dir
 func GetTokenDefault(ctx context.Context) (string, error) {
 	saDir := configloader.GetOrDefaultString("kubernetes.serviceaccount.dir", defaultServiceAccountDir)
-	return getToken(ctx, "kubernetes.io/serviceaccount", saDir)
+	return getToken(ctx, oidcTokenAud, saDir)
 }
 
 // getToken gets fresh token from a cached fileTokenSource if fileTokenSource with audience is alraedy created. Otherwise it creates new fileTokenSource that watches token in tokenDir. ctx is passed to the newly created fileTokenSource
