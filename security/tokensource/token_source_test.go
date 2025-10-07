@@ -2,7 +2,6 @@ package tokensource
 
 import (
 	"context"
-	"errors"
 	"os"
 	"path/filepath"
 	"sync/atomic"
@@ -14,46 +13,52 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+var (
+	testAudience          = "test-audience"
+	tokensDir             string
+	dataDir               string
+	dataSymlinkPath       string
+	tokenFile *os.File
+)
+
 func TestFileTokenSource(t *testing.T) {
 	ctx, cancelCtx := context.WithTimeout(context.Background(), time.Minute)
 	defer cancelCtx()
 
-	tokenDir := t.TempDir()
-	tokenFilePath := filepath.Join(tokenDir, tokenFileName)
-	dataSymlinkPath := filepath.Join(tokenDir, "..data")
-	tokenFile, err := os.CreateTemp(tokenDir, "")
-	require.NoError(t, err)
-	defer tokenFile.Close()
-	err = os.Symlink(tokenFile.Name(), dataSymlinkPath)
-	require.NoError(t, err)
-	err = os.Symlink(dataSymlinkPath, tokenFilePath)
-	require.NoError(t, err)
-
+	setupTokensDir(t)
+	var err error
 	firstValidToken := "first_valid_token"
-	_, err = tokenFile.Write([]byte(firstValidToken))
+	err = os.WriteFile(tokenFile.Name(), []byte(firstValidToken), 0)
 	require.NoError(t, err)
 
-	fts, err := newFileTokenSource(ctx, tokenDir)
-	require.NoError(t, err)
-	defer fts.Close()
-	token, err := fts.Token()
+	tokensSource, err = newFileTokenSource(ctx, tokensDir, filepath.Join(tokensDir, testAudience))
 	require.NoError(t, err)
 
+	token, err := GetToken(ctx, testAudience)
+	require.NoError(t, err)
+	assert.Equal(t, firstValidToken, token)
+
+	token, err = GetTokenDefault(ctx)
+	require.NoError(t, err)
 	assert.Equal(t, firstValidToken, token)
 
 	secondValidToken := "second_valid_token"
-	_, err = tokenFile.WriteAt([]byte(secondValidToken), 0)
+	err = os.WriteFile(tokenFile.Name(), []byte(secondValidToken), 0)
 	require.NoError(t, err)
-	err = os.Remove(dataSymlinkPath)
-	require.NoError(t, err)
-	err = os.Symlink(tokenFile.Name(), dataSymlinkPath)
-	require.NoError(t, err)
+
+	refreshDataSymlink(t)
 
 	time.Sleep(time.Millisecond * 50)
-	token, err = fts.Token()
-	require.NoError(t, err)
 
+	token, err = GetToken(ctx, testAudience)
+	require.NoError(t, err)
 	assert.Equal(t, secondValidToken, token)
+
+	token, err = GetTokenDefault(ctx)
+	require.NoError(t, err)
+	assert.Equal(t, secondValidToken, token)
+
+	tokensSource = nil
 }
 
 func TestGetToken(t *testing.T) {
@@ -67,16 +72,15 @@ func TestFileTokenSourceRace(t *testing.T) {
 	ctx, cancelCtx := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancelCtx()
 
-	tokenDir := t.TempDir()
-	tokenFilePath := filepath.Join(tokenDir, tokenFileName)
-	tokenFile, err := os.Create(tokenFilePath)
-	require.NoError(t, err)
-	defer tokenFile.Close()
+	setupTokensDir(t)
 
 	var newCalled atomic.Int32
-	newFileTokenSource = func(ctx context.Context, tokenDir string) (*fileTokenSource, error) {
+	newFileTokenSource = func(_ context.Context, _, _ string) (*fileTokenSource, error) {
 		newCalled.Add(1)
 		return &fileTokenSource{
+			tokensCache: map[string]*tokenCache{
+				testAudience: {},
+			},
 			cancel: func() {},
 		}, nil
 	}
@@ -85,7 +89,7 @@ func TestFileTokenSourceRace(t *testing.T) {
 	for range 10 {
 		wg.Add(1)
 		go func() {
-			_, err = getToken(ctx, filepath.Base(tokenDir), filepath.Dir(tokenDir))
+			_, err := GetToken(ctx, testAudience)
 			require.NoError(t, err)
 			wg.Done()
 		}()
@@ -93,77 +97,38 @@ func TestFileTokenSourceRace(t *testing.T) {
 	require.NoError(t, wg.Wait(ctx))
 
 	assert.Equal(t, int32(1), newCalled.Load())
-	newFileTokenSource = newFileTokenSource
+
+	newFileTokenSource = createFileTokenSource
+	tokensSource = nil
 }
 
-func TestErrChannel(t *testing.T) {
-	ctx, cancelCtx := context.WithTimeout(context.Background(), time.Minute)
-	defer cancelCtx()
+func setupTokensDir(t *testing.T) {
+	tokensDir = t.TempDir()
 
-	tokenDir := t.TempDir()
-	tokenFilePath := filepath.Join(tokenDir, tokenFileName)
-	dataSymlinkPath := filepath.Join(tokenDir, "..data")
-	tokenFile, err := os.CreateTemp(tokenDir, "")
+	var err error
+	dataDir, err = os.MkdirTemp(tokensDir, "")
+	require.NoError(t, err)
+
+	dataSymlinkPath = filepath.Join(tokensDir, "..data")
+	err = os.Symlink(dataDir, dataSymlinkPath)
+	require.NoError(t, err)
+
+	testAudienceTokenDir := filepath.Join(dataDir, testAudience)
+	err = os.Mkdir(testAudienceTokenDir, 0775)
+	require.NoError(t, err)
+
+	tokenFile, err = os.Create(filepath.Join(testAudienceTokenDir, "token"))
 	require.NoError(t, err)
 	defer tokenFile.Close()
-	err = os.Symlink(tokenFile.Name(), dataSymlinkPath)
+
+	testAudienceTokenDirLink := filepath.Join(tokensDir, testAudience)
+	err = os.Symlink(filepath.Join(dataSymlinkPath, testAudience), testAudienceTokenDirLink)
 	require.NoError(t, err)
-	err = os.Symlink(dataSymlinkPath, tokenFilePath)
-	require.NoError(t, err)
-
-	fts, err := newFileTokenSource(ctx, tokenDir)
-	require.NoError(t, err)
-	defer fts.Close()
-
-	fts.watcher.Errors <- errors.New("mock error to see if the watcher doesn't stop after an error")
-	fts.setError(nil)
-
-	freshToken := "valid_token"
-	_, err = tokenFile.Write([]byte(freshToken))
-	require.NoError(t, err)
-	err = refreshDataSymlink(tokenFile.Name(), dataSymlinkPath)
-	require.NoError(t, err)
-
-	time.Sleep(time.Millisecond * 50)
-
-	token, err := fts.Token()
-	require.NoError(t, err)
-	assert.Equal(t, freshToken, token)
-
-	fts.setError(nil)
-
-	err = os.Remove(tokenFilePath)
-	require.NoError(t, err)
-
-	err = refreshDataSymlink(tokenFile.Name(), dataSymlinkPath)
-	require.NoError(t, err)
-
-	time.Sleep(time.Millisecond * 50)
-
-	assert.Error(t, fts.err)
 }
 
-func TestWrongDirectoryStructure(t *testing.T) {
-	ctx, cancelCtx := context.WithTimeout(context.Background(), time.Minute)
-	defer cancelCtx()
-
-	tokenDir := t.TempDir()
-	tokenFilePath := filepath.Join(tokenDir, "test-audience")
-	testFile, err := os.Create(tokenFilePath)
-	require.NoError(t, err)
-	defer testFile.Close()
-	_, err = getToken(ctx, "test-audience", tokenDir)
-	assert.Error(t, err)
-}
-
-func refreshDataSymlink(tokenFile, dataSymlinkPath string) error {
+func refreshDataSymlink(t *testing.T) {
 	err := os.Remove(dataSymlinkPath)
-	if err != nil {
-		return err
-	}
-	err = os.Symlink(tokenFile, dataSymlinkPath)
-	if err != nil {
-		return err
-	}
-	return nil
+	require.NoError(t, err)
+	err = os.Symlink(dataDir, dataSymlinkPath)
+	require.NoError(t, err)
 }

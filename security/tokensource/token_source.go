@@ -15,12 +15,12 @@ import (
 const (
 	defaultTokensDir         = "/var/run/secrets/tokens"
 	defaultServiceAccountDir = "/var/run/secrets/kubernetes.io/serviceaccount"
-	oidcTokenAud             = "oidc-token"
+	defaultTokenAud          = "oidc-token"
 )
 
 var (
 	logger       = logging.GetLogger("token-file-storage")
-	mu           sync.Mutex
+	mu           sync.RWMutex
 	tokensSource *fileTokenSource
 )
 
@@ -29,27 +29,42 @@ func GetToken(ctx context.Context, audience string) (string, error) {
 	if audience == "" {
 		return "", fmt.Errorf("GetToken: empty audience")
 	}
-	mu.Lock()
-	defer mu.Unlock()
+	mu.RLock()
+	rlocked := true
 	if tokensSource == nil {
-		tokensDir := configloader.GetOrDefaultString("kubernetes.tokens.dir", defaultTokensDir)
-		saDir := configloader.GetOrDefaultString("kubernetes.serviceaccount.dir", defaultServiceAccountDir)
-		fts, err := newFileTokenSource(ctx, tokensDir, saDir)
-		if err != nil {
-			return "", fmt.Errorf("failed to initialize token source: %w", err)
-		}
-		tokensSource = fts
+		mu.RUnlock()
+		rlocked = false
+		initTokensSource(ctx)
+	}
+	if rlocked {
+		mu.RUnlock()
 	}
 	token, err := tokensSource.getToken(audience)
 	if err != nil {
-		return "", fmt.Errorf("token by audience %s not found or properyly configured in k8s deployments", audience)
+		return "", fmt.Errorf("failed to get token by audience: %s: %w", audience, err)
 	}
 	return token, nil
 }
 
-// GetOidcToken gets the default token used to make OIDC discovery to Kubernetes. Default dir for this token can be overrided using config property kubernetes.serviceaccount.dir
-func GetOidcToken(ctx context.Context) (string, error) {
-	return GetToken(ctx, oidcTokenAud)
+// GetTokenDefault gets the default token used to make OIDC discovery to Kubernetes located at serviceaccount directory. Default dir for this token can be overrided using config property kubernetes.serviceaccount.dir
+func GetTokenDefault(ctx context.Context) (string, error) {
+	return GetToken(ctx, defaultTokenAud)
+}
+
+func initTokensSource(ctx context.Context) error {
+	mu.Lock()
+	defer mu.Unlock()
+	if tokensSource != nil {
+		return nil
+	}
+	tokensDir := configloader.GetOrDefaultString("kubernetes.tokens.dir", defaultTokensDir)
+	saDir := configloader.GetOrDefaultString("kubernetes.serviceaccount.dir", defaultServiceAccountDir)
+	fts, err := newFileTokenSource(ctx, tokensDir, saDir)
+	if err != nil {
+		return fmt.Errorf("failed to initialize token source: %w", err)
+	}
+	tokensSource = fts
+	return nil
 }
 
 type tokenCache struct {
@@ -70,7 +85,7 @@ type fileTokenSource struct {
 	cancel            context.CancelFunc
 }
 
-func newFileTokenSource(ctx context.Context, tokensDir, serviceAccountDir string) (*fileTokenSource, error) {
+func createFileTokenSource(ctx context.Context, tokensDir, serviceAccountDir string) (*fileTokenSource, error) {
 	ctx, cancel := context.WithCancel(ctx)
 	ts := &fileTokenSource{
 		tokensDir:         tokensDir,
@@ -80,7 +95,7 @@ func newFileTokenSource(ctx context.Context, tokensDir, serviceAccountDir string
 	}
 	err := ts.refreshTokensCache()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to refresh tokens cache: %w", err)
 	}
 	ts.watcher, err = fsnotify.NewWatcher()
 	if err != nil {
@@ -96,6 +111,8 @@ func newFileTokenSource(ctx context.Context, tokensDir, serviceAccountDir string
 	go ts.listenFs(ctx, ts.watcher.Events, ts.watcher.Errors)
 	return ts, nil
 }
+
+var newFileTokenSource = createFileTokenSource
 
 func (f *fileTokenSource) Close() {
 	f.cancel()
@@ -116,7 +133,7 @@ func (f *fileTokenSource) listenFs(ctx context.Context, events <-chan fsnotify.E
 				logger.Debugf("k8s tokensCache refreshed")
 			}
 		case err := <-errs:
-			logger.Error("%v", fmt.Errorf("error at volume mounted token watcher at path %s: %v", err))
+			logger.Error("%v", fmt.Errorf("error at k8s volume mounted token watcher: %w", err))
 		case <-ctx.Done():
 			f.watcher.Close()
 			logger.Infof("k8s token watcher shutdown")
@@ -131,23 +148,26 @@ func (f *fileTokenSource) refreshTokensCache() error {
 		return fmt.Errorf("failed to get dir entries from tokenDir %s: %w", f.tokensDir, err)
 	}
 	for _, tokenDir := range entries {
-		if !tokenDir.IsDir() {
-			continue
-		}
 		audience := tokenDir.Name()
-		f.tokensCache[audience] = f.updatedToken(filepath.Join(f.tokensDir, audience))
+		tokenPath := filepath.Join(f.tokensDir, audience, "token")
+		tokenExists, err := fileExists(tokenPath)
+		if err != nil {
+			return err
+		}
+		if tokenExists {
+			f.tokensCache[audience] = f.updatedToken(tokenPath)
+		}
 	}
-	f.tokensCache[oidcTokenAud] = f.updatedToken(f.serviceAccountDir)
+	f.tokensCache[defaultTokenAud] = f.updatedToken(filepath.Join(f.serviceAccountDir, "token"))
 	return nil
 }
 
-func (f *fileTokenSource) updatedToken(tokenDir string) *tokenCache {
+func (f *fileTokenSource) updatedToken(tokenPath string) *tokenCache {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	tokenFilePath := filepath.Join(tokenDir, "token")
-	freshToken, err := os.ReadFile(tokenFilePath)
+	freshToken, err := os.ReadFile(tokenPath)
 	if err != nil {
-		err = fmt.Errorf("failed to refresh token at path %s: %w", tokenFilePath, err)
+		err = fmt.Errorf("failed to refresh token at path %s: %w", tokenPath, err)
 	}
 	return &tokenCache{token: string(freshToken), err: err}
 }
@@ -155,6 +175,20 @@ func (f *fileTokenSource) updatedToken(tokenDir string) *tokenCache {
 func (f *fileTokenSource) getToken(audience string) (string, error) {
 	f.mu.RLock()
 	defer f.mu.RUnlock()
-	tokenCache := f.tokensCache[audience]
+	tokenCache, ok := f.tokensCache[audience]
+	if !ok {
+		return "", fmt.Errorf("token by audience %s not found or properyly configured in k8s deployments", audience)
+	}
 	return tokenCache.token, tokenCache.err
+}
+
+func fileExists(filePath string) (bool, error) {
+	_, err := os.Stat(filePath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return false, nil
+		}
+		return false, fmt.Errorf("failed to check if file %s exists: %w", filePath, err)
+	}
+	return true, nil
 }
