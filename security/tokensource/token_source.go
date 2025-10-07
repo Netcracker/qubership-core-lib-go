@@ -15,7 +15,7 @@ import (
 const (
 	defaultTokensDir         = "/var/run/secrets/tokens"
 	defaultServiceAccountDir = "/var/run/secrets/kubernetes.io/serviceaccount"
-	oidcTokenAud             = "oidc"
+	oidcTokenAud             = "oidc-token"
 	tokenFileName            = "token"
 )
 
@@ -34,8 +34,8 @@ func GetToken(ctx context.Context, audience string) (string, error) {
 	return getToken(ctx, audience, filepath.Join(tokensDir, audience))
 }
 
-// GetTokenDefault gets the default token used to make OIDC discovery to Kubernetes. Default dir for this token can be overrided using config property kubernetes.serviceaccount.dir
-func GetTokenDefault(ctx context.Context) (string, error) {
+// GetOidcToken gets the default token used to make OIDC discovery to Kubernetes. Default dir for this token can be overrided using config property kubernetes.serviceaccount.dir
+func GetOidcToken(ctx context.Context) (string, error) {
 	saDir := configloader.GetOrDefaultString("kubernetes.serviceaccount.dir", defaultServiceAccountDir)
 	return getToken(ctx, oidcTokenAud, saDir)
 }
@@ -122,6 +122,7 @@ func (f *fileTokenSource) listenFs(ctx context.Context, events <-chan fsnotify.E
 		case ev := <-events:
 			// we look for event "..data file created". kubernetes updates the token by updating the "..data" symlink token file points to.
 			if filepath.Base(ev.Name) == "..data" && ev.Op.Has(fsnotify.Create) {
+				logger.Debugf("k8s token at dir %s updated by k8s: started refreshing", f.tokenDir)
 				err := f.refreshToken()
 				if err != nil {
 					msg := "watching volume token at dir %s: %v"
@@ -129,6 +130,7 @@ func (f *fileTokenSource) listenFs(ctx context.Context, events <-chan fsnotify.E
 					logger.Errorf(msg, f.tokenDir, err)
 					break
 				}
+				logger.Debugf("k8s token at dir %s refreshed", f.tokenDir)
 				f.setError(nil)
 			}
 		case err := <-errs:

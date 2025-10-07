@@ -10,7 +10,6 @@ import (
 	"github.com/coreos/go-oidc/v3/oidc"
 	"github.com/failsafe-go/failsafe-go/failsafehttp"
 	"github.com/golang-jwt/jwt/v5"
-	"github.com/netcracker/qubership-core-lib-go/v3/logging"
 	"github.com/netcracker/qubership-core-lib-go/v3/security/tokensource"
 )
 
@@ -20,8 +19,6 @@ const (
 	retryBackoffMaxDelay = time.Second * 15
 	retryJitter          = time.Millisecond * 100
 )
-
-var logger = logging.GetLogger("oidc")
 
 type Claims struct {
 	jwt.RegisteredClaims
@@ -50,7 +47,7 @@ type getTokenFunc func() (string, error)
 
 func New(ctx context.Context, audience string) (*verifier, error) {
 	return newVerifier(ctx, audience, func() (string, error) {
-		return tokensource.GetTokenDefault(ctx)
+		return tokensource.GetOidcToken(ctx)
 	})
 }
 
