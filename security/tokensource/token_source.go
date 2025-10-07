@@ -29,19 +29,21 @@ func GetToken(ctx context.Context, audience string) (string, error) {
 	if audience == "" {
 		return "", fmt.Errorf("GetToken: empty audience")
 	}
+
 	mu.RLock()
-	rlocked := true
-	if tokensSource == nil {
-		mu.RUnlock()
-		rlocked = false
-		err := initTokensSource(ctx)
-		if err != nil {
-			return "", fmt.Errorf("failed to get token: %w", err)
+	ts := tokensSource
+	mu.RUnlock()
+	if ts == nil {
+		mu.Lock()
+		if tokensSource == nil {
+			if err := initTokensSource(ctx); err != nil {
+				mu.Unlock()
+				return "", fmt.Errorf("failed to init token source: %w", err)
+			}
 		}
+		mu.Unlock()
 	}
-	if rlocked {
-		mu.RUnlock()
-	}
+
 	token, err := tokensSource.getToken(audience)
 	if err != nil {
 		return "", fmt.Errorf("failed to get token by audience: %s: %w", audience, err)
@@ -55,8 +57,6 @@ func GetTokenDefault(ctx context.Context) (string, error) {
 }
 
 func initTokensSource(ctx context.Context) error {
-	mu.Lock()
-	defer mu.Unlock()
 	if tokensSource != nil {
 		return nil
 	}
@@ -64,7 +64,7 @@ func initTokensSource(ctx context.Context) error {
 	saDir := configloader.GetOrDefaultString("kubernetes.serviceaccount.dir", defaultServiceAccountDir)
 	fts, err := newFileTokenSource(ctx, tokensDir, saDir)
 	if err != nil {
-		return fmt.Errorf("failed to initialize token source: %w", err)
+		return fmt.Errorf("failed to create token source: %w", err)
 	}
 	tokensSource = fts
 	return nil
