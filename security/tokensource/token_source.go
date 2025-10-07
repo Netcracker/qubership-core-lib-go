@@ -34,7 +34,10 @@ func GetToken(ctx context.Context, audience string) (string, error) {
 	if tokensSource == nil {
 		mu.RUnlock()
 		rlocked = false
-		initTokensSource(ctx)
+		err := initTokensSource(ctx)
+		if err != nil {
+			return "", fmt.Errorf("failed to get token: %w", err)
+		}
 	}
 	if rlocked {
 		mu.RUnlock()
