@@ -34,14 +34,9 @@ func GetToken(ctx context.Context, audience string) (string, error) {
 	ts := tokensSource
 	mu.RUnlock()
 	if ts == nil {
-		mu.Lock()
-		if tokensSource == nil {
-			if err := initTokensSource(ctx); err != nil {
-				mu.Unlock()
-				return "", fmt.Errorf("failed to init token source: %w", err)
-			}
+		if err := initTokensSource(ctx); err != nil {
+			return "", fmt.Errorf("failed to init token source: %w", err)
 		}
-		mu.Unlock()
 	}
 
 	token, err := tokensSource.getToken(audience)
@@ -57,6 +52,8 @@ func GetTokenDefault(ctx context.Context) (string, error) {
 }
 
 func initTokensSource(ctx context.Context) error {
+	mu.Lock()
+	defer mu.Unlock()
 	if tokensSource != nil {
 		return nil
 	}
