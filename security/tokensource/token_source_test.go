@@ -93,7 +93,7 @@ func TestFileTokenSourceRace(t *testing.T) {
 	require.NoError(t, wg.Wait(ctx))
 
 	assert.Equal(t, int32(1), newCalled.Load())
-	newFileTokenSource = createFileTokenSource
+	newFileTokenSource = newFileTokenSource
 }
 
 func TestErrChannel(t *testing.T) {
