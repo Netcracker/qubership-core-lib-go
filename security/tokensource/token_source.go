@@ -10,18 +10,20 @@ import (
 
 	"github.com/fsnotify/fsnotify"
 	"github.com/netcracker/qubership-core-lib-go/v3/logging"
+	"github.com/netcracker/qubership-core-lib-go/v3/utils"
 )
 
 var (
 	DefaultTokensDir         = "/var/run/secrets/tokens"
 	DefaultServiceAccountDir = "/var/run/secrets/kubernetes.io/serviceaccount"
 	DefaultTokenAud          = "oidc-token"
-)
 
-var (
-	logger       = logging.GetLogger("token-file-storage")
-	mu           sync.RWMutex
-	tokensSource atomic.Pointer[fileTokenSource]
+	logger = logging.GetLogger("token-file-storage")
+
+	// we can't define lazy initializer in var section definition, because initialization
+	// function have global variables that can be redefined by consumer level code and thus
+	// values can't be captured early
+	tokensSource atomic.Pointer[utils.Lazy[*fileTokenSource]]
 )
 
 // GetToken gets token by audience. Token is always up to date. Default tokens directory can be overridden using config property kubernetes.tokens.dir. ctx should be app ctx that will be used for gracefull shutdown.
@@ -30,14 +32,15 @@ func GetToken(ctx context.Context, audience string) (string, error) {
 		return "", fmt.Errorf("GetToken: empty audience")
 	}
 
-	err := updateOnce(&tokensSource, func() (*fileTokenSource, error) {
+	tokensSource.CompareAndSwap(nil, utils.NewLazy(func() (*fileTokenSource, error) {
 		return newFileTokenSource(ctx, DefaultTokensDir, DefaultServiceAccountDir)
-	})
+	}))
+	ts, err := tokensSource.Load().Get()
 	if err != nil {
 		return "", fmt.Errorf("failed to create token source: %w", err)
 	}
 
-	token, err := tokensSource.Load().getToken(audience)
+	token, err := ts.getToken(audience)
 	if err != nil {
 		return "", fmt.Errorf("failed to get token by audience: %s: %w", audience, err)
 	}
@@ -173,20 +176,4 @@ func fileExists(filePath string) (bool, error) {
 		return false, fmt.Errorf("failed to check if file %s exists: %w", filePath, err)
 	}
 	return true, nil
-}
-
-func updateOnce[T any](value *atomic.Pointer[T], init func() (*T, error)) error {
-	if value.Load() == nil {
-		mu.Lock()
-		defer mu.Unlock()
-
-		if value.Load() == nil {
-			newValue, err := init()
-			if err == nil {
-				value.Store(newValue)
-			}
-			return err
-		}
-	}
-	return nil
 }
