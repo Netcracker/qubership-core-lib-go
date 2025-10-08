@@ -14,11 +14,11 @@ import (
 )
 
 var (
-	testAudience          = "test-audience"
-	tokensDir             string
-	dataDir               string
-	dataSymlinkPath       string
-	tokenFile *os.File
+	testAudience    = "test-audience"
+	tokensDir       string
+	dataDir         string
+	dataSymlinkPath string
+	tokenFile       *os.File
 )
 
 func TestFileTokenSource(t *testing.T) {
@@ -31,8 +31,9 @@ func TestFileTokenSource(t *testing.T) {
 	err = os.WriteFile(tokenFile.Name(), []byte(firstValidToken), 0)
 	require.NoError(t, err)
 
-	tokensSource, err = newFileTokenSource(ctx, tokensDir, filepath.Join(tokensDir, testAudience))
+	ts, err := newFileTokenSource(ctx, tokensDir, filepath.Join(tokensDir, testAudience))
 	require.NoError(t, err)
+	tokensSource.Store(ts)
 
 	token, err := GetToken(ctx, testAudience)
 	require.NoError(t, err)
@@ -58,7 +59,7 @@ func TestFileTokenSource(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, secondValidToken, token)
 
-	tokensSource = nil
+	tokensSource.Store(nil)
 }
 
 func TestGetToken(t *testing.T) {
@@ -99,7 +100,7 @@ func TestFileTokenSourceRace(t *testing.T) {
 	assert.Equal(t, int32(1), newCalled.Load())
 
 	newFileTokenSource = createFileTokenSource
-	tokensSource = nil
+	tokensSource.Store(nil)
 }
 
 func setupTokensDir(t *testing.T) {
