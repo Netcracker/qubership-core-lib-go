@@ -24,7 +24,7 @@ var (
 	tokensSource atomic.Pointer[fileTokenSource]
 )
 
-// GetToken gets token by audience. Token is always up to date. Default tokens directory can be overridden using config property kubernetes.tokens.dir. ctx should be app ctx that will be used for gracefull shutdown.
+// GetToken gets token by audience. Token is always up to date. Default tokens directory can be overridden using global variable DefaultTokensDir
 func GetToken(ctx context.Context, audience string) (string, error) {
 	if audience == "" {
 		return "", fmt.Errorf("GetToken: empty audience")
@@ -44,7 +44,7 @@ func GetToken(ctx context.Context, audience string) (string, error) {
 	return token, nil
 }
 
-// GetTokenDefault gets the default token used to make OIDC discovery to Kubernetes located at serviceaccount directory. Default dir for this token can be overrided using config property kubernetes.serviceaccount.dir
+// GetTokenDefault gets the default service account token used to make OIDC discovery to Kubernetes located at serviceaccount directory. Default dir for this token can be overrided using global variable DefaultServiceAccountDir
 func GetTokenDefault(ctx context.Context) (string, error) {
 	return GetToken(ctx, DefaultTokenAud)
 }
