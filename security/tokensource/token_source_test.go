@@ -33,7 +33,9 @@ func TestFileTokenSource(t *testing.T) {
 
 	ts, err := newFileTokenSource(ctx, tokensDir, filepath.Join(tokensDir, testAudience))
 	require.NoError(t, err)
-	tokensSource.Store(ts)
+	tokensSource.Store(utils.NewLazy(func() (*fileTokenSource, error) {
+		return ts, nil
+	}))
 
 	token, err := GetToken(ctx, testAudience)
 	require.NoError(t, err)
