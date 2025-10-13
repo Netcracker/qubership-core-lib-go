@@ -45,7 +45,7 @@ type verifier struct {
 
 type getTokenFunc func() (string, error)
 
-func New(ctx context.Context, audience string) (*verifier, error) {
+func New(ctx context.Context, audience string) (Verifier, error) {
 	return newVerifier(ctx, audience, func() (string, error) {
 		return tokensource.GetServiceAccountToken(ctx)
 	})

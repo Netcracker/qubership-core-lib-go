@@ -1,6 +1,6 @@
 module github.com/netcracker/qubership-core-lib-go/v3
 
-go 1.25.1
+go 1.23.0
 
 require (
 	github.com/coreos/go-oidc/v3 v3.15.0

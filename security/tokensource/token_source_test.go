@@ -21,7 +21,7 @@ var (
 )
 
 func TestFileTokenSource(t *testing.T) {
-	ctx, cancelCtx := context.WithTimeout(t.Context(), time.Minute)
+	ctx, cancelCtx := context.WithTimeout(context.Background(), time.Minute)
 	defer cancelCtx()
 
 	setupTokensDir(t)
@@ -33,7 +33,7 @@ func TestFileTokenSource(t *testing.T) {
 	DefaultAudienceTokensDir = tokensDir
 	DefaultServiceAccountDir = filepath.Join(tokensDir, testAudience)
 
-	token, err := GetAudienceToken(ctx, testAudience)
+	token, err := GetAudienceToken(ctx, TokenAudience(testAudience))
 	require.NoError(t, err)
 	assert.Equal(t, firstValidToken, token)
 
@@ -48,7 +48,7 @@ func TestFileTokenSource(t *testing.T) {
 	refreshDataSymlink(t, audienceTokensDataDir, audienceTokensDataSymlinkPath)
 	time.Sleep(time.Millisecond * 50)
 
-	token, err = GetAudienceToken(ctx, testAudience)
+	token, err = GetAudienceToken(ctx, TokenAudience(testAudience))
 	require.NoError(t, err)
 	assert.Equal(t, secondValidToken, token)
 
@@ -64,7 +64,7 @@ func TestFileTokenSource(t *testing.T) {
 }
 
 func TestGetToken(t *testing.T) {
-	ctx, cancelCtx := context.WithCancel(t.Context())
+	ctx, cancelCtx := context.WithCancel(context.Background())
 	defer cancelCtx()
 	_, err := GetAudienceToken(ctx, "")
 	assert.Error(t, err)

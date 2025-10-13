@@ -14,8 +14,20 @@ import (
 	"github.com/netcracker/qubership-core-lib-go/v3/utils"
 )
 
+// TokenAudience represents an audience of a Kubernetes projected volume token. For common predefined audiences see below
+type TokenAudience string
+
+const (
+	// AudienceNetcracker is used for m2m communication between microservices in the same namespace
+	AudienceNetcracker = "netcracker"
+	// AudienceDBaaS is used for sending requests to DBaaS infra service
+	AudienceDBaaS = "dbaas"
+	// AudienceMaaS is used for sending requests to MaaS infra service
+	AudienceMaaS = "maas"
+)
+
 var (
-	// DefaultServiceAccountDir is the default directory where kubernetes projected volume tokens with custom audience will be located. Set this value to override the location for test purposes
+	// DefaultAudienceTokensDir is the default directory where kubernetes projected volume tokens with custom audience will be located. Set this value to override the location for test purposes
 	DefaultAudienceTokensDir = "/var/run/secrets/tokens"
 	// DefaultServiceAccountDir is the default kubernetes service account directory. GetServiceAccountToken returns the token located at this dir. Set this value to override the location for test purposes
 	DefaultServiceAccountDir = "/var/run/secrets/kubernetes.io/serviceaccount"
@@ -33,7 +45,7 @@ var (
 )
 
 // GetAudienceToken gets token by audience. Do not store the token. Always call GetAudienceToken again to get a fresh token. Default tokens directory can be overridden using global variable DefaultAudienceTokensDir
-func GetAudienceToken(ctx context.Context, audience string) (string, error) {
+func GetAudienceToken(ctx context.Context, audience TokenAudience) (string, error) {
 	if audience == "" {
 		return "", fmt.Errorf("GetToken: empty audience")
 	}
