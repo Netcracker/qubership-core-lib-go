@@ -1,6 +1,7 @@
 package tokenverifier
 
 import (
+	"context"
 	"crypto"
 	"crypto/rand"
 	"crypto/rsa"
@@ -146,7 +147,7 @@ func TestVerifier(t *testing.T) {
 	require.NoError(t, err)
 	tvClientToken = clientToken
 
-	ctx := openid.ClientContext(t.Context(), server.Client())
+	ctx := openid.ClientContext(context.Background(), server.Client())
 
 	tokenFile, err := os.Create(filepath.Join(t.TempDir(), "token"))
 	require.NoError(t, err)
@@ -166,7 +167,7 @@ func TestVerifier(t *testing.T) {
 		}
 		rawToken, err := generateJwt(key, test.claims)
 		require.NoError(t, err)
-		claims, err := v.Verify(t.Context(), rawToken)
+		claims, err := v.Verify(context.Background(), rawToken)
 		if test.ok {
 			assert.NoError(t, err, "test %q: expected no error, got: %v", test.name, err)
 			if assert.NotNil(t, claims, "test %q: expected claims, got nil", test.name) {

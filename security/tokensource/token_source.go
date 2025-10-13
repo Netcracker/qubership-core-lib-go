@@ -97,7 +97,7 @@ func refreshAudienceTokensCache(tokensDir string) error {
 	for _, tokenDir := range entries {
 		audience := tokenDir.Name()
 		token, err := readToken(filepath.Join(tokensDir, audience, "token"))
-		audienceTokensCache.Store(audience, tokenUpdateResult{
+		audienceTokensCache.Store(TokenAudience(audience), tokenUpdateResult{
 			value: token,
 			err:   err,
 		})
