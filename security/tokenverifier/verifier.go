@@ -47,7 +47,7 @@ type getTokenFunc func() (string, error)
 
 func New(ctx context.Context, audience string) (*verifier, error) {
 	return newVerifier(ctx, audience, func() (string, error) {
-		return tokensource.GetTokenDefault(ctx)
+		return tokensource.GetServiceAccountToken(ctx)
 	})
 }
 
