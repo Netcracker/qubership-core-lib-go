@@ -41,12 +41,12 @@ go get github.com/netcracker/qubership-core-lib-go/v3
 
 ## Features
 
-✅ **OIDC-based Verification** - Standards-compliant token verification  
-✅ **Automatic Retries** - Built-in failsafe mechanism with exponential backoff  
-✅ **Kubernetes Integration** - Native support for K8s service account tokens  
-✅ **Secure by Default** - Uses secure transport with proper token authentication  
-✅ **Flexible Configuration** - Customizable audience validation  
-✅ **Rich Claims Extraction** - Access to both standard JWT and Kubernetes-specific claims
+**OIDC-based Verification** - Standards-compliant token verification  
+**Automatic Retries** - Built-in failsafe mechanism with exponential backoff  
+**Kubernetes Integration** - Native support for K8s service account tokens  
+**Secure by Default** - Uses secure transport with proper token authentication  
+**Flexible Configuration** - Customizable audience validation  
+**Rich Claims Extraction** - Access to both standard JWT and Kubernetes-specific claims
 
 ## Quick Start
 
@@ -230,12 +230,12 @@ The verifier implements intelligent retry logic:
 
 ```go
 // Retries are attempted for:
-✅ Non-URL errors (network issues, timeouts)
-✅ 5xx server errors from OIDC provider
+Non-URL errors (network issues, timeouts)
+5xx server errors from OIDC provider
 
 // No retries for:
-❌ URL errors (malformed URLs)
-❌ 2xx, 3xx, 4xx responses
+URL errors (malformed URLs)
+2xx, 3xx, 4xx responses
 ```
 
 **Backoff Strategy:**
@@ -416,7 +416,7 @@ func init() {
     }
 }
 
-// ❌ Bad - Creating per request
+// Bad - Creating per request
 func handler(w http.ResponseWriter, r *http.Request) {
     verifier, _ := tokenverifier.New(r.Context(), "my-service") // Don't do this!
 }
@@ -427,10 +427,10 @@ func handler(w http.ResponseWriter, r *http.Request) {
 Pass request context to Verify for proper timeout and cancellation handling:
 
 ```go
-// ✅ Good
+// Good
 claims, err := verifier.Verify(r.Context(), token)
 
-// ❌ Bad
+// Bad
 claims, err := verifier.Verify(context.Background(), token)
 ```
 

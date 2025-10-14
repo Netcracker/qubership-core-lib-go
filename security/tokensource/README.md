@@ -4,12 +4,12 @@
 
 ## Features
 
-- 🔄 **Automatic Token Refresh** - Monitors token files and automatically updates cached tokens when Kubernetes rotates them
-- 🎯 **Audience-Specific Tokens** - Support for custom audience tokens via Kubernetes projected volumes
-- 💾 **In-Memory Caching** - Fast token retrieval with thread-safe caching
-- 🔒 **Thread-Safe** - Concurrent access to tokens is fully supported
-- 📁 **File System Watching** - Uses `fsnotify` to detect token updates in real-time
-- 🚀 **Lazy Initialization** - Token watchers are initialized only when first accessed
+- **Automatic Token Refresh** - Monitors token files and automatically updates cached tokens when Kubernetes rotates them
+- **Audience-Specific Tokens** - Support for custom audience tokens via Kubernetes projected volumes
+- **In-Memory Caching** - Fast token retrieval with thread-safe caching
+- **Thread-Safe** - Concurrent access to tokens is fully supported
+- **File System Watching** - Uses `fsnotify` to detect token updates in real-time
+- **Lazy Initialization** - Token watchers are initialized only when first accessed
 
 ## Table of Contents
 
@@ -297,7 +297,7 @@ func main() {
 
 ### 1. Never Store Tokens
 
-**❌ Don't do this:**
+**Don't do this:**
 ```go
 // BAD: Storing token for reuse
 var cachedToken string
@@ -312,7 +312,7 @@ func makeRequest() {
 }
 ```
 
-**✅ Do this instead:**
+**Do this instead:**
 ```go
 // GOOD: Always get fresh token
 func makeRequest(ctx context.Context) error {
@@ -494,10 +494,10 @@ logging.SetLevel("token-file-storage", logging.DEBUG)
 
 The `tokensource` package provides a robust, production-ready solution for managing Kubernetes service account tokens in Go applications. Key takeaways:
 
-- ✅ Always call `GetServiceAccountToken()` or `GetAudienceToken()` to get fresh tokens
-- ✅ Never store tokens - the package handles caching and refresh automatically
-- ✅ Use context for proper lifecycle management
-- ✅ Handle errors gracefully and log appropriately
-- ✅ Override default directories for testing
+- Always call `GetServiceAccountToken()` or `GetAudienceToken()` to get fresh tokens
+- Never store tokens - the package handles caching and refresh automatically
+- Use context for proper lifecycle management
+- Handle errors gracefully and log appropriately
+- Override default directories for testing
 
 For more information, see the [Kubernetes documentation on service account tokens](https://kubernetes.io/docs/tasks/configure-pod-container/configure-service-account/).
