@@ -50,7 +50,7 @@ func GetAudienceToken(ctx context.Context, audience TokenAudience) (string, erro
 		return "", fmt.Errorf("GetToken: empty audience")
 	}
 	audienceTokensWatcher.CompareAndSwap(nil, utils.NewLazy(func() (*tokenWatcher, error) {
-		return newFileTokenSource(ctx, DefaultAudienceTokensDir, refreshAudienceTokensCache)
+		return newTokenWatcher(ctx, DefaultAudienceTokensDir, refreshAudienceTokensCache)
 	}))
 	_, err := audienceTokensWatcher.Load().Get()
 	if err != nil {
@@ -70,7 +70,7 @@ func GetAudienceToken(ctx context.Context, audience TokenAudience) (string, erro
 // GetServiceAccountToken gets the default service account token located at /var/run/secrets/kubernetes.io/serviceaccount. Do not store the token. Always call GetServiceAccountToken again to get a fresh token. Default service account token directory can be overridden using global variable DefaultServiceAccountDir
 func GetServiceAccountToken(ctx context.Context) (string, error) {
 	serviceAccountTokenWatcher.CompareAndSwap(nil, utils.NewLazy(func() (*tokenWatcher, error) {
-		return newFileTokenSource(ctx, DefaultServiceAccountDir, refreshServiceAccountTokenCache)
+		return newTokenWatcher(ctx, DefaultServiceAccountDir, refreshServiceAccountTokenCache)
 	}))
 	_, err := serviceAccountTokenWatcher.Load().Get()
 	if err != nil {
@@ -129,7 +129,7 @@ type tokenWatcher struct {
 	cancel      context.CancelFunc
 }
 
-func newFileTokenSource(ctx context.Context, tokensDir string, updateCache func(tokensDir string) error) (*tokenWatcher, error) {
+func newTokenWatcher(ctx context.Context, tokensDir string, updateCache func(tokensDir string) error) (*tokenWatcher, error) {
 	ctx, cancel := context.WithCancel(ctx)
 	tw := &tokenWatcher{
 		tokensDir:   tokensDir,
