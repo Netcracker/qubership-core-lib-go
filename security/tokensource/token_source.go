@@ -4,164 +4,175 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"path"
+	"path/filepath"
+	"strings"
 	"sync"
+	"sync/atomic"
 
 	"github.com/fsnotify/fsnotify"
 	"github.com/netcracker/qubership-core-lib-go/v3/logging"
+	"github.com/netcracker/qubership-core-lib-go/v3/utils"
 )
 
+// TokenAudience represents an audience of a Kubernetes projected volume token. For common predefined audiences see below
+type TokenAudience string
+
 const (
-	serviceAccountDir = "/var/run/secrets/kubernetes.io/serviceaccount"
-	secretsDir        = "/var/run/secrets/tokens"
+	// AudienceNetcracker is used for m2m communication between microservices in the same namespace
+	AudienceNetcracker = "netcracker"
+	// AudienceDBaaS is used for sending requests to DBaaS infra service
+	AudienceDBaaS = "dbaas"
+	// AudienceMaaS is used for sending requests to MaaS infra service
+	AudienceMaaS = "maas"
 )
 
 var (
-	logger   = logging.GetLogger("token-file-storage")
-	mu       sync.RWMutex
-	launched = make(map[string]*fileTokenSource)
+	// DefaultAudienceTokensDir is the default directory where kubernetes projected volume tokens with custom audience will be located. Set this value to override the location for test purposes
+	DefaultAudienceTokensDir = "/var/run/secrets/tokens"
+	// DefaultServiceAccountDir is the default kubernetes service account directory. GetServiceAccountToken returns the token located at this dir. Set this value to override the location for test purposes
+	DefaultServiceAccountDir = "/var/run/secrets/kubernetes.io/serviceaccount"
+
+	logger = logging.GetLogger("token-file-storage")
+
+	// we can't define lazy initializer in var section definition, because initialization
+	// function have global variables that can be redefined by consumer level code and thus
+	// values can't be captured early
+	audienceTokensWatcher      atomic.Pointer[utils.Lazy[*tokenWatcher]]
+	serviceAccountTokenWatcher atomic.Pointer[utils.Lazy[*tokenWatcher]]
+
+	audienceTokensCache      sync.Map
+	serviceAccountTokenCache atomic.Value
 )
 
-func GetToken(ctx context.Context, audience string) (string, error) {
+// GetAudienceToken gets token by audience. Do not store the token. Always call GetAudienceToken again to get a fresh token. Default tokens directory can be overridden using global variable DefaultAudienceTokensDir
+func GetAudienceToken(ctx context.Context, audience TokenAudience) (string, error) {
 	if audience == "" {
 		return "", fmt.Errorf("GetToken: empty audience")
 	}
-	return getToken(ctx, audience, secretsDir)
-}
-
-func getToken(ctx context.Context, audience string, dir string) (string, error) {
-	mu.RLock()
-	tokenSource, ok := launched[audience]
-	mu.RUnlock()
-	if ok {
-		return tokenSource.Token()
-	}
-
-	mu.Lock()
-	defer mu.Unlock()
-	tokenSource, ok = launched[audience]
-	if ok {
-		return tokenSource.Token()
-	}
-
-	entries, err := os.ReadDir(dir)
+	audienceTokensWatcher.CompareAndSwap(nil, utils.NewLazy(func() (*tokenWatcher, error) {
+		return newTokenWatcher(ctx, DefaultAudienceTokensDir, refreshAudienceTokensCache)
+	}))
+	_, err := audienceTokensWatcher.Load().Get()
 	if err != nil {
-		return "", fmt.Errorf("failed to get entries of dir %s: %w", dir, err)
+		return "", fmt.Errorf("failed to create token watcher: %w", err)
 	}
-	for _, entry := range entries {
-		if entry.Name() != audience {
-			continue
-		}
-		ts, err := newFileTokenSource(ctx, fmt.Sprintf("%s/%s/token", dir, audience))
-		if err != nil {
-			return "", fmt.Errorf("failed to create a tokensource for token with audience %s: %w", audience, err)
-		}
-		launched[audience] = ts
-		return ts.Token()
+	cachedToken, ok := audienceTokensCache.Load(audience)
+	if !ok {
+		return "", fmt.Errorf("token with audience %s was not found", audience)
 	}
-	return "", fmt.Errorf("token with audience %s not found in %s", audience, dir)
+	result := cachedToken.(tokenUpdateResult)
+	if result.err != nil {
+		return "", fmt.Errorf("failed to get token by audience: %s: %w", audience, err)
+	}
+	return result.value, nil
 }
 
-type fileTokenSource struct {
-	mu       sync.RWMutex
-	watcher  *fsnotify.Watcher
-	err      error
-	token    string
-	tokenDir string
-	cancel   context.CancelFunc
-}
-
-func NewDefault(ctx context.Context) (*fileTokenSource, error) {
-	return New(ctx, serviceAccountDir)
-}
-
-func New(ctx context.Context, tokenDir string) (*fileTokenSource, error) {
-	if tokenDir == "" {
-		return nil, fmt.Errorf("tokenDir is an empty string, use NewDefault if default service account dir needed or specify tokenDir")
-	}
-
-	ts := &fileTokenSource{
-		tokenDir: tokenDir,
-	}
-	err := ts.refreshToken()
+// GetServiceAccountToken gets the default service account token located at /var/run/secrets/kubernetes.io/serviceaccount. Do not store the token. Always call GetServiceAccountToken again to get a fresh token. Default service account token directory can be overridden using global variable DefaultServiceAccountDir
+func GetServiceAccountToken(ctx context.Context) (string, error) {
+	serviceAccountTokenWatcher.CompareAndSwap(nil, utils.NewLazy(func() (*tokenWatcher, error) {
+		return newTokenWatcher(ctx, DefaultServiceAccountDir, refreshServiceAccountTokenCache)
+	}))
+	_, err := serviceAccountTokenWatcher.Load().Get()
 	if err != nil {
-		return nil, err
+		return "", fmt.Errorf("failed to create token watcher: %w", err)
 	}
+	cachedToken := serviceAccountTokenCache.Load()
+	result := cachedToken.(tokenUpdateResult)
+	if result.err != nil {
+		return "", fmt.Errorf("failed to get token default kubernetes service account token: %w", err)
+	}
+	return result.value, nil
+}
 
-	ts.watcher, err = fsnotify.NewWatcher()
+type tokenUpdateResult struct {
+	value string
+	err   error
+}
+
+func refreshAudienceTokensCache(tokensDir string) error {
+	entries, err := os.ReadDir(tokensDir)
 	if err != nil {
-		return nil, fmt.Errorf("failed to initialize file watcher: %w", err)
+		return fmt.Errorf("failed to get dir entries from tokenDir %s: %w", tokensDir, err)
 	}
-
-	err = ts.watcher.Add(ts.tokenDir + "/")
-	if err != nil {
-		ts.watcher.Close()
-		return nil, fmt.Errorf("failed to add path %s to file watcher: %w", ts.tokenDir, err)
+	for _, tokenDir := range entries {
+		audience := tokenDir.Name()
+		token, err := readToken(filepath.Join(tokensDir, audience, "token"))
+		audienceTokensCache.Store(TokenAudience(audience), tokenUpdateResult{
+			value: token,
+			err:   err,
+		})
 	}
-
-	ctx, ts.cancel = context.WithCancel(ctx)
-	go ts.listenFs(ctx, ts.watcher.Events, ts.watcher.Errors)
-
-	return ts, nil
-}
-
-var newFileTokenSource = New
-
-func (f *fileTokenSource) Token() (string, error) {
-	f.mu.RLock()
-	defer f.mu.RUnlock()
-
-	return f.token, f.err
-}
-
-func (f *fileTokenSource) Close() {
-	f.cancel()
-}
-
-func (f *fileTokenSource) listenFs(ctx context.Context, events <-chan fsnotify.Event, errs <-chan error) {
-	for {
-		select {
-		case ev := <-events:
-			// we look for event "..data file created". kubernetes updates the token by updating the "..data" symlink token file points to.
-			if path.Base(ev.Name) == "..data" && ev.Op.Has(fsnotify.Create) {
-				logger.Infof("volume mounted token updated, refreshing token at dir %s", f.tokenDir)
-				err := f.refreshToken()
-				if err != nil {
-					msg := "watching volume token at dir %s: %v"
-					f.setError(fmt.Errorf(msg, f.tokenDir, err))
-					logger.Errorf(msg, f.tokenDir, err)
-					break
-				}
-				f.setError(nil)
-			}
-		case err := <-errs:
-			if err != nil {
-				msg := "error at volume mounted token watcher at path %s: %v"
-				f.setError(fmt.Errorf(msg, f.tokenDir, err))
-				logger.Errorf(msg, f.tokenDir, err)
-			}
-		case <-ctx.Done():
-			f.watcher.Close()
-			logger.Infof("token watcher at %s shutdown", f.tokenDir)
-			return
-		}
-	}
-}
-
-func (f *fileTokenSource) refreshToken() error {
-	f.mu.Lock()
-	defer f.mu.Unlock()
-
-	freshToken, err := os.ReadFile(f.tokenDir + "/token")
-	if err != nil {
-		return fmt.Errorf("failed to refresh token at path %s: %w", f.tokenDir+"/token", err)
-	}
-	f.token = string(freshToken)
 	return nil
 }
 
-func (f *fileTokenSource) setError(err error) {
-	f.mu.Lock()
-	defer f.mu.Unlock()
-	f.err = err
+func refreshServiceAccountTokenCache(serviceAccountDir string) error {
+	token, err := readToken(filepath.Join(serviceAccountDir, "token"))
+	serviceAccountTokenCache.Store(tokenUpdateResult{
+		value: token,
+		err:   err,
+	})
+	return nil
+}
+
+func readToken(tokenPath string) (string, error) {
+	freshToken, err := os.ReadFile(tokenPath)
+	if err != nil {
+		return "", fmt.Errorf("failed to read token at path %s: %w", tokenPath, err)
+	}
+	return string(freshToken), nil
+}
+
+type tokenWatcher struct {
+	watcher     *fsnotify.Watcher
+	tokensDir   string
+	updateCache func(string) error
+	cancel      context.CancelFunc
+}
+
+func newTokenWatcher(ctx context.Context, tokensDir string, updateCache func(tokensDir string) error) (*tokenWatcher, error) {
+	ctx, cancel := context.WithCancel(ctx)
+	tw := &tokenWatcher{
+		tokensDir:   tokensDir,
+		updateCache: updateCache,
+		cancel:      cancel,
+	}
+	err := tw.updateCache(tokensDir)
+	if err != nil {
+		return nil, fmt.Errorf("failed to refresh tokens cache: %w", err)
+	}
+	tw.watcher, err = fsnotify.NewWatcher()
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize file watcher: %w", err)
+	}
+	err = tw.watcher.Add(tokensDir)
+	if err != nil {
+		_ = tw.watcher.Close()
+		return nil, fmt.Errorf("failed to add path %s to file watcher: %w", tw.tokensDir, err)
+	}
+	go tw.listenFs(ctx, tw.watcher.Events, tw.watcher.Errors)
+	return tw, nil
+}
+
+func (tw *tokenWatcher) listenFs(ctx context.Context, events <-chan fsnotify.Event, errs <-chan error) {
+	for {
+		select {
+		case ev := <-events:
+			// we look for event "..data file created". kubernetes updates the token by updating the "..data" in tokensDir.
+			if ev.Op.Has(fsnotify.Create) && strings.Contains(ev.Name, "..data") {
+				logger.Debugf("k8s tokens updated: started refreshing k8s tokensCache")
+				err := tw.updateCache(tw.tokensDir)
+				if err != nil {
+					logger.Errorf("%v", fmt.Errorf("failed to update cache: %w", err))
+					break
+				}
+				logger.Debugf("k8s tokensCache refreshed")
+			}
+		case err := <-errs:
+			logger.Error("%v", fmt.Errorf("error at k8s volume mounted token watcher: %w", err))
+		case <-ctx.Done():
+			_ = tw.watcher.Close()
+			logger.Infof("k8s token watcher shutdown")
+			return
+		}
+	}
 }
