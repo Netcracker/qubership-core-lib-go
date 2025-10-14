@@ -26,11 +26,24 @@ type Claims struct {
 }
 
 type K8sClaims struct {
-	Namespace      string         `json:"namespace,omitempty"`
-	ServiceAccount ServiceAccount `json:"serviceaccount"`
+	Namespace      string              `json:"namespace,omitempty"`
+	ServiceAccount ServiceAccountClaim `json:"serviceaccount"`
+	Node           NodeClaim           `json:"node"`
+	Pod            PodClaim            `json:"pod"`
+	WarnAfter      *jwt.NumericDate    `json:"warnafter,omitempty"`
 }
 
-type ServiceAccount struct {
+type ServiceAccountClaim struct {
+	Name string `json:"name,omitempty"`
+	Uid  string `json:"uid,omitempty"`
+}
+
+type NodeClaim struct {
+	Name string `json:"name,omitempty"`
+	Uid  string `json:"uid,omitempty"`
+}
+
+type PodClaim struct {
 	Name string `json:"name,omitempty"`
 	Uid  string `json:"uid,omitempty"`
 }

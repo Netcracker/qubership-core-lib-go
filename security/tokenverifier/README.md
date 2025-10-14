@@ -135,11 +135,22 @@ type Claims struct {
 }
 
 type K8sClaims struct {
-    Namespace      string         `json:"namespace,omitempty"`
-    ServiceAccount ServiceAccount `json:"serviceaccount"`
+    Namespace      string              `json:"namespace,omitempty"`
+    ServiceAccount ServiceAccountClaim `json:"serviceaccount"`
+	Node           NodeClaim           `json:"node"`
+	Pod            PodClaim            `json:"pod"`
 }
 
-type ServiceAccount struct {
+type ServiceAccountClaim struct {
+    Name string `json:"name,omitempty"`
+    Uid  string `json:"uid,omitempty"`
+}
+type NodeClaim struct {
+    Name string `json:"name,omitempty"`
+    Uid  string `json:"uid,omitempty"`
+}
+
+type PodClaim struct {
     Name string `json:"name,omitempty"`
     Uid  string `json:"uid,omitempty"`
 }
@@ -211,34 +222,6 @@ The verifier uses the following retry policy for OIDC operations:
 
 These values are optimized for production use and handle transient network issues automatically.
 
-### Kubernetes Prerequisites
-
-The verifier requires a Kubernetes projected service account token volume. Ensure your deployment has the following configuration:
-
-```yaml
-apiVersion: v1
-kind: Pod
-metadata:
-  name: my-service
-spec:
-  serviceAccountName: my-service-account
-  containers:
-  - name: app
-    image: my-image
-    volumeMounts:
-    - name: token
-      mountPath: /var/run/secrets/kubernetes.io/serviceaccount
-      readOnly: true
-  volumes:
-  - name: token
-    projected:
-      sources:
-      - serviceAccountToken:
-          audience: my-service  # Must match verifier audience
-          expirationSeconds: 3600
-          path: token
-```
-
 ## Architecture
 
 ### Retry Policy
@@ -277,115 +260,6 @@ The verifier uses a secure HTTP transport that:
 4. **Signature Verification** - Cryptographically verify token signature
 5. **Claims Validation** - Verify audience, expiration, and required claims
 6. **Claims Extraction** - Parse and return validated claims
-
-## API Reference
-
-### Types
-
-#### Verifier Interface
-
-```go
-type Verifier interface {
-    Verify(ctx context.Context, rawToken string) (*Claims, error)
-}
-```
-
-Primary interface for token verification.
-
-#### Claims
-
-```go
-type Claims struct {
-    jwt.RegisteredClaims
-    Kubernetes K8sClaims `json:"kubernetes.io"`
-}
-```
-
-Contains all claims extracted from a verified token.
-
-#### K8sClaims
-
-```go
-type K8sClaims struct {
-    Namespace      string         `json:"namespace,omitempty"`
-    ServiceAccount ServiceAccount `json:"serviceaccount"`
-}
-```
-
-Kubernetes-specific claims including namespace and service account information.
-
-#### ServiceAccount
-
-```go
-type ServiceAccount struct {
-    Name string `json:"name,omitempty"`
-    Uid  string `json:"uid,omitempty"`
-}
-```
-
-Service account identity information.
-
-### Functions
-
-#### New
-
-```go
-func New(ctx context.Context, audience string) (Verifier, error)
-```
-
-Creates a new token verifier.
-
-**Parameters:**
-- `ctx` - Context for OIDC provider initialization
-- `audience` - Expected audience claim value (typically your service identifier)
-
-**Returns:**
-- `Verifier` - Token verifier instance
-- `error` - Error if initialization fails
-
-**Errors:**
-- Projected volume token not found or misconfigured
-- Unable to parse token or extract issuer
-- OIDC provider unreachable or invalid
-
-**Example:**
-```go
-verifier, err := tokenverifier.New(ctx, "my-api-gateway")
-if err != nil {
-    log.Fatalf("Failed to initialize verifier: %v", err)
-}
-```
-
-#### Verify
-
-```go
-func (vf *verifier) Verify(ctx context.Context, rawToken string) (*Claims, error)
-```
-
-Verifies a token and extracts claims.
-
-**Parameters:**
-- `ctx` - Context for verification operation
-- `rawToken` - Raw JWT token string
-
-**Returns:**
-- `*Claims` - Verified token claims
-- `error` - Error if verification fails
-
-**Errors:**
-- Token signature invalid
-- Token expired or not yet valid
-- Audience mismatch
-- Required claims missing
-- Malformed token
-
-**Example:**
-```go
-claims, err := verifier.Verify(ctx, bearerToken)
-if err != nil {
-    return fmt.Errorf("invalid token: %w", err)
-}
-```
 
 ## Examples
 

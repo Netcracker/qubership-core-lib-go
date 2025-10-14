@@ -47,7 +47,7 @@ var tests = []struct {
 			},
 			Kubernetes: K8sClaims{
 				Namespace: namespace,
-				ServiceAccount: ServiceAccount{
+				ServiceAccount: ServiceAccountClaim{
 					Name: sa,
 					Uid:  uuid,
 				},
@@ -67,7 +67,7 @@ var tests = []struct {
 			},
 			Kubernetes: K8sClaims{
 				Namespace: namespace,
-				ServiceAccount: ServiceAccount{
+				ServiceAccount: ServiceAccountClaim{
 					Name: sa,
 					Uid:  uuid,
 				},
@@ -87,7 +87,7 @@ var tests = []struct {
 			},
 			Kubernetes: K8sClaims{
 				Namespace: namespace,
-				ServiceAccount: ServiceAccount{
+				ServiceAccount: ServiceAccountClaim{
 					Name: sa,
 					Uid:  uuid,
 				},
@@ -108,7 +108,7 @@ var tests = []struct {
 			},
 			Kubernetes: K8sClaims{
 				Namespace: namespace,
-				ServiceAccount: ServiceAccount{
+				ServiceAccount: ServiceAccountClaim{
 					Name: sa,
 					Uid:  uuid,
 				},
@@ -138,7 +138,7 @@ func TestVerifier(t *testing.T) {
 		},
 		Kubernetes: K8sClaims{
 			Namespace: "default",
-			ServiceAccount: ServiceAccount{
+			ServiceAccount: ServiceAccountClaim{
 				Name: "default",
 				Uid:  "12345678-1234-1234-1234-1234567890ab",
 			},
