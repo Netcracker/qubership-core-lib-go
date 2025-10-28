@@ -5,15 +5,20 @@ import (
 	"errors"
 	"fmt"
 	"math"
-	"strings"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/netcracker/qubership-core-lib-go/v3/utils"
 )
 
-// see https://openid.net/specs/openid-connect-core-1_0.html#IDToken and https://datatracker.ietf.org/doc/html/rfc7519
-// see https://openid.net/specs/openid-connect-discovery-1_0.html#ProviderConfig
+// Standard JWT claim names used in OpenID Connect and JSON Web Tokens (JWT).
+// These constants represent the registered claim names defined in:
+//   - OpenID Connect Core 1.0, Section 2 “ID Token”:
+//     https://openid.net/specs/openid-connect-core-1_0.html#IDToken
+//   - RFC 7519 “JSON Web Token (JWT)”:
+//     https://datatracker.ietf.org/doc/html/rfc7519
+// The claims are commonly included in ID Tokens issued by OpenID Providers and
+// are used for subject identification, audience restriction, and token lifetime validation.
 const (
 	Iss = "iss"
 	Sub = "sub"
@@ -22,19 +27,18 @@ const (
 	Nbf = "nbf"
 	Iat = "iat"
 	Jti = "jti"
+)
 
-	OpenIdConfigurationSubPath = "/.well-known/openid-configuration"
-
+const (
 	claimIsInvalid = "%s is invalid, expected %s, but got %T"
 	claimIsMissed  = "%s is missed"
 )
 
-var ErrTokenClaimMissing = errors.New("token is missing claim")
-var ErrTokenClaimsUnsupported = errors.New("token has unsupported claims implementation")
+var (
+	ErrTokenClaimMissing      = errors.New("token is missing claim")
+	ErrTokenClaimsUnsupported = errors.New("token has unsupported claims implementation")
+)
 
-func GetOidcEndpointUrl(issuer string) string {
-	return strings.TrimSuffix(issuer, "/") + OpenIdConfigurationSubPath
-}
 func GetValue(token *jwt.Token, claim string) (any, error) {
 	claims, err := getMapClaims(token)
 	if err != nil {

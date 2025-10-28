@@ -27,11 +27,6 @@ const (
 	keycloakNoRolesPayload         = "../token/test_data/keycloakNoRolesPayload.json"
 )
 
-func Test_GetOidcEndpointUrl(t *testing.T) {
-	assert.Equal(t, "/.well-known/openid-configuration", GetOidcEndpointUrl(""))
-	assert.Equal(t, "http://localhost:8080/.well-known/openid-configuration", GetOidcEndpointUrl("http://localhost:8080"))
-	assert.Equal(t, "http://localhost:8080/.well-known/openid-configuration", GetOidcEndpointUrl("http://localhost:8080/"))
-}
 func Test_GetValue(t *testing.T) {
 	value, err := GetValue(nil, Iss)
 	assert.ErrorContains(t, err, "token is nil")

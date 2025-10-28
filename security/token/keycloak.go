@@ -2,8 +2,13 @@ package token
 
 import "github.com/golang-jwt/jwt/v5"
 
-// see https://openid.net/specs/openid-connect-core-1_0.html#StandardClaims
-// see https://www.keycloak.org/docs/latest/server_admin/index.html#_oidc_token_role_mappings
+// Standard OpenID Connect and Keycloak-specific claim names.
+// These constants represent commonly used claim names found in OpenID Connect
+// ID Tokens and UserInfo responses, as well as Keycloak-specific claims related to role mappings.
+//   - OpenID Connect Core 1.0, Section 5.1 “Standard Claims”:
+//     https://openid.net/specs/openid-connect-core-1_0.html#StandardClaims
+//   - Keycloak Server Administration Guide, “OIDC Token Role Mappings”:
+//     https://www.keycloak.org/docs/latest/server_admin/index.html#_oidc_token_role_mappings
 const (
 	GivenName         = "given_name"
 	FamilyName        = "family_name"

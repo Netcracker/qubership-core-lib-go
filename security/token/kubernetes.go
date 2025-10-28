@@ -6,7 +6,11 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 )
 
-// see https://kubernetes.io/docs/tasks/configure-pod-container/configure-service-account/
+// Kubernetes-related claim and identifier constants.
+// These constants are commonly used when working with Kubernetes service accounts,
+// projected tokens, or identity claims associated with workloads running inside the cluster.
+//   - Kubernetes Documentation, “Configure Service Accounts for Pods”:
+//     https://kubernetes.io/docs/tasks/configure-pod-container/configure-service-account/
 const (
 	KubernetesIo            = "kubernetes.io"
 	Namespace               = "namespace"

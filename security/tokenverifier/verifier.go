@@ -3,7 +3,6 @@ package tokenverifier
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"mime"
@@ -14,7 +13,7 @@ import (
 	"github.com/MicahParks/keyfunc/v3"
 	"github.com/failsafe-go/failsafe-go/failsafehttp"
 	"github.com/golang-jwt/jwt/v5"
-	"github.com/netcracker/qubership-core-lib-go/v3/security/token"
+	"github.com/netcracker/qubership-core-lib-go/v3/security/oidc"
 	"github.com/netcracker/qubership-core-lib-go/v3/security/tokensource"
 )
 
@@ -29,26 +28,33 @@ type Verifier interface {
 	Verify(ctx context.Context, rawToken string) (*jwt.Token, error)
 }
 
-type verifier struct {
-	parser  *jwt.Parser
-	keyFunc keyfunc.Keyfunc
-}
-
-type kubernetesVerifier struct {
-	verifier
+type KubernetesVerifier struct {
+	parser      *jwt.Parser
+	keyFunc     keyfunc.Keyfunc
+	validations []Validation
 }
 
 type getTokenFunc func() (string, error)
 
-func NewKubernetesVerifier(ctx context.Context, audience string) (Verifier, error) {
+func NewKubernetesVerifier(ctx context.Context, audience string, options ...VerifierOptions) (Verifier, error) {
 	return newKubernetesVerifier(ctx, audience, func() (string, error) {
 		return tokensource.GetServiceAccountToken(ctx)
-	})
+	}, options)
 }
-func (vf *verifier) Verify(ctx context.Context, rawToken string) (*jwt.Token, error) {
-	return vf.parser.Parse(rawToken, vf.keyFunc.KeyfuncCtx(ctx))
+func (vf *KubernetesVerifier) Verify(ctx context.Context, rawToken string) (*jwt.Token, error) {
+	token, err := vf.parser.Parse(rawToken, vf.keyFunc.KeyfuncCtx(ctx))
+	if err != nil {
+		return nil, err
+	}
+
+	for _, validation := range vf.validations {
+		if ok, validationErr := validation(token); !ok {
+			return nil, validationErr
+		}
+	}
+	return token, nil
 }
-func newKubernetesVerifier(ctx context.Context, audience string, getToken getTokenFunc) (*kubernetesVerifier, error) {
+func newKubernetesVerifier(ctx context.Context, audience string, getToken getTokenFunc, options []VerifierOptions) (*KubernetesVerifier, error) {
 	trustedIssuer, err := getTrustedIssuer(getToken)
 	if err != nil {
 		return nil, err
@@ -57,12 +63,15 @@ func newKubernetesVerifier(ctx context.Context, audience string, getToken getTok
 	if err != nil {
 		return nil, err
 	}
-	return &kubernetesVerifier{
-		verifier: verifier{
-			parser:  newJwtParser(trustedIssuer, audience),
-			keyFunc: keyFunc,
-		},
-	}, nil
+	v := &KubernetesVerifier{
+		parser:  newJwtParser(trustedIssuer, audience),
+		keyFunc: keyFunc,
+	}
+	for _, option := range options {
+		option(v)
+	}
+
+	return v, nil
 }
 func getTrustedIssuer(getToken getTokenFunc) (string, error) {
 	rawToken, err := getToken()
@@ -81,13 +90,13 @@ func getTrustedIssuer(getToken getTokenFunc) (string, error) {
 }
 func newKeyFunction(ctx context.Context, trustedIssuer string, getToken getTokenFunc) (keyfunc.Keyfunc, error) {
 	httpClient := newHttpClient(getToken)
-	request, err := http.NewRequest(http.MethodGet, token.GetOidcEndpointUrl(trustedIssuer), nil)
+	request, err := http.NewRequest(http.MethodGet, oidc.GetProviderUrl(trustedIssuer), nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create oidc request: %w", err)
 	}
 	response, err := httpClient.Do(request)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to send oidc request (the possible cause is outdated base image without kubernetes service account ca.crt, please check your base image version.): %w", err)
 	}
 	defer response.Body.Close()
 	body, err := io.ReadAll(response.Body)
@@ -97,14 +106,14 @@ func newKeyFunction(ctx context.Context, trustedIssuer string, getToken getToken
 	if response.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("%s: %s", response.Status, body)
 	}
-	var oidcResponse OidcResponse
-	err = unmarshalResponse(response, body, &oidcResponse)
+	var providerResponse oidc.ProviderResponse
+	err = unmarshalResponse(response, body, &providerResponse)
 	if err != nil {
 		return nil, fmt.Errorf("oidc: failed to decode provider discovery object: %v", err)
 	}
 	return keyfunc.NewDefaultOverrideCtx(
 		ctx,
-		[]string{oidcResponse.JwksUri},
+		[]string{providerResponse.JwksUri},
 		keyfunc.Override{Client: &httpClient},
 	)
 }
@@ -131,8 +140,7 @@ func newHttpClient(getToken getTokenFunc) http.Client {
 	}
 }
 func isRetryNeeded(response *http.Response, err error) bool {
-	var urlError *url.Error
-	isUrlErr := errors.As(err, &urlError)
+	_, isUrlErr := err.(*url.Error)
 	switch {
 	case isUrlErr:
 		return false
