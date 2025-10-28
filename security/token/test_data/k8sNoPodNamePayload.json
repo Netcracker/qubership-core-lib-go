@@ -1,0 +1,23 @@
+{
+  "aud": "audience1",
+  "exp": 1757656985,
+  "iat": 1757656385,
+  "iss": "https://kubernetes.default.svc.cluster.local",
+  "jti": "cca3c408-f65c-4daa-a45e-5e390ffe0540",
+  "kubernetes.io": {
+    "namespace": "namespace",
+    "node": {
+      "name": "node",
+      "uid": "225d44ac-4729-4277-bd20-450859a10d0f"
+    },
+    "pod": {
+      "uid": "6b52c6a5-614f-484d-a329-80de170a45e6"
+    },
+    "serviceaccount": {
+      "name": "service",
+      "uid": "530f2aa0-ed7b-4923-886b-2223a0dadae4"
+    }
+  },
+  "nbf": 1757656385,
+  "sub": "system:serviceaccount:namespace:service"
+}

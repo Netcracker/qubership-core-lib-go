@@ -2,105 +2,91 @@ package tokensource
 
 import (
 	"context"
-	"os"
-	"path/filepath"
 	"testing"
 	"time"
 
+	"github.com/netcracker/qubership-core-lib-go/v3/test"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-)
-
-var (
-	testAudience                  = "test-audience"
-	tokensDir                     string
-	audienceTokensDataDir         string
-	audienceTokensDataSymlinkPath string
-	saLinkPath                    string
-	tokenFile                     *os.File
 )
 
 func TestFileTokenSource(t *testing.T) {
 	ctx, cancelCtx := context.WithTimeout(context.Background(), time.Minute)
 	defer cancelCtx()
-
-	setupTokensDir(t)
 	var err error
-	firstValidToken := "first_valid_token"
-	err = os.WriteFile(tokenFile.Name(), []byte(firstValidToken), 0)
+	var ok bool
+
+	audienceTokensStorage, err := test.NewAudienceTokensStorage(t.TempDir())
+	require.NoError(t, err)
+	serviceAccountTokenStorage, err := test.NewServiceAccountTokenStorage(t.TempDir())
 	require.NoError(t, err)
 
-	DefaultAudienceTokensDir = tokensDir
-	DefaultServiceAccountDir = filepath.Join(tokensDir, testAudience)
+	DefaultAudienceTokensDir = audienceTokensStorage.AudienceTokensDir
+	DefaultServiceAccountDir = serviceAccountTokenStorage.ServiceAccountTokenDir
 
-	token, err := GetAudienceToken(ctx, TokenAudience(testAudience))
+	netcrackerTokenInitialValue := "netcracker_token_initial_value"
+	err, ok = audienceTokensStorage.SaveTokenValue(AudienceNetcracker, netcrackerTokenInitialValue)
+	assert.True(t, ok)
 	require.NoError(t, err)
-	assert.Equal(t, firstValidToken, token)
+
+	dbaasTokenInitialValue := "dbaas_token_initial_value"
+	err, ok = audienceTokensStorage.SaveTokenValue(AudienceDBaaS, dbaasTokenInitialValue)
+	assert.True(t, ok)
+	require.NoError(t, err)
+
+	serviceAccountTokenInitialValue := "service_account_token_initial_value"
+	err, ok = serviceAccountTokenStorage.SaveTokenValue(serviceAccountTokenInitialValue)
+	assert.True(t, ok)
+	require.NoError(t, err)
+
+	token, err := GetAudienceToken(ctx, AudienceNetcracker)
+	require.NoError(t, err)
+	assert.Equal(t, netcrackerTokenInitialValue, token)
+
+	token, err = GetAudienceToken(ctx, AudienceDBaaS)
+	require.NoError(t, err)
+	assert.Equal(t, dbaasTokenInitialValue, token)
 
 	token, err = GetServiceAccountToken(ctx)
 	require.NoError(t, err)
-	assert.Equal(t, firstValidToken, token)
+	assert.Equal(t, serviceAccountTokenInitialValue, token)
 
-	secondValidToken := "second_valid_token"
-	err = os.WriteFile(tokenFile.Name(), []byte(secondValidToken), 0)
+	netcrackerTokenSecondValue := "netcracker_token_second_value"
+	err, ok = audienceTokensStorage.SaveTokenValue(AudienceNetcracker, netcrackerTokenSecondValue)
+	assert.True(t, ok)
 	require.NoError(t, err)
 
-	refreshDataSymlink(t, audienceTokensDataDir, audienceTokensDataSymlinkPath)
-	time.Sleep(time.Millisecond * 50)
-
-	token, err = GetAudienceToken(ctx, TokenAudience(testAudience))
+	token, err = GetAudienceToken(ctx, AudienceNetcracker)
 	require.NoError(t, err)
-	assert.Equal(t, secondValidToken, token)
+	assert.Equal(t, netcrackerTokenSecondValue, token)
 
-	refreshDataSymlink(t, tokenFile.Name(), saLinkPath)
-	time.Sleep(time.Millisecond * 50)
+	dbaasTokenSecondValue := "dbaas_token_second_value"
+	err, ok = audienceTokensStorage.SaveTokenValue(AudienceDBaaS, dbaasTokenSecondValue)
+	assert.True(t, ok)
+	require.NoError(t, err)
+
+	token, err = GetAudienceToken(ctx, AudienceDBaaS)
+	require.NoError(t, err)
+	assert.Equal(t, dbaasTokenSecondValue, token)
+
+	serviceAccountTokenSecondValue := "service_account_token_second_value"
+	err, ok = serviceAccountTokenStorage.SaveTokenValue(serviceAccountTokenSecondValue)
+	assert.True(t, ok)
+	require.NoError(t, err)
 
 	token, err = GetServiceAccountToken(ctx)
 	require.NoError(t, err)
-	assert.Equal(t, secondValidToken, token)
+	assert.Equal(t, serviceAccountTokenSecondValue, token)
 
 	audienceTokensWatcher.Store(nil)
 	serviceAccountTokenWatcher.Store(nil)
 }
 
-func TestGetToken(t *testing.T) {
+func TestGetAudienceTokenEmptyAudience(t *testing.T) {
 	ctx, cancelCtx := context.WithCancel(context.Background())
 	defer cancelCtx()
-	_, err := GetAudienceToken(ctx, "")
-	assert.Error(t, err)
-}
-
-func setupTokensDir(t *testing.T) {
-	tokensDir = t.TempDir()
-
 	var err error
-	audienceTokensDataDir, err = os.MkdirTemp(tokensDir, "")
-	require.NoError(t, err)
 
-	audienceTokensDataSymlinkPath = filepath.Join(tokensDir, "..data")
-	err = os.Symlink(audienceTokensDataDir, audienceTokensDataSymlinkPath)
-	require.NoError(t, err)
-
-	testAudienceTokenDir := filepath.Join(audienceTokensDataDir, testAudience)
-	err = os.Mkdir(testAudienceTokenDir, 0775)
-	require.NoError(t, err)
-
-	tokenFile, err = os.Create(filepath.Join(testAudienceTokenDir, "token"))
-	require.NoError(t, err)
-	defer tokenFile.Close()
-
-	testAudienceTokenDirLink := filepath.Join(tokensDir, testAudience)
-	err = os.Symlink(filepath.Join(audienceTokensDataSymlinkPath, testAudience), testAudienceTokenDirLink)
-	require.NoError(t, err)
-
-	saLinkPath = filepath.Join(tokensDir, testAudience, "..data")
-	err = os.Symlink(tokenFile.Name(), saLinkPath)
-	require.NoError(t, err)
-}
-
-func refreshDataSymlink(t *testing.T, dataDir string, symlinkPath string) {
-	err := os.Remove(symlinkPath)
-	require.NoError(t, err)
-	err = os.Symlink(dataDir, symlinkPath)
-	require.NoError(t, err)
+	_, err = GetAudienceToken(ctx, "")
+	assert.ErrorContains(t, err, "audience is empty")
 }

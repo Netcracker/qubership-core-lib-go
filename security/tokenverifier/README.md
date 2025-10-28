@@ -595,7 +595,6 @@ mockVerifier := &MockVerifier{
 
 ## Dependencies
 
-- `github.com/coreos/go-oidc/v3/oidc` - OIDC token verification
 - `github.com/failsafe-go/failsafe-go/failsafehttp` - Retry and circuit breaker
 - `github.com/golang-jwt/jwt/v5` - JWT parsing
 - `github.com/netcracker/qubership-core-lib-go/v3/security/tokensource` - Service account token retrieval

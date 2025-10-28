@@ -2,82 +2,83 @@ package tokenverifier
 
 import (
 	"context"
-	"crypto"
 	"crypto/rand"
 	"crypto/rsa"
 	"encoding/base64"
 	"encoding/json"
 	"math/big"
 	"net/http"
-	"net/http/httptest"
-	"os"
-	"path/filepath"
 	"testing"
 	"time"
 
-	openid "github.com/coreos/go-oidc/v3/oidc"
+	"github.com/MicahParks/jwkset"
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/netcracker/qubership-core-lib-go/v3/security/token"
 	"github.com/netcracker/qubership-core-lib-go/v3/security/tokensource"
+	"github.com/netcracker/qubership-core-lib-go/v3/test"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 const (
-	aud       = "maas"
-	sa        = "test-service-account"
-	sub       = "system:serviceaccount:default:test-service-account"
-	namespace = "default"
-	uuid      = "test-uuid"
+	jwksSubPath    = "/jwks"
+	serviceAccount = "test-service-account"
+	namespace      = "test-namespace"
+	uuid           = "test-uuid"
 )
 
-var tests = []struct {
-	name   string
-	claims Claims
-	ok     bool
+var (
+	sub = token.GetKubernetesSubject(namespace, serviceAccount)
+)
+
+var scenarios = []struct {
+	name         string
+	claims       token.KubernetesClaims
+	errorMessage string
 }{
 	{
 		name: "valid token",
-		claims: Claims{
+		claims: token.KubernetesClaims{
 			RegisteredClaims: jwt.RegisteredClaims{
 				Subject:   sub,
-				Audience:  jwt.ClaimStrings{aud},
+				Audience:  jwt.ClaimStrings{tokensource.AudienceMaaS},
 				ExpiresAt: jwt.NewNumericDate(time.Now().Add(1 * time.Hour)),
 				NotBefore: jwt.NewNumericDate(time.Now()),
 				IssuedAt:  jwt.NewNumericDate(time.Now()),
 			},
-			Kubernetes: K8sClaims{
+			KubernetesIo: token.KubernetesIoClaim{
 				Namespace: namespace,
-				ServiceAccount: ServiceAccountClaim{
-					Name: sa,
+				ServiceAccount: token.ServiceAccountClaim{
+					Name: serviceAccount,
 					Uid:  uuid,
 				},
 			},
 		},
-		ok: true,
+		errorMessage: "",
 	},
 	{
 		name: "expired token",
-		claims: Claims{
+		claims: token.KubernetesClaims{
 			RegisteredClaims: jwt.RegisteredClaims{
 				Subject:   sub,
-				Audience:  jwt.ClaimStrings{aud},
+				Audience:  jwt.ClaimStrings{tokensource.AudienceMaaS},
 				ExpiresAt: jwt.NewNumericDate(time.Now().Add(-1 * time.Minute)),
 				NotBefore: jwt.NewNumericDate(time.Now()),
 				IssuedAt:  jwt.NewNumericDate(time.Now()),
 			},
-			Kubernetes: K8sClaims{
+			KubernetesIo: token.KubernetesIoClaim{
 				Namespace: namespace,
-				ServiceAccount: ServiceAccountClaim{
-					Name: sa,
+				ServiceAccount: token.ServiceAccountClaim{
+					Name: serviceAccount,
 					Uid:  uuid,
 				},
 			},
 		},
-		ok: false,
+		errorMessage: "token has invalid claims: token is expired",
 	},
 	{
 		name: "wrong audience",
-		claims: Claims{
+		claims: token.KubernetesClaims{
 			RegisteredClaims: jwt.RegisteredClaims{
 				Subject:   sub,
 				Audience:  jwt.ClaimStrings{"some-other-aud"},
@@ -85,166 +86,136 @@ var tests = []struct {
 				NotBefore: jwt.NewNumericDate(time.Now()),
 				IssuedAt:  jwt.NewNumericDate(time.Now()),
 			},
-			Kubernetes: K8sClaims{
+			KubernetesIo: token.KubernetesIoClaim{
 				Namespace: namespace,
-				ServiceAccount: ServiceAccountClaim{
-					Name: sa,
+				ServiceAccount: token.ServiceAccountClaim{
+					Name: serviceAccount,
 					Uid:  uuid,
 				},
 			},
 		},
-		ok: false,
+		errorMessage: "token has invalid claims: token has invalid audience",
 	},
 	{
 		name: "wrong issuer",
-		claims: Claims{
+		claims: token.KubernetesClaims{
 			RegisteredClaims: jwt.RegisteredClaims{
 				Subject:   sub,
 				Issuer:    "https://accounts.google.com",
-				Audience:  jwt.ClaimStrings{aud},
+				Audience:  jwt.ClaimStrings{tokensource.AudienceMaaS},
 				ExpiresAt: jwt.NewNumericDate(time.Now().Add(1 * time.Hour)),
 				NotBefore: jwt.NewNumericDate(time.Now()),
 				IssuedAt:  jwt.NewNumericDate(time.Now()),
 			},
-			Kubernetes: K8sClaims{
+			KubernetesIo: token.KubernetesIoClaim{
 				Namespace: namespace,
-				ServiceAccount: ServiceAccountClaim{
-					Name: sa,
+				ServiceAccount: token.ServiceAccountClaim{
+					Name: serviceAccount,
 					Uid:  uuid,
 				},
 			},
 		},
-		ok: false,
+		errorMessage: "token has invalid claims: token has invalid issuer",
 	},
 }
 
 func TestVerifier(t *testing.T) {
+	ctx, cancelCtx := context.WithTimeout(context.Background(), time.Minute)
+	defer cancelCtx()
+
 	key, err := rsa.GenerateKey(rand.Reader, 2048)
 	require.NoError(t, err)
 
-	var tvClientToken string
-	server, err := setupServer(&key.PublicKey, &tvClientToken)
-	require.NoError(t, err)
-	defer server.Close()
+	test.StartMockServer()
 
-	clientToken, err := generateJwt(key, Claims{
+	serviceAccountToken := test.CreateSignedTokenString(t, key, token.KubernetesClaims{
 		RegisteredClaims: jwt.RegisteredClaims{
-			Issuer:    server.URL,
-			Subject:   "system:serviceaccount:default:default",
-			Audience:  jwt.ClaimStrings{"kubernetes.default.svc"},
+			Issuer:    test.GetMockServerUrl(),
+			Subject:   sub,
+			Audience:  jwt.ClaimStrings{"https://kubernetes.default.svc.cluster.local"},
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(1 * time.Hour)),
 			NotBefore: jwt.NewNumericDate(time.Now()),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
 		},
-		Kubernetes: K8sClaims{
-			Namespace: "default",
-			ServiceAccount: ServiceAccountClaim{
-				Name: "default",
-				Uid:  "12345678-1234-1234-1234-1234567890ab",
+		KubernetesIo: token.KubernetesIoClaim{
+			Namespace: namespace,
+			ServiceAccount: token.ServiceAccountClaim{
+				Name: serviceAccount,
+				Uid:  uuid,
 			},
 		},
 	})
-	require.NoError(t, err)
-	tvClientToken = clientToken
 
-	ctx := openid.ClientContext(context.Background(), server.Client())
-
-	tokenFile, err := os.Create(filepath.Join(t.TempDir(), "token"))
-	require.NoError(t, err)
-	defer tokenFile.Close()
-	_, err = tokenFile.Write([]byte(tvClientToken))
+	prepareHandlers(&key.PublicKey, &serviceAccountToken)
 	require.NoError(t, err)
 
-	tokenDir := filepath.Dir(tokenFile.Name())
-	tokensource.DefaultServiceAccountDir = tokenDir
-
-	v, err := New(ctx, aud)
+	tokenStorage, err := test.NewServiceAccountTokenStorage(t.TempDir())
+	require.NoError(t, err)
+	tokensource.DefaultServiceAccountDir = tokenStorage.ServiceAccountTokenDir
+	err, ok := tokenStorage.SaveTokenValue(serviceAccountToken)
+	assert.True(t, ok)
 	require.NoError(t, err)
 
-	for _, test := range tests {
-		if test.claims.Issuer == "" {
-			test.claims.Issuer = server.URL
+	maasTokenVerifier, err := NewKubernetesVerifier(ctx, tokensource.AudienceMaaS)
+	require.NoError(t, err)
+
+	for _, scenario := range scenarios {
+		if scenario.claims.Issuer == "" {
+			scenario.claims.Issuer = test.GetMockServerUrl()
 		}
-		rawToken, err := generateJwt(key, test.claims)
-		require.NoError(t, err)
-		claims, err := v.Verify(context.Background(), rawToken)
-		if test.ok {
-			assert.NoError(t, err, "test %q: expected no error, got: %v", test.name, err)
-			if assert.NotNil(t, claims, "test %q: expected claims, got nil", test.name) {
-				assert.Equal(t, test.claims.Kubernetes, claims.Kubernetes, "test %q: unexpected Kubernetes claim", test.name)
+		rawToken := test.CreateSignedTokenString(t, key, scenario.claims)
+		actualToken, verificationErr := maasTokenVerifier.Verify(context.Background(), rawToken)
+		if scenario.errorMessage == "" {
+			assert.NoError(t, verificationErr, "test %q: expected no error, got: %v", scenario.name, verificationErr)
+			if assert.NotNil(t, actualToken, "test %q: expected claims, got nil", scenario.name) {
+				actualKubernetesIoClaim, getClaimErr := token.GetKubernetesIo(actualToken)
+				assert.Nil(t, getClaimErr)
+				assert.Equal(t, scenario.claims.KubernetesIo, actualKubernetesIoClaim, "test %q: unexpected Kubernetes claim", scenario.name)
 			}
 		} else {
-			assert.Error(t, err, "test %q: expected error, got none", test.name)
+			assert.ErrorContains(t, verificationErr, scenario.errorMessage)
 		}
 	}
+
+	test.StopMockServer()
 }
 
-func generateJwt(key crypto.PrivateKey, claims Claims) (string, error) {
-	token := jwt.NewWithClaims(jwt.SigningMethodRS256, claims)
-	rawToken, err := token.SignedString(key)
-	if err != nil {
-		return "", err
-	}
-	return rawToken, nil
-}
-
-type jsonWebKey struct {
-	KeyType   string `json:"kty"`
-	KeyID     string `json:"kid"`
-	Algorithm string `json:"alg"`
-	Use       string `json:"use"`
-	N         string `json:"n"`
-	E         string `json:"e"`
-}
-
-func setupServer(key *rsa.PublicKey, clientToken *string) (*httptest.Server, error) {
-	jwks := struct {
-		Keys []jsonWebKey `json:"keys"`
-	}{
-		Keys: []jsonWebKey{{
-			KeyType:   "RSA",
-			KeyID:     "key-1",
-			Algorithm: string(jwt.SigningMethodRS256.Alg()),
-			Use:       "sig",
-			N:         toHexBase64(key.N),
-			E:         toHexBase64(big.NewInt(int64(key.E))),
-		}},
-	}
-	rawJwks, err := json.Marshal(jwks)
-	if err != nil {
-		return nil, err
-	}
-	openidConf := struct {
-		JwksUri string `json:"jwks_uri"`
-		Issuer  string `json:"issuer"`
-	}{}
-	var server *httptest.Server
-	server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Header.Get("Authorization") != "Bearer "+*clientToken {
-			w.WriteHeader(http.StatusUnauthorized)
-			return
-		}
-
-		switch r.URL.Path {
-		case "/.well-known/openid-configuration":
-			if openidConf.Issuer == "" {
-				openidConf.Issuer = server.URL
+func prepareHandlers(key *rsa.PublicKey, serviceAccountToken *string) {
+	test.AddHandler(test.Contains(token.OpenIdConfigurationSubPath),
+		func(responseWriter http.ResponseWriter, request *http.Request) {
+			if request.Header.Get("Authorization") != "Bearer "+*serviceAccountToken {
+				responseWriter.WriteHeader(http.StatusUnauthorized)
+				return
 			}
-			if openidConf.JwksUri == "" {
-				openidConf.JwksUri = server.URL + "/jwks"
+			oidcResponse := OidcResponse{
+				Issuer:  test.GetMockServerUrl(),
+				JwksUri: test.GetMockServerUrl() + jwksSubPath,
 			}
-			openidConfJson, err := json.Marshal(openidConf)
-			if err != nil {
-				panic(err)
+			responseBody, _ := json.Marshal(oidcResponse)
+			_, _ = responseWriter.Write(responseBody)
+		})
+
+	test.AddHandler(test.Contains(jwksSubPath),
+		func(responseWriter http.ResponseWriter, request *http.Request) {
+			if request.Header.Get("Authorization") != "Bearer "+*serviceAccountToken {
+				responseWriter.WriteHeader(http.StatusUnauthorized)
+				return
 			}
-			w.Write(openidConfJson)
-		case "/jwks":
-			w.Write(rawJwks)
-		default:
-			w.WriteHeader(http.StatusNotFound)
-		}
-	}))
-	return server, nil
+
+			jwks := &jwkset.JWKSMarshal{
+				Keys: []jwkset.JWKMarshal{{
+					KTY: "RSA",
+					KID: "key-1",
+					ALG: jwkset.ALG(jwt.SigningMethodRS256.Alg()),
+					USE: "sig",
+					N:   toHexBase64(key.N),
+					E:   toHexBase64(big.NewInt(int64(key.E))),
+				}},
+			}
+
+			responseBody, _ := json.Marshal(jwks)
+			_, _ = responseWriter.Write(responseBody)
+		})
 }
 
 func toHexBase64(a *big.Int) string {

@@ -24,11 +24,11 @@ func newSecureTransport(getToken getTokenFunc) *secureTransport {
 	}
 }
 
-func (s *secureTransport) RoundTrip(r *http.Request) (*http.Response, error) {
+func (s *secureTransport) RoundTrip(request *http.Request) (*http.Response, error) {
 	token, err := s.getToken()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get k8s sa token: %w", err)
 	}
-	r.Header.Add("Authorization", "Bearer "+token)
-	return s.base.RoundTrip(r)
+	request.Header.Add("Authorization", "Bearer "+token)
+	return s.base.RoundTrip(request)
 }

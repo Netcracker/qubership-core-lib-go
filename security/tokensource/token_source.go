@@ -47,7 +47,7 @@ var (
 // GetAudienceToken gets token by audience. Do not store the token. Always call GetAudienceToken again to get a fresh token. Default tokens directory can be overridden using global variable DefaultAudienceTokensDir
 func GetAudienceToken(ctx context.Context, audience TokenAudience) (string, error) {
 	if audience == "" {
-		return "", fmt.Errorf("GetToken: empty audience")
+		return "", fmt.Errorf("audience is empty")
 	}
 	audienceTokensWatcher.CompareAndSwap(nil, utils.NewLazy(func() (*tokenWatcher, error) {
 		return newTokenWatcher(ctx, DefaultAudienceTokensDir, refreshAudienceTokensCache)
@@ -62,7 +62,7 @@ func GetAudienceToken(ctx context.Context, audience TokenAudience) (string, erro
 	}
 	result := cachedToken.(tokenUpdateResult)
 	if result.err != nil {
-		return "", fmt.Errorf("failed to get token by audience: %s: %w", audience, err)
+		return "", fmt.Errorf("failed to get token by audience: %s: %w", audience, result.err)
 	}
 	return result.value, nil
 }
@@ -79,7 +79,7 @@ func GetServiceAccountToken(ctx context.Context) (string, error) {
 	cachedToken := serviceAccountTokenCache.Load()
 	result := cachedToken.(tokenUpdateResult)
 	if result.err != nil {
-		return "", fmt.Errorf("failed to get token default kubernetes service account token: %w", err)
+		return "", fmt.Errorf("failed to get token default kubernetes service account token: %w", result.err)
 	}
 	return result.value, nil
 }

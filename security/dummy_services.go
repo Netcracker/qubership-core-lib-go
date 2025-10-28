@@ -2,8 +2,8 @@ package security
 
 import (
 	"context"
-	"github.com/golang-jwt/jwt/v5"
 
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/netcracker/qubership-core-lib-go/v3/logging"
 )
 
