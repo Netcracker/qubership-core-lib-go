@@ -9,7 +9,7 @@ import (
 )
 
 var (
-	logger       logging.Logger
+	logger       = logging.GetLogger("test")
 	mockHandlers []mockHandler
 	mockServer   *httptest.Server
 	started      = false

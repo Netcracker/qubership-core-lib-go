@@ -405,6 +405,12 @@ func Test_GetServiceAccount(t *testing.T) {
 		Uid:  "530f2aa0-ed7b-4923-886b-2223a0dadae4",
 	}
 	assert.Equal(t, expectedValue, value)
+	stringValue, err := GetServiceAccountName(token)
+	assert.Nil(t, err)
+	assert.Equal(t, "service", stringValue)
+	stringValue, err = GetServiceAccountId(token)
+	assert.Nil(t, err)
+	assert.Equal(t, "530f2aa0-ed7b-4923-886b-2223a0dadae4", stringValue)
 
 	token = test.CreateUnsignedTokenFromPayload(t, k8sNoServiceAccountIdPayload)
 	value, err = GetServiceAccount(token)
@@ -413,6 +419,12 @@ func Test_GetServiceAccount(t *testing.T) {
 		Name: "service",
 	}
 	assert.Equal(t, expectedValue, value)
+	stringValue, err = GetServiceAccountName(token)
+	assert.Nil(t, err)
+	assert.Equal(t, "service", stringValue)
+	stringValue, err = GetServiceAccountId(token)
+	assert.ErrorIs(t, err, ErrTokenClaimMissing)
+	assert.ErrorContains(t, err, "token is missing claim: uid is missed")
 
 	token = test.CreateUnsignedTokenFromPayload(t, k8sNoServiceAccountNamePayload)
 	value, err = GetServiceAccount(token)
@@ -421,9 +433,21 @@ func Test_GetServiceAccount(t *testing.T) {
 		Uid: "530f2aa0-ed7b-4923-886b-2223a0dadae4",
 	}
 	assert.Equal(t, expectedValue, value)
+	stringValue, err = GetServiceAccountName(token)
+	assert.ErrorIs(t, err, ErrTokenClaimMissing)
+	assert.ErrorContains(t, err, "token is missing claim: name is missed")
+	stringValue, err = GetServiceAccountId(token)
+	assert.Nil(t, err)
+	assert.Equal(t, "530f2aa0-ed7b-4923-886b-2223a0dadae4", stringValue)
 
 	token = test.CreateUnsignedTokenFromPayload(t, noClaimsPayload)
 	value, err = GetServiceAccount(token)
+	assert.ErrorIs(t, err, ErrTokenClaimMissing)
+	assert.ErrorContains(t, err, "token is missing claim: kubernetes.io is missed")
+	stringValue, err = GetServiceAccountName(token)
+	assert.ErrorIs(t, err, ErrTokenClaimMissing)
+	assert.ErrorContains(t, err, "token is missing claim: kubernetes.io is missed")
+	stringValue, err = GetServiceAccountId(token)
 	assert.ErrorIs(t, err, ErrTokenClaimMissing)
 	assert.ErrorContains(t, err, "token is missing claim: kubernetes.io is missed")
 }
@@ -436,6 +460,12 @@ func Test_GetNode(t *testing.T) {
 		Uid:  "225d44ac-4729-4277-bd20-450859a10d0f",
 	}
 	assert.Equal(t, expectedValue, value)
+	stringValue, err := GetNodeName(token)
+	assert.Nil(t, err)
+	assert.Equal(t, "node", stringValue)
+	stringValue, err = GetNodeId(token)
+	assert.Nil(t, err)
+	assert.Equal(t, "225d44ac-4729-4277-bd20-450859a10d0f", stringValue)
 
 	token = test.CreateUnsignedTokenFromPayload(t, k8sNoNodeIdPayload)
 	value, err = GetNode(token)
@@ -444,6 +474,12 @@ func Test_GetNode(t *testing.T) {
 		Name: "node",
 	}
 	assert.Equal(t, expectedValue, value)
+	stringValue, err = GetNodeName(token)
+	assert.Nil(t, err)
+	assert.Equal(t, "node", stringValue)
+	stringValue, err = GetNodeId(token)
+	assert.ErrorIs(t, err, ErrTokenClaimMissing)
+	assert.ErrorContains(t, err, "token is missing claim: uid is missed")
 
 	token = test.CreateUnsignedTokenFromPayload(t, k8sNoNodeNamePayload)
 	value, err = GetNode(token)
@@ -452,9 +488,21 @@ func Test_GetNode(t *testing.T) {
 		Uid: "225d44ac-4729-4277-bd20-450859a10d0f",
 	}
 	assert.Equal(t, expectedValue, value)
+	stringValue, err = GetNodeName(token)
+	assert.ErrorIs(t, err, ErrTokenClaimMissing)
+	assert.ErrorContains(t, err, "token is missing claim: name is missed")
+	stringValue, err = GetNodeId(token)
+	assert.Nil(t, err)
+	assert.Equal(t, "225d44ac-4729-4277-bd20-450859a10d0f", stringValue)
 
 	token = test.CreateUnsignedTokenFromPayload(t, noClaimsPayload)
 	value, err = GetNode(token)
+	assert.ErrorIs(t, err, ErrTokenClaimMissing)
+	assert.ErrorContains(t, err, "token is missing claim: kubernetes.io is missed")
+	stringValue, err = GetNodeName(token)
+	assert.ErrorIs(t, err, ErrTokenClaimMissing)
+	assert.ErrorContains(t, err, "token is missing claim: kubernetes.io is missed")
+	stringValue, err = GetNodeId(token)
 	assert.ErrorIs(t, err, ErrTokenClaimMissing)
 	assert.ErrorContains(t, err, "token is missing claim: kubernetes.io is missed")
 }
@@ -467,6 +515,12 @@ func Test_GetPod(t *testing.T) {
 		Uid:  "6b52c6a5-614f-484d-a329-80de170a45e6",
 	}
 	assert.Equal(t, expectedValue, value)
+	stringValue, err := GetPodName(token)
+	assert.Nil(t, err)
+	assert.Equal(t, "pod", stringValue)
+	stringValue, err = GetPodId(token)
+	assert.Nil(t, err)
+	assert.Equal(t, "6b52c6a5-614f-484d-a329-80de170a45e6", stringValue)
 
 	token = test.CreateUnsignedTokenFromPayload(t, k8sNoPodIdPayload)
 	value, err = GetPod(token)
@@ -475,6 +529,12 @@ func Test_GetPod(t *testing.T) {
 		Name: "pod",
 	}
 	assert.Equal(t, expectedValue, value)
+	stringValue, err = GetPodName(token)
+	assert.Nil(t, err)
+	assert.Equal(t, "pod", stringValue)
+	stringValue, err = GetPodId(token)
+	assert.ErrorIs(t, err, ErrTokenClaimMissing)
+	assert.ErrorContains(t, err, "token is missing claim: uid is missed")
 
 	token = test.CreateUnsignedTokenFromPayload(t, k8sNoPodNamePayload)
 	value, err = GetPod(token)
@@ -483,9 +543,21 @@ func Test_GetPod(t *testing.T) {
 		Uid: "6b52c6a5-614f-484d-a329-80de170a45e6",
 	}
 	assert.Equal(t, expectedValue, value)
+	stringValue, err = GetPodName(token)
+	assert.ErrorIs(t, err, ErrTokenClaimMissing)
+	assert.ErrorContains(t, err, "token is missing claim: name is missed")
+	stringValue, err = GetPodId(token)
+	assert.Nil(t, err)
+	assert.Equal(t, "6b52c6a5-614f-484d-a329-80de170a45e6", stringValue)
 
 	token = test.CreateUnsignedTokenFromPayload(t, noClaimsPayload)
 	value, err = GetPod(token)
+	assert.ErrorIs(t, err, ErrTokenClaimMissing)
+	assert.ErrorContains(t, err, "token is missing claim: kubernetes.io is missed")
+	stringValue, err = GetPodName(token)
+	assert.ErrorIs(t, err, ErrTokenClaimMissing)
+	assert.ErrorContains(t, err, "token is missing claim: kubernetes.io is missed")
+	stringValue, err = GetPodId(token)
 	assert.ErrorIs(t, err, ErrTokenClaimMissing)
 	assert.ErrorContains(t, err, "token is missing claim: kubernetes.io is missed")
 }

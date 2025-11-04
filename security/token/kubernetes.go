@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/netcracker/qubership-core-lib-go/v3/utils"
 )
 
 // Kubernetes-related claim and identifier constants.
@@ -88,6 +89,26 @@ func GetServiceAccount(token *jwt.Token) (ServiceAccountClaim, error) {
 	}
 	return getServiceAccount(kubernetesIoMap)
 }
+func GetServiceAccountId(token *jwt.Token) (string, error) {
+	serviceAccount, err := GetServiceAccount(token)
+	if err != nil {
+		return "", err
+	}
+	if serviceAccount.Uid == "" {
+		return "", utils.NewError(fmt.Sprintf(claimIsMissed, Uid), ErrTokenClaimMissing)
+	}
+	return serviceAccount.Uid, nil
+}
+func GetServiceAccountName(token *jwt.Token) (string, error) {
+	serviceAccount, err := GetServiceAccount(token)
+	if err != nil {
+		return "", err
+	}
+	if serviceAccount.Name == "" {
+		return "", utils.NewError(fmt.Sprintf(claimIsMissed, Name), ErrTokenClaimMissing)
+	}
+	return serviceAccount.Name, nil
+}
 func GetNode(token *jwt.Token) (NodeClaim, error) {
 	kubernetesIoMap, err := GetMapValue(token, KubernetesIo)
 	if err != nil {
@@ -95,12 +116,52 @@ func GetNode(token *jwt.Token) (NodeClaim, error) {
 	}
 	return getNode(kubernetesIoMap)
 }
+func GetNodeId(token *jwt.Token) (string, error) {
+	node, err := GetNode(token)
+	if err != nil {
+		return "", err
+	}
+	if node.Uid == "" {
+		return "", utils.NewError(fmt.Sprintf(claimIsMissed, Uid), ErrTokenClaimMissing)
+	}
+	return node.Uid, nil
+}
+func GetNodeName(token *jwt.Token) (string, error) {
+	node, err := GetNode(token)
+	if err != nil {
+		return "", err
+	}
+	if node.Name == "" {
+		return "", utils.NewError(fmt.Sprintf(claimIsMissed, Name), ErrTokenClaimMissing)
+	}
+	return node.Name, nil
+}
 func GetPod(token *jwt.Token) (PodClaim, error) {
 	kubernetesIoMap, err := GetMapValue(token, KubernetesIo)
 	if err != nil {
 		return PodClaim{}, err
 	}
 	return getPod(kubernetesIoMap)
+}
+func GetPodId(token *jwt.Token) (string, error) {
+	pod, err := GetPod(token)
+	if err != nil {
+		return "", err
+	}
+	if pod.Uid == "" {
+		return "", utils.NewError(fmt.Sprintf(claimIsMissed, Uid), ErrTokenClaimMissing)
+	}
+	return pod.Uid, nil
+}
+func GetPodName(token *jwt.Token) (string, error) {
+	pod, err := GetPod(token)
+	if err != nil {
+		return "", err
+	}
+	if pod.Name == "" {
+		return "", utils.NewError(fmt.Sprintf(claimIsMissed, Name), ErrTokenClaimMissing)
+	}
+	return pod.Name, nil
 }
 func GetNamespace(token *jwt.Token) (string, error) {
 	kubernetesIoMap, err := GetMapValue(token, KubernetesIo)

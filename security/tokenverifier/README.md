@@ -1,6 +1,7 @@
 # Token Verifier
 
-A Go package for verifying Kubernetes service account tokens using OIDC (OpenID Connect) token verification with built-in retry and failsafe mechanisms.
+A Go package for verifying Kubernetes service account tokens using OIDC (OpenID Connect) token verification with
+built-in retry and failsafe mechanisms.
 
 ## Table of Contents
 
@@ -25,7 +26,8 @@ A Go package for verifying Kubernetes service account tokens using OIDC (OpenID 
 
 ## Overview
 
-The `tokenverifier` package provides a secure, production-ready solution for verifying Kubernetes service account tokens using OIDC standards. It automatically handles:
+The `tokenverifier` package provides a secure, production-ready solution for verifying Kubernetes service account tokens
+using OIDC standards. It automatically handles:
 
 - OIDC provider discovery and configuration
 - Token verification with audience validation
@@ -56,29 +58,25 @@ package main
 import (
     "context"
     "log"
-    
+
     "github.com/netcracker/qubership-core-lib-go/v3/security/tokenverifier"
 )
 
 func main() {
     ctx := context.Background()
-    
+
     // Create a verifier with your service's audience
     verifier, err := tokenverifier.New(ctx, "my-service-audience")
     if err != nil {
         log.Fatalf("Failed to create verifier: %v", err)
     }
-    
+
     // Verify a token
     token := "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9..." // Raw JWT token
-    claims, err := verifier.Verify(ctx, token)
+    jwt, err := verifier.Verify(ctx, token)
     if err != nil {
         log.Fatalf("Token verification failed: %v", err)
     }
-    
-    log.Printf("Token verified for service account: %s in namespace: %s", 
-        claims.Kubernetes.ServiceAccount.Name,
-        claims.Kubernetes.Namespace)
 }
 ```
 
@@ -89,9 +87,12 @@ func main() {
 #### Step 1: Create a Verifier
 
 ```go
+package main
+
 import (
     "context"
     "github.com/netcracker/qubership-core-lib-go/v3/security/tokenverifier"
+    "github.com/netcracker/qubership-core-lib-go/v3/security/token"
 )
 
 ctx := context.Background()
@@ -113,7 +114,7 @@ if err != nil {
 // Verify an incoming token (e.g., from HTTP Authorization header)
 rawToken := extractTokenFromRequest(r) // Your token extraction logic
 
-claims, err := verifier.Verify(ctx, rawToken)
+jwt, err := verifier.Verify(ctx, rawToken)
 if err != nil {
     // Token is invalid or expired
     http.Error(w, "Unauthorized", http.StatusUnauthorized)
@@ -121,65 +122,33 @@ if err != nil {
 }
 
 // Token is valid - use claims
-log.Printf("Authenticated: %s", claims.Subject)
-```
-
-### Understanding Claims
-
-The `Claims` struct contains both standard JWT claims and Kubernetes-specific information:
-
-```go
-type Claims struct {
-    jwt.RegisteredClaims // Standard JWT claims
-    Kubernetes K8sClaims `json:"kubernetes.io"`
-}
-
-type K8sClaims struct {
-    Namespace      string              `json:"namespace,omitempty"`
-    ServiceAccount ServiceAccountClaim `json:"serviceaccount"`
-	Node           NodeClaim           `json:"node"`
-	Pod            PodClaim            `json:"pod"`
-}
-
-type ServiceAccountClaim struct {
-    Name string `json:"name,omitempty"`
-    Uid  string `json:"uid,omitempty"`
-}
-type NodeClaim struct {
-    Name string `json:"name,omitempty"`
-    Uid  string `json:"uid,omitempty"`
-}
-
-type PodClaim struct {
-    Name string `json:"name,omitempty"`
-    Uid  string `json:"uid,omitempty"`
-}
+log.Printf("Authenticated: %s", token.GetSubject(jwt))
 ```
 
 #### Accessing Standard JWT Claims
 
 ```go
-claims, _ := verifier.Verify(ctx, token)
+jwt, _ := verifier.Verify(ctx, token)
 
-// Standard JWT claims (from jwt.RegisteredClaims)
-issuer := claims.Issuer           // Token issuer
-subject := claims.Subject          // Token subject
-audience := claims.Audience        // Intended audience
-expiresAt := claims.ExpiresAt      // Expiration time
-notBefore := claims.NotBefore      // Not valid before time
-issuedAt := claims.IssuedAt        // Issued at time
-jwtID := claims.ID                 // JWT ID
+// Standard JWT claims
+issuer, _ := token.GetIssuer(jwt) // Token issuer
+subject, _ := token.GetSubject(jwt) // Token subject
+audience, _ := token.GetAudience(jwt) // Intended audience
+expiresAt, _ := token.GetExpirationTime(jwt) // Expiration time
+notBefore, _ := token.GetNotBefore(jwt) // Not valid before time
+issuedAt, _ := token.GetIssuedAt(jwt) // Issued at time
+jwtID, _ := token.GetId(jwt) // JWT ID
 ```
 
 #### Accessing Kubernetes Claims
 
 ```go
-claims, _ := verifier.Verify(ctx, token)
+jwt, _ := verifier.Verify(ctx, token)
 
 // Kubernetes-specific claims
-namespace := claims.Kubernetes.Namespace
-serviceAccountName := claims.Kubernetes.ServiceAccount.Name
-serviceAccountUID := claims.Kubernetes.ServiceAccount.Uid
+namespace, _ := token.GetNamespace(jwt)
+serviceAccountName, _ := token.GetServiceAccountName(jwt)
+serviceAccountUID := token.GetServiceAccountId(jwt)
 
 log.Printf("Service account %s/%s (UID: %s)", 
     namespace, 
@@ -190,7 +159,7 @@ log.Printf("Service account %s/%s (UID: %s)",
 ### Error Handling
 
 ```go
-claims, err := verifier.Verify(ctx, token)
+jwt, err := verifier.Verify(ctx, token)
 if err != nil {
     // Common error scenarios:
     // - Token expired
@@ -213,12 +182,12 @@ if err != nil {
 
 The verifier uses the following retry policy for OIDC operations:
 
-| Parameter | Value | Description |
-|-----------|-------|-------------|
-| **Max Attempts** | 5 | Maximum number of retry attempts |
-| **Initial Delay** | 500ms | Starting backoff delay |
-| **Max Delay** | 15s | Maximum backoff delay |
-| **Jitter** | 100ms | Random jitter added to delays |
+| Parameter         | Value | Description                      |
+|-------------------|-------|----------------------------------|
+| **Max Attempts**  | 5     | Maximum number of retry attempts |
+| **Initial Delay** | 500ms | Starting backoff delay           |
+| **Max Delay**     | 15s   | Maximum backoff delay            |
+| **Jitter**        | 100ms | Random jitter added to delays    |
 
 These values are optimized for production use and handle transient network issues automatically.
 
@@ -239,6 +208,7 @@ URL errors (malformed URLs)
 ```
 
 **Backoff Strategy:**
+
 - Exponential backoff starting at 500ms
 - Capped at 15 seconds maximum
 - Random jitter of ±100ms to prevent thundering herd
@@ -248,6 +218,7 @@ URL errors (malformed URLs)
 #### Secure Transport
 
 The verifier uses a secure HTTP transport that:
+
 - Automatically attaches service account tokens to OIDC requests
 - Uses the Kubernetes projected token for authentication
 - Implements proper TLS verification
@@ -280,7 +251,7 @@ func AuthMiddleware(verifier tokenverifier.Verifier) func(http.Handler) http.Han
             token := strings.TrimPrefix(authHeader, "Bearer ")
             
             // Verify token
-            claims, err := verifier.Verify(r.Context(), token)
+            jwt, err := verifier.Verify(r.Context(), token)
             if err != nil {
                 log.Printf("Token verification failed: %v", err)
                 http.Error(w, "Invalid token", http.StatusUnauthorized)
@@ -288,7 +259,7 @@ func AuthMiddleware(verifier tokenverifier.Verifier) func(http.Handler) http.Han
             }
             
             // Add claims to context
-            ctx := context.WithValue(r.Context(), "claims", claims)
+            ctx := context.WithValue(r.Context(), "claims", jwt.Claims)
             next.ServeHTTP(w, r.WithContext(ctx))
         })
     }
@@ -324,13 +295,13 @@ func UnaryAuthInterceptor(verifier tokenverifier.Verifier) grpc.UnaryServerInter
         token := strings.TrimPrefix(tokens[0], "Bearer ")
         
         // Verify token
-        claims, err := verifier.Verify(ctx, token)
+        jwt, err := verifier.Verify(ctx, token)
         if err != nil {
             return nil, status.Errorf(codes.Unauthenticated, "invalid token: %v", err)
         }
         
         // Add claims to context
-        ctx = context.WithValue(ctx, "claims", claims)
+        ctx = context.WithValue(ctx, "claims", jwt.Claims)
         return handler(ctx, req)
     }
 }
@@ -368,16 +339,19 @@ func CallDownstreamService(ctx context.Context, verifier tokenverifier.Verifier)
 func RequireNamespace(allowedNamespaces []string) func(http.Handler) http.Handler {
     return func(next http.Handler) http.Handler {
         return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-            claims, ok := r.Context().Value("claims").(*tokenverifier.Claims)
+            claims, ok := r.Context().Value("claims").(*jwt.MapClaims)
             if !ok {
                 http.Error(w, "Unauthorized", http.StatusUnauthorized)
                 return
             }
+
+            kubernetesIoMap, _ := token.MapValue(claims, token.KubernetesIo)
+            namespace, _ := token.StringValue(kubernetesIoMap, token.Namespace)
             
             // Check if service account is in allowed namespace
             allowed := false
             for _, ns := range allowedNamespaces {
-                if claims.Kubernetes.Namespace == ns {
+                if namespace == ns {
                     allowed = true
                     break
                 }
@@ -453,18 +427,22 @@ if err != nil {
 Beyond verification, validate claims match your requirements:
 
 ```go
+verifier, err := NewKubernetesVerifier(ctx, tokensource.AudienceMaaS, subjectValidation)
+
 claims, err := verifier.Verify(ctx, token)
 if err != nil {
     return err
 }
 
-// Additional validation
-if claims.Kubernetes.Namespace != expectedNamespace {
-    return errors.New("wrong namespace")
+func subjectValidation(jwt *jwt.Token) error {
+    subject, err := token.GetSubject(jwt)
+    if err != nil {
+        return err
+    } else if subject != "wrong" {
+        return nil
+    } else {
+    return fmt.Errorf("subject claim is wrong")
 }
-
-if claims.Kubernetes.ServiceAccount.Name != expectedSA {
-    return errors.New("wrong service account")
 }
 ```
 
@@ -495,11 +473,13 @@ expirationSeconds: 3600  # 1 hour (default)
 **Cause:** Unable to reach OIDC provider (typically Kubernetes API server).
 
 **Possible causes:**
+
 - Network connectivity issues
 - Kubernetes API server unavailable
 - Invalid issuer URL
 
 **Solution:**
+
 - Check network policies
 - Verify Kubernetes API server is accessible
 - Check pod logs for network errors
@@ -524,6 +504,7 @@ serviceAccountToken:
 **Cause:** Token expired or clock skew between services.
 
 **Solution:**
+
 - Check `expirationSeconds` in projected token config
 - Ensure NTP is configured correctly on nodes
 - Token is automatically refreshed - ensure your app reads fresh token
@@ -532,7 +513,8 @@ serviceAccountToken:
 
 **Cause:** First verification requires OIDC provider discovery and key fetching.
 
-**Solution:** This is expected. Subsequent verifications use cached provider configuration and are much faster. Consider warming up the verifier at startup:
+**Solution:** This is expected. Subsequent verifications use cached provider configuration and are much faster. Consider
+warming up the verifier at startup:
 
 ```go
 func warmupVerifier(verifier tokenverifier.Verifier) {
@@ -554,9 +536,9 @@ import "log"
 
 claims, err := verifier.Verify(ctx, token)
 if err != nil {
-    log.Printf("Verification error: %v", err)
-    log.Printf("Token (first 20 chars): %s...", token[:min(20, len(token))])
-    // Don't log full token in production!
+log.Printf("Verification error: %v", err)
+log.Printf("Token (first 20 chars): %s...", token[:min(20, len(token))])
+// Don't log full token in production!
 }
 ```
 
@@ -566,24 +548,23 @@ For unit tests, consider using a mock verifier:
 
 ```go
 type MockVerifier struct {
-    VerifyFunc func(context.Context, string) (*tokenverifier.Claims, error)
+    VerifyFunc func(context.Context, string) (*jwt.Token, error)
 }
 
-func (m *MockVerifier) Verify(ctx context.Context, token string) (*tokenverifier.Claims, error) {
+func (m *MockVerifier) Verify(ctx context.Context, token string) (*jwt.Token, error) {
     if m.VerifyFunc != nil {
         return m.VerifyFunc(ctx, token)
     }
-    return &tokenverifier.Claims{}, nil
+    return &jwt.Token{}, nil
 }
 
 // In tests
 mockVerifier := &MockVerifier{
-    VerifyFunc: func(ctx context.Context, token string) (*tokenverifier.Claims, error) {
+    VerifyFunc: func(ctx context.Context, token string) (*jwt.Token, error) {
         if token == "valid" {
-            return &tokenverifier.Claims{
-                Kubernetes: tokenverifier.K8sClaims{
-                    Namespace: "test",
-                },
+            //some logic to prepare test claims
+            return return &jwt.Token{
+                Claims: claims,
             }, nil
         }
         return nil, errors.New("invalid token")
@@ -610,6 +591,7 @@ Part of the Qubership Core Library for Go.
 ## Support
 
 For issues and questions:
+
 - Check the [Troubleshooting](#troubleshooting) section
 - Review Kubernetes service account token configuration
 - Verify network connectivity to Kubernetes API server
