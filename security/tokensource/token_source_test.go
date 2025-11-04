@@ -36,6 +36,7 @@ func TestServiceAccountToken(t *testing.T) {
 	assert.Equal(t, serviceAccountTokenSecondValue, token)
 
 	_ = storage.Clear()
+	onCloseServiceAccountTokenWatcher()
 }
 
 func TestNoServiceAccountToken(t *testing.T) {
@@ -67,6 +68,7 @@ func TestNoServiceAccountToken(t *testing.T) {
 	assert.ErrorContains(t, err, "failed to get token default kubernetes service account token: failed to read token at path")
 
 	_ = storage.Clear()
+	onCloseServiceAccountTokenWatcher()
 }
 
 func TestNoServiceAccountTokenDir(t *testing.T) {
@@ -85,12 +87,12 @@ func TestNoServiceAccountTokenDir(t *testing.T) {
 	assert.ErrorContains(t, err, "failed to create token watcher: failed to add path")
 
 	_ = storage.Clear()
+	onCloseServiceAccountTokenWatcher()
 }
 
 func TestAudienceTokens(t *testing.T) {
 	ctx, cancelCtx := context.WithTimeout(context.Background(), time.Minute)
 	defer cancelCtx()
-	var err error
 
 	storage, err := test.NewAudienceTokensStorage(t.TempDir())
 	require.NoError(t, err)
@@ -130,6 +132,7 @@ func TestAudienceTokens(t *testing.T) {
 	assert.Equal(t, dbaasTokenSecondValue, token)
 
 	_ = storage.Clear()
+	onCloseAudienceTokensWatcher()
 }
 
 func TestNoAudienceToken(t *testing.T) {
@@ -158,6 +161,7 @@ func TestNoAudienceToken(t *testing.T) {
 	assert.ErrorContains(t, err, "failed to get token by audience: netcracker: failed to read token at path")
 
 	_ = storage.Clear()
+	onCloseAudienceTokensWatcher()
 }
 
 func TestNoAudienceTokensDir(t *testing.T) {
@@ -176,13 +180,13 @@ func TestNoAudienceTokensDir(t *testing.T) {
 	assert.ErrorContains(t, err, "failed to create token watcher: failed to refresh tokens cache: failed to get dir entries from tokenDir")
 
 	_ = storage.Clear()
+	onCloseAudienceTokensWatcher()
 }
 
 func TestEmptyAudience(t *testing.T) {
 	ctx, cancelCtx := context.WithCancel(context.Background())
 	defer cancelCtx()
-	var err error
 
-	_, err = GetAudienceToken(ctx, "")
+	_, err := GetAudienceToken(ctx, "")
 	assert.ErrorContains(t, err, "audience is empty")
 }
