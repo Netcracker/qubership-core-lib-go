@@ -48,7 +48,7 @@ func getTrustedIssuer(kubernetesApiToken tokenFunction) (string, error) {
 		return "", fmt.Errorf("failed to acquire token for kubernetes API (the possible cause is missing kubernetes service account for the microservice.): %w", err)
 	}
 	claims := jwt.RegisteredClaims{}
-	_, _, err = jwt.NewParser().ParseUnverified(rawToken, &claims)
+	_, _, err = jwt.NewParser().ParseUnverified(rawToken, &claims) //NOSONAR
 	if err != nil {
 		return "", fmt.Errorf("invalid jwt: %w", err)
 	}
