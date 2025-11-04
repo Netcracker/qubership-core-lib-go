@@ -7,11 +7,11 @@ import (
 )
 
 type secureTransport struct {
-	base     http.RoundTripper
-	getToken getTokenFunc
+	base  http.RoundTripper
+	token tokenFunction
 }
 
-func newSecureTransport(getToken getTokenFunc) *secureTransport {
+func newSecureTransport(token tokenFunction) *secureTransport {
 	base := &http.Transport{
 		MaxIdleConns:          100,
 		IdleConnTimeout:       90 * time.Second,
@@ -19,13 +19,13 @@ func newSecureTransport(getToken getTokenFunc) *secureTransport {
 		ExpectContinueTimeout: 1 * time.Second,
 	}
 	return &secureTransport{
-		base:     base,
-		getToken: getToken,
+		base:  base,
+		token: token,
 	}
 }
 
 func (s *secureTransport) RoundTrip(request *http.Request) (*http.Response, error) {
-	token, err := s.getToken()
+	token, err := s.token()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get k8s sa token: %w", err)
 	}

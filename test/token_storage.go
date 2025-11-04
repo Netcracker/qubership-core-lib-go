@@ -5,12 +5,27 @@ import (
 	"os"
 	"path/filepath"
 	"time"
+
+	"github.com/failsafe-go/failsafe-go/retrypolicy"
 )
 
 const dataSymlinkName = "..data"
+const timeout = time.Millisecond * 50
+
+var (
+	policy retrypolicy.RetryPolicy[bool]
+)
+
+func init() {
+	policy = retrypolicy.NewBuilder[bool]().
+		AbortOnResult(true).
+		WithDelay(timeout).
+		WithMaxRetries(20).
+		Build()
+}
 
 type TokenStorage struct {
-	RootDir        string
+	rootDir        string
 	dataDir        string
 	dataDirSymlink string
 }
@@ -47,7 +62,7 @@ func NewServiceAccountTokenStorage(rootDir string) (*ServiceAccountTokenStorage,
 	}
 	serviceAccountTokenStorage := &ServiceAccountTokenStorage{
 		TokenStorage: TokenStorage{
-			RootDir:        rootDir,
+			rootDir:        rootDir,
 			dataDir:        dataDir,
 			dataDirSymlink: dataDirSymlink,
 		},
@@ -84,27 +99,37 @@ func (s *ServiceAccountTokenStorage) createTokenFile() error {
 	s.tokenInfo = tokenInfo
 	return nil
 }
-func (s *ServiceAccountTokenStorage) SaveTokenValue(token string) (error, bool) {
+func (s *ServiceAccountTokenStorage) SaveTokenValue(token string) error {
 	err := s.createTokenFile()
 	if err != nil {
-		return err, false
+		return err
 	}
 	err = os.WriteFile(s.tokenInfo.TokenFile.Name(), []byte(token), 0)
 	if err != nil {
-		return fmt.Errorf("error saving token value into service account token file: %w", err), false
+		return fmt.Errorf("error saving token value into service account token file: %w", err)
 	}
-	return s.refreshToken(), true
+	return s.refreshSymlink()
 }
-func (s *ServiceAccountTokenStorage) DeleteTokenFile() (error, bool) {
+func (s *ServiceAccountTokenStorage) DeleteTokenFile() error {
 	var err error
+	if s.tokenInfo == nil {
+		return nil
+	}
 	err = os.Remove(s.tokenInfo.TokenFile.Name())
 	if err != nil {
-		return fmt.Errorf("error deleting service account token file: %w", err), false
+		return fmt.Errorf("error deleting service account token file: %w", err)
 	}
 	s.tokenInfo = nil
-	return s.refreshToken(), true
+	return s.refreshSymlink()
 }
-func (s *ServiceAccountTokenStorage) refreshToken() error {
+func (s *ServiceAccountTokenStorage) Clear() error {
+	err := os.RemoveAll(s.rootDir)
+	if err != nil {
+		return fmt.Errorf("error clearing service account token dir: %w", err)
+	}
+	return nil
+}
+func (s *ServiceAccountTokenStorage) refreshSymlink() error {
 	err := os.Remove(s.dataDirSymlink)
 	if err != nil {
 		return fmt.Errorf("error deleting service account token data dir symlink: %w", err)
@@ -133,7 +158,7 @@ func NewAudienceTokensStorage(rootDir string) (*AudienceTokensStorage, error) {
 	}
 	return &AudienceTokensStorage{
 		TokenStorage: TokenStorage{
-			RootDir:        rootDir,
+			rootDir:        rootDir,
 			dataDir:        dataDir,
 			dataDirSymlink: dataDirSymlink,
 		},
@@ -171,31 +196,38 @@ func (s *AudienceTokensStorage) createTokenFile(audience string) (*TokenStorageI
 	s.tokenInfos[audience] = tokenInfo
 	return tokenInfo, nil
 }
-func (s *AudienceTokensStorage) SaveTokenValue(audience string, token string) (error, bool) {
+func (s *AudienceTokensStorage) SaveTokenValue(audience string, token string) error {
 	tokenInfo, err := s.createTokenFile(audience)
 	if err != nil {
-		return err, false
+		return err
 	}
 	err = os.WriteFile(tokenInfo.TokenFile.Name(), []byte(token), 0)
 	if err != nil {
-		return fmt.Errorf("error saving token value into audience %s token file: %w", audience, err), false
+		return fmt.Errorf("error saving token value into audience %s token file: %w", audience, err)
 	}
-	return s.refreshTokens(), true
+	return s.refreshSymlink()
 }
-func (s *AudienceTokensStorage) DeleteTokenFile(audience string) (error, bool) {
+func (s *AudienceTokensStorage) DeleteTokenFile(audience string) error {
 	var err error
 	tokenInfo, ok := s.tokenInfos[audience]
 	if !ok {
-		return nil, false
+		return nil
 	}
 	err = os.Remove(filepath.Join(tokenInfo.tokenDir, "token"))
 	if err != nil {
-		return fmt.Errorf("error deleting audience %s token file: %w", audience, err), false
+		return fmt.Errorf("error deleting audience %s token file: %w", audience, err)
 	}
 	delete(s.tokenInfos, audience)
-	return s.refreshTokens(), true
+	return s.refreshSymlink()
 }
-func (s *AudienceTokensStorage) refreshTokens() error {
+func (s *AudienceTokensStorage) Clear() error {
+	err := os.RemoveAll(s.rootDir)
+	if err != nil {
+		return fmt.Errorf("error clearing audience tokens dir: %w", err)
+	}
+	return nil
+}
+func (s *AudienceTokensStorage) refreshSymlink() error {
 	err := os.Remove(s.dataDirSymlink)
 	if err != nil {
 		return fmt.Errorf("error deleting audience tokens data dir symlink: %w", err)

@@ -7,7 +7,18 @@ import (
 )
 
 func Test_GetProviderUrl(t *testing.T) {
-	assert.Equal(t, "/.well-known/openid-configuration", GetProviderUrl(""))
-	assert.Equal(t, "http://localhost:8080/.well-known/openid-configuration", GetProviderUrl("http://localhost:8080"))
-	assert.Equal(t, "http://localhost:8080/.well-known/openid-configuration", GetProviderUrl("http://localhost:8080/"))
+	url, err := GetProviderUrl("")
+	assert.NoError(t, err)
+	assert.Equal(t, "/.well-known/openid-configuration", url)
+
+	url, err = GetProviderUrl("some 	text")
+	assert.ErrorContains(t, err, "issuer url is invalid: parse \"some \\ttext\": net/url: invalid control character in URL")
+
+	url, err = GetProviderUrl("http://localhost:8080")
+	assert.NoError(t, err)
+	assert.Equal(t, "http://localhost:8080/.well-known/openid-configuration", url)
+
+	url, err = GetProviderUrl("http://localhost:8080/")
+	assert.NoError(t, err)
+	assert.Equal(t, "http://localhost:8080/.well-known/openid-configuration", url)
 }

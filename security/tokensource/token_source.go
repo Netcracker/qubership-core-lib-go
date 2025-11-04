@@ -50,7 +50,7 @@ func GetAudienceToken(ctx context.Context, audience TokenAudience) (string, erro
 		return "", fmt.Errorf("audience is empty")
 	}
 	audienceTokensWatcher.CompareAndSwap(nil, utils.NewLazy(func() (*tokenWatcher, error) {
-		return newTokenWatcher(ctx, DefaultAudienceTokensDir, refreshAudienceTokensCache)
+		return newTokenWatcher(ctx, DefaultAudienceTokensDir, refreshAudienceTokensCache, onCloseAudienceTokensWatcher)
 	}))
 	_, err := audienceTokensWatcher.Load().Get()
 	if err != nil {
@@ -70,7 +70,7 @@ func GetAudienceToken(ctx context.Context, audience TokenAudience) (string, erro
 // GetServiceAccountToken gets the default service account token located at /var/run/secrets/kubernetes.io/serviceaccount. Do not store the token. Always call GetServiceAccountToken again to get a fresh token. Default service account token directory can be overridden using global variable DefaultServiceAccountDir
 func GetServiceAccountToken(ctx context.Context) (string, error) {
 	serviceAccountTokenWatcher.CompareAndSwap(nil, utils.NewLazy(func() (*tokenWatcher, error) {
-		return newTokenWatcher(ctx, DefaultServiceAccountDir, refreshServiceAccountTokenCache)
+		return newTokenWatcher(ctx, DefaultServiceAccountDir, refreshServiceAccountTokenCache, onCloseServiceAccountTokenWatcher)
 	}))
 	_, err := serviceAccountTokenWatcher.Load().Get()
 	if err != nil {
@@ -105,6 +105,11 @@ func refreshAudienceTokensCache(tokensDir string) error {
 	return nil
 }
 
+func onCloseAudienceTokensWatcher() {
+	audienceTokensWatcher.Store(nil)
+	audienceTokensCache.Clear()
+}
+
 func refreshServiceAccountTokenCache(serviceAccountDir string) error {
 	token, err := readToken(filepath.Join(serviceAccountDir, "token"))
 	serviceAccountTokenCache.Store(tokenUpdateResult{
@@ -112,6 +117,11 @@ func refreshServiceAccountTokenCache(serviceAccountDir string) error {
 		err:   err,
 	})
 	return nil
+}
+
+func onCloseServiceAccountTokenWatcher() {
+	serviceAccountTokenWatcher.Store(nil)
+	serviceAccountTokenCache.Store(tokenUpdateResult{})
 }
 
 func readToken(tokenPath string) (string, error) {
@@ -126,14 +136,16 @@ type tokenWatcher struct {
 	watcher     *fsnotify.Watcher
 	tokensDir   string
 	updateCache func(string) error
+	onClose     func()
 	cancel      context.CancelFunc
 }
 
-func newTokenWatcher(ctx context.Context, tokensDir string, updateCache func(tokensDir string) error) (*tokenWatcher, error) {
+func newTokenWatcher(ctx context.Context, tokensDir string, updateCache func(tokensDir string) error, onClose func()) (*tokenWatcher, error) {
 	ctx, cancel := context.WithCancel(ctx)
 	tw := &tokenWatcher{
 		tokensDir:   tokensDir,
 		updateCache: updateCache,
+		onClose:     onClose,
 		cancel:      cancel,
 	}
 	err := tw.updateCache(tokensDir)
@@ -171,6 +183,7 @@ func (tw *tokenWatcher) listenFs(ctx context.Context, events <-chan fsnotify.Eve
 			logger.Error("%v", fmt.Errorf("error at k8s volume mounted token watcher: %w", err))
 		case <-ctx.Done():
 			_ = tw.watcher.Close()
+			tw.onClose()
 			logger.Infof("k8s token watcher shutdown")
 			return
 		}

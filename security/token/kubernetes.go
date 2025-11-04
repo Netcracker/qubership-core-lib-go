@@ -71,8 +71,8 @@ func GetKubernetesIo(token *jwt.Token) (KubernetesIoClaim, error) {
 	serviceAccount, _ := getServiceAccount(kubernetesIoMap)
 	node, _ := getNode(kubernetesIoMap)
 	pod, _ := getPod(kubernetesIoMap)
-	namespace, _ := getStringValue(kubernetesIoMap, Namespace)
-	warnAfter, _ := getNumericDateValue(kubernetesIoMap, Warnafter)
+	namespace, _ := StringValue(kubernetesIoMap, Namespace)
+	warnAfter, _ := NumericDateValue(kubernetesIoMap, Warnafter)
 	return KubernetesIoClaim{
 		ServiceAccount: serviceAccount,
 		Node:           node,
@@ -107,7 +107,7 @@ func GetNamespace(token *jwt.Token) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return getStringValue(kubernetesIoMap, Namespace)
+	return StringValue(kubernetesIoMap, Namespace)
 }
 func getServiceAccount(kubernetesIoMap jwt.MapClaims) (ServiceAccountClaim, error) {
 	serviceAccountId, serviceAccountName, err := getEntity(kubernetesIoMap, ServiceAccount)
@@ -146,11 +146,11 @@ func getPod(kubernetesIoMap jwt.MapClaims) (PodClaim, error) {
 		Uid:  podId}, nil
 }
 func getEntity(claims jwt.MapClaims, claimName string) (string, string, error) {
-	claimMap, err := getMapValue(claims, claimName)
+	claimMap, err := MapValue(claims, claimName)
 	if err != nil {
 		return "", "", err
 	}
-	entityName, _ := getStringValue(claimMap, Name)
-	entityId, _ := getStringValue(claimMap, Uid)
+	entityName, _ := StringValue(claimMap, Name)
+	entityId, _ := StringValue(claimMap, Uid)
 	return entityId, entityName, nil
 }

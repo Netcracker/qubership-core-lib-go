@@ -49,7 +49,7 @@ func GetRealmAccess(token *jwt.Token) (RealmAccessClaim, error) {
 	if err != nil {
 		return empty, err
 	}
-	roles, _ := getClaimStringsValue(realmAccessMap, Roles)
+	roles, _ := ClaimStringsValue(realmAccessMap, Roles)
 	return RealmAccessClaim{
 		Roles: roles,
 	}, nil
@@ -59,7 +59,7 @@ func GetRoles(token *jwt.Token) (jwt.ClaimStrings, error) {
 	if err != nil {
 		return nil, err
 	}
-	roles, err := getClaimStringsValue(realmAccessMap, Roles)
+	roles, err := ClaimStringsValue(realmAccessMap, Roles)
 	if err != nil {
 		return nil, err
 	}

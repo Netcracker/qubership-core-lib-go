@@ -14,83 +14,47 @@ import (
 	"github.com/failsafe-go/failsafe-go/failsafehttp"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/netcracker/qubership-core-lib-go/v3/security/oidc"
-	"github.com/netcracker/qubership-core-lib-go/v3/security/tokensource"
-)
-
-const (
-	retryMaxAttempts     = 5
-	retryBackoffDelay    = time.Millisecond * 500
-	retryBackoffMaxDelay = time.Second * 15
-	retryJitter          = time.Millisecond * 100
+	qubetoken "github.com/netcracker/qubership-core-lib-go/v3/security/token"
+	"github.com/netcracker/qubership-core-lib-go/v3/utils"
 )
 
 type Verifier interface {
 	Verify(ctx context.Context, rawToken string) (*jwt.Token, error)
 }
 
-type KubernetesVerifier struct {
+type TokenVerifier struct {
 	parser      *jwt.Parser
 	keyFunc     keyfunc.Keyfunc
 	validations []Validation
 }
 
-type getTokenFunc func() (string, error)
+type Validation func(token *jwt.Token) error
 
-func NewKubernetesVerifier(ctx context.Context, audience string, options ...VerifierOptions) (Verifier, error) {
-	return newKubernetesVerifier(ctx, audience, func() (string, error) {
-		return tokensource.GetServiceAccountToken(ctx)
-	}, options)
+func NewVerifier(parser *jwt.Parser, keyFunc keyfunc.Keyfunc, validations ...Validation) (*TokenVerifier, error) {
+	return &TokenVerifier{
+		parser:      parser,
+		keyFunc:     keyFunc,
+		validations: validations,
+	}, nil
 }
-func (vf *KubernetesVerifier) Verify(ctx context.Context, rawToken string) (*jwt.Token, error) {
+func (vf *TokenVerifier) Verify(ctx context.Context, rawToken string) (*jwt.Token, error) {
 	token, err := vf.parser.Parse(rawToken, vf.keyFunc.KeyfuncCtx(ctx))
 	if err != nil {
 		return nil, err
 	}
-
 	for _, validation := range vf.validations {
-		if ok, validationErr := validation(token); !ok {
+		if validationErr := validation(token); validationErr != nil {
 			return nil, validationErr
 		}
 	}
 	return token, nil
 }
-func newKubernetesVerifier(ctx context.Context, audience string, getToken getTokenFunc, options []VerifierOptions) (*KubernetesVerifier, error) {
-	trustedIssuer, err := getTrustedIssuer(getToken)
+func CreateKeyFunction(ctx context.Context, httpClient http.Client, issuer string) (keyfunc.Keyfunc, error) {
+	issuerUrl, err := oidc.GetProviderUrl(issuer)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to get issuer url: %w", err)
 	}
-	keyFunc, err := newKeyFunction(ctx, trustedIssuer, getToken)
-	if err != nil {
-		return nil, err
-	}
-	v := &KubernetesVerifier{
-		parser:  newJwtParser(trustedIssuer, audience),
-		keyFunc: keyFunc,
-	}
-	for _, option := range options {
-		option(v)
-	}
-
-	return v, nil
-}
-func getTrustedIssuer(getToken getTokenFunc) (string, error) {
-	rawToken, err := getToken()
-	if err != nil {
-		return "", fmt.Errorf("failed to acquire token for kubernetes API (the possible cause is missing kubernetes service account for the microservice.): %w", err)
-	}
-	claims := jwt.RegisteredClaims{}
-	_, _, err = jwt.NewParser().ParseUnverified(rawToken, &claims)
-	if err != nil {
-		return "", fmt.Errorf("invalid jwt: %w", err)
-	}
-	if claims.Issuer == "" {
-		return "", fmt.Errorf("jwt does not have the issuer claim value: %w", err)
-	}
-	return claims.Issuer, nil
-}
-func newKeyFunction(ctx context.Context, trustedIssuer string, getToken getTokenFunc) (keyfunc.Keyfunc, error) {
-	httpClient := newHttpClient(getToken)
-	request, err := http.NewRequest(http.MethodGet, oidc.GetProviderUrl(trustedIssuer), nil)
+	request, err := http.NewRequest(http.MethodGet, issuerUrl, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create oidc request: %w", err)
 	}
@@ -104,7 +68,7 @@ func newKeyFunction(ctx context.Context, trustedIssuer string, getToken getToken
 		return nil, fmt.Errorf("unable to read oidc response body: %v", err)
 	}
 	if response.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("%s: %s", response.Status, body)
+		return nil, fmt.Errorf("unexpected response http status code %s", response.Status)
 	}
 	var providerResponse oidc.ProviderResponse
 	err = unmarshalResponse(response, body, &providerResponse)
@@ -117,19 +81,22 @@ func newKeyFunction(ctx context.Context, trustedIssuer string, getToken getToken
 		keyfunc.Override{Client: &httpClient},
 	)
 }
-func newJwtParser(trustedIssuer, audience string) *jwt.Parser {
-	var opts = []jwt.ParserOption{
-		jwt.WithExpirationRequired(),
-		jwt.WithLeeway(30 * time.Second),
-		jwt.WithIssuer(trustedIssuer),
-		jwt.WithAudience(audience)}
-
-	return jwt.NewParser(opts...)
+func unmarshalResponse(response *http.Response, body []byte, result interface{}) error {
+	err := json.Unmarshal(body, &result)
+	if err == nil {
+		return nil
+	}
+	contentType := response.Header.Get("Content-Type")
+	mediaType, _, cerr := mime.ParseMediaType(contentType)
+	if cerr == nil && mediaType == "application/json" {
+		return fmt.Errorf("got content-type = application/json, but could not unmarshal as json: %w", err)
+	}
+	return fmt.Errorf("expected content-type = application/json, got %q: %w", contentType, err)
 }
-func newHttpClient(getToken getTokenFunc) http.Client {
+func CreateHttpClient(innerRoundTripper http.RoundTripper) http.Client {
 	return http.Client{
 		Transport: failsafehttp.NewRoundTripper(
-			newSecureTransport(getToken),
+			innerRoundTripper,
 			failsafehttp.NewRetryPolicyBuilder().
 				WithMaxAttempts(retryMaxAttempts).
 				WithBackoff(retryBackoffDelay, retryBackoffMaxDelay).
@@ -159,15 +126,14 @@ func isStatus5xx(code int) bool {
 	}
 	return false
 }
-func unmarshalResponse(response *http.Response, body []byte, result interface{}) error {
-	err := json.Unmarshal(body, &result)
-	if err == nil {
-		return nil
+func ValidateIssuedAt(token *jwt.Token) error {
+	issuedAt, err := qubetoken.GetIssuedAt(token)
+	if err != nil {
+		return err
 	}
-	contentType := response.Header.Get("Content-Type")
-	mediaType, _, err := mime.ParseMediaType(contentType)
-	if err == nil && mediaType == "application/json" {
-		return fmt.Errorf("got Content-Type = application/json, but could not unmarshal as JSON: %v", err)
+	current := time.Now()
+	if current.Before(issuedAt.Add(-leeway)) {
+		return utils.NewError(fmt.Sprintf("current time is before issuedAt more than %v sec", leewaySec), jwt.ErrTokenUsedBeforeIssued)
 	}
-	return fmt.Errorf("expected Content-Type = application/json, got %q: %v", contentType, err)
+	return nil
 }

@@ -17,6 +17,7 @@ import (
 //     https://openid.net/specs/openid-connect-core-1_0.html#IDToken
 //   - RFC 7519 “JSON Web Token (JWT)”:
 //     https://datatracker.ietf.org/doc/html/rfc7519
+//
 // The claims are commonly included in ID Tokens issued by OpenID Providers and
 // are used for subject identification, audience restriction, and token lifetime validation.
 const (
@@ -44,35 +45,35 @@ func GetValue(token *jwt.Token, claim string) (any, error) {
 	if err != nil {
 		return nil, err
 	}
-	return getValue(claims, claim)
+	return Value(claims, claim)
 }
 func GetStringValue(token *jwt.Token, claim string) (string, error) {
 	claims, err := getMapClaims(token)
 	if err != nil {
 		return "", err
 	}
-	return getStringValue(claims, claim)
+	return StringValue(claims, claim)
 }
 func GetClaimStringsValue(token *jwt.Token, claim string) (jwt.ClaimStrings, error) {
 	claims, err := getMapClaims(token)
 	if err != nil {
 		return nil, err
 	}
-	return getClaimStringsValue(claims, claim)
+	return ClaimStringsValue(claims, claim)
 }
 func GetNumericDateValue(token *jwt.Token, claim string) (*jwt.NumericDate, error) {
 	claims, err := getMapClaims(token)
 	if err != nil {
 		return nil, err
 	}
-	return getNumericDateValue(claims, claim)
+	return NumericDateValue(claims, claim)
 }
 func GetMapValue(token *jwt.Token, claim string) (jwt.MapClaims, error) {
 	claims, err := getMapClaims(token)
 	if err != nil {
 		return nil, err
 	}
-	return getMapValue(claims, claim)
+	return MapValue(claims, claim)
 }
 func GetIssuer(token *jwt.Token) (string, error) {
 	return GetStringValue(token, Iss)
@@ -104,14 +105,14 @@ func getMapClaims(token *jwt.Token) (jwt.MapClaims, error) {
 	}
 	return nil, utils.NewError(fmt.Sprintf("expected jwt.MapClaims, but got %T", token.Claims), ErrTokenClaimsUnsupported)
 }
-func getValue(claims jwt.MapClaims, claim string) (any, error) {
+func Value(claims jwt.MapClaims, claim string) (any, error) {
 	if value, found := claims[claim]; found {
 		return value, nil
 	}
 	return nil, utils.NewError(fmt.Sprintf(claimIsMissed, claim), ErrTokenClaimMissing)
 }
-func getStringValue(claims jwt.MapClaims, claim string) (string, error) {
-	value, err := getValue(claims, claim)
+func StringValue(claims jwt.MapClaims, claim string) (string, error) {
+	value, err := Value(claims, claim)
 	if err != nil {
 		return "", err
 	}
@@ -120,8 +121,8 @@ func getStringValue(claims jwt.MapClaims, claim string) (string, error) {
 	}
 	return "", utils.NewError(fmt.Sprintf(claimIsInvalid, claim, "string", value), jwt.ErrInvalidType)
 }
-func getClaimStringsValue(claims jwt.MapClaims, claim string) (jwt.ClaimStrings, error) {
-	value, err := getValue(claims, claim)
+func ClaimStringsValue(claims jwt.MapClaims, claim string) (jwt.ClaimStrings, error) {
+	value, err := Value(claims, claim)
 	if err != nil {
 		return nil, err
 	}
@@ -144,8 +145,8 @@ func getClaimStringsValue(claims jwt.MapClaims, claim string) (jwt.ClaimStrings,
 	}
 	return array, nil
 }
-func getNumericDateValue(claims jwt.MapClaims, claim string) (*jwt.NumericDate, error) {
-	value, err := getValue(claims, claim)
+func NumericDateValue(claims jwt.MapClaims, claim string) (*jwt.NumericDate, error) {
+	value, err := Value(claims, claim)
 	if err != nil {
 		return nil, err
 	}
@@ -165,8 +166,8 @@ func newNumericDateFromSeconds(f float64) *jwt.NumericDate {
 	round, frac := math.Modf(f)
 	return jwt.NewNumericDate(time.Unix(int64(round), int64(frac*1e9)))
 }
-func getMapValue(claims jwt.MapClaims, claim string) (jwt.MapClaims, error) {
-	value, err := getValue(claims, claim)
+func MapValue(claims jwt.MapClaims, claim string) (jwt.MapClaims, error) {
+	value, err := Value(claims, claim)
 	if err != nil {
 		return nil, err
 	}
