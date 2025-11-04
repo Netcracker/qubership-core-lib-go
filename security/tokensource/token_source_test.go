@@ -17,6 +17,7 @@ func TestServiceAccountToken(t *testing.T) {
 	storage, err := test.NewServiceAccountTokenStorage(t.TempDir())
 	require.NoError(t, err)
 	DefaultServiceAccountDir = storage.ServiceAccountTokenDir
+	logger.Infof("service account token dir is %s", storage.ServiceAccountTokenDir)
 
 	serviceAccountTokenInitialValue := "service_account_token_initial_value"
 	err = storage.SaveTokenValue(serviceAccountTokenInitialValue)
@@ -44,6 +45,7 @@ func TestNoServiceAccountToken(t *testing.T) {
 	storage, err := test.NewServiceAccountTokenStorage(t.TempDir())
 	require.NoError(t, err)
 	DefaultServiceAccountDir = storage.ServiceAccountTokenDir
+	logger.Infof("service account token dir is %s", storage.ServiceAccountTokenDir)
 
 	err = storage.DeleteTokenFile()
 	require.NoError(t, err)
@@ -74,6 +76,7 @@ func TestNoServiceAccountTokenDir(t *testing.T) {
 	storage, err := test.NewServiceAccountTokenStorage(t.TempDir())
 	require.NoError(t, err)
 	DefaultServiceAccountDir = storage.ServiceAccountTokenDir
+	logger.Infof("service account token dir is %s", storage.ServiceAccountTokenDir)
 
 	err = storage.Clear()
 	require.NoError(t, err)
@@ -92,6 +95,7 @@ func TestAudienceTokens(t *testing.T) {
 	storage, err := test.NewAudienceTokensStorage(t.TempDir())
 	require.NoError(t, err)
 	DefaultAudienceTokensDir = storage.AudienceTokensDir
+	logger.Infof("audience tokens dir is %s", storage.AudienceTokensDir)
 
 	netcrackerTokenInitialValue := "netcracker_token_initial_value"
 	err = storage.SaveTokenValue(AudienceNetcracker, netcrackerTokenInitialValue)
@@ -135,6 +139,7 @@ func TestNoAudienceToken(t *testing.T) {
 	storage, err := test.NewAudienceTokensStorage(t.TempDir())
 	require.NoError(t, err)
 	DefaultAudienceTokensDir = storage.AudienceTokensDir
+	logger.Infof("audience tokens dir is %s", storage.AudienceTokensDir)
 
 	_, err = GetAudienceToken(ctx, AudienceNetcracker)
 	assert.ErrorContains(t, err, "token with audience netcracker was not found")
@@ -162,6 +167,7 @@ func TestNoAudienceTokensDir(t *testing.T) {
 	storage, err := test.NewAudienceTokensStorage(t.TempDir())
 	require.NoError(t, err)
 	DefaultAudienceTokensDir = storage.AudienceTokensDir
+	logger.Infof("audience tokens dir is %s", storage.AudienceTokensDir)
 
 	err = storage.Clear()
 	require.NoError(t, err)
