@@ -63,6 +63,8 @@ func TestNoServiceAccountToken(t *testing.T) {
 
 	_, err = GetServiceAccountToken(ctx)
 	assert.ErrorContains(t, err, "failed to get token default kubernetes service account token: failed to read token at path")
+
+	_ = storage.Clear()
 }
 
 func TestNoServiceAccountTokenDir(t *testing.T) {
@@ -78,6 +80,8 @@ func TestNoServiceAccountTokenDir(t *testing.T) {
 
 	_, err = GetServiceAccountToken(ctx)
 	assert.ErrorContains(t, err, "failed to create token watcher: failed to add path")
+
+	_ = storage.Clear()
 }
 
 func TestAudienceTokens(t *testing.T) {
@@ -147,6 +151,8 @@ func TestNoAudienceToken(t *testing.T) {
 
 	_, err = GetAudienceToken(ctx, AudienceNetcracker)
 	assert.ErrorContains(t, err, "failed to get token by audience: netcracker: failed to read token at path")
+
+	_ = storage.Clear()
 }
 
 func TestNoAudienceTokensDir(t *testing.T) {
@@ -162,6 +168,8 @@ func TestNoAudienceTokensDir(t *testing.T) {
 
 	_, err = GetAudienceToken(ctx, AudienceNetcracker)
 	assert.ErrorContains(t, err, "failed to create token watcher: failed to refresh tokens cache: failed to get dir entries from tokenDir")
+
+	_ = storage.Clear()
 }
 
 func TestEmptyAudience(t *testing.T) {
