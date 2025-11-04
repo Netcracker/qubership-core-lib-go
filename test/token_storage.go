@@ -9,9 +9,6 @@ import (
 
 const dataSymlinkName = "..data"
 
-func init() {
-}
-
 type TokenStorage struct {
 	rootDir        string
 	dataDir        string
