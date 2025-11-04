@@ -5,23 +5,11 @@ import (
 	"os"
 	"path/filepath"
 	"time"
-
-	"github.com/failsafe-go/failsafe-go/retrypolicy"
 )
 
 const dataSymlinkName = "..data"
-const timeout = time.Millisecond * 50
-
-var (
-	policy retrypolicy.RetryPolicy[bool]
-)
 
 func init() {
-	policy = retrypolicy.NewBuilder[bool]().
-		AbortOnResult(true).
-		WithDelay(timeout).
-		WithMaxRetries(20).
-		Build()
 }
 
 type TokenStorage struct {
