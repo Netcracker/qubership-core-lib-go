@@ -12,7 +12,7 @@ import (
 
 func TestServiceAccountToken(t *testing.T) {
 	ctx, cancel := context.WithCancel(t.Context())
-	defer cancel()
+	defer func() { cancel(); time.Sleep(time.Second) }()
 
 	storage, err := test.NewServiceAccountTokenStorage(t.TempDir())
 	require.NoError(t, err)
@@ -40,7 +40,7 @@ func TestServiceAccountToken(t *testing.T) {
 
 func TestNoServiceAccountToken(t *testing.T) {
 	ctx, cancel := context.WithCancel(t.Context())
-	defer cancel()
+	defer func() { cancel(); time.Sleep(time.Second) }()
 
 	storage, err := test.NewServiceAccountTokenStorage(t.TempDir())
 	require.NoError(t, err)
@@ -67,13 +67,11 @@ func TestNoServiceAccountToken(t *testing.T) {
 	assert.ErrorContains(t, err, "failed to get token default kubernetes service account token: failed to read token at path")
 
 	_ = storage.Clear()
-
-	time.Sleep(time.Second)
 }
 
 func TestNoServiceAccountTokenDir(t *testing.T) {
 	ctx, cancel := context.WithCancel(t.Context())
-	defer cancel()
+	defer func() { cancel(); time.Sleep(time.Second) }()
 
 	storage, err := test.NewServiceAccountTokenStorage(t.TempDir())
 	require.NoError(t, err)
@@ -91,7 +89,7 @@ func TestNoServiceAccountTokenDir(t *testing.T) {
 
 func TestAudienceTokens(t *testing.T) {
 	ctx, cancel := context.WithCancel(t.Context())
-	defer cancel()
+	defer func() { cancel(); time.Sleep(time.Second) }()
 
 	storage, err := test.NewAudienceTokensStorage(t.TempDir())
 	require.NoError(t, err)
@@ -135,7 +133,7 @@ func TestAudienceTokens(t *testing.T) {
 
 func TestNoAudienceToken(t *testing.T) {
 	ctx, cancel := context.WithCancel(t.Context())
-	defer cancel()
+	defer func() { cancel(); time.Sleep(time.Second) }()
 
 	storage, err := test.NewAudienceTokensStorage(t.TempDir())
 	require.NoError(t, err)
@@ -163,7 +161,7 @@ func TestNoAudienceToken(t *testing.T) {
 
 func TestNoAudienceTokensDir(t *testing.T) {
 	ctx, cancel := context.WithCancel(t.Context())
-	defer cancel()
+	defer func() { cancel(); time.Sleep(time.Second) }()
 
 	storage, err := test.NewAudienceTokensStorage(t.TempDir())
 	require.NoError(t, err)
@@ -181,7 +179,7 @@ func TestNoAudienceTokensDir(t *testing.T) {
 
 func TestEmptyAudience(t *testing.T) {
 	ctx, cancel := context.WithCancel(t.Context())
-	defer cancel()
+	defer func() { cancel(); time.Sleep(time.Second) }()
 
 	_, err := GetAudienceToken(ctx, "")
 	assert.ErrorContains(t, err, "audience is empty")
