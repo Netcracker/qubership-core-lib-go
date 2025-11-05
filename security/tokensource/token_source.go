@@ -50,7 +50,7 @@ func GetAudienceToken(ctx context.Context, audience TokenAudience) (string, erro
 		return "", fmt.Errorf("audience is empty")
 	}
 	audienceTokensWatcher.CompareAndSwap(nil, utils.NewLazy(func() (*tokenWatcher, error) {
-		return newTokenWatcher(ctx, DefaultAudienceTokensDir, refreshAudienceTokensCache, OnCloseAudienceTokensWatcher)
+		return newTokenWatcher(ctx, DefaultAudienceTokensDir, refreshAudienceTokensCache, onCloseAudienceTokensWatcher)
 	}))
 	_, err := audienceTokensWatcher.Load().Get()
 	if err != nil {
@@ -70,7 +70,7 @@ func GetAudienceToken(ctx context.Context, audience TokenAudience) (string, erro
 // GetServiceAccountToken gets the default service account token located at /var/run/secrets/kubernetes.io/serviceaccount. Do not store the token. Always call GetServiceAccountToken again to get a fresh token. Default service account token directory can be overridden using global variable DefaultServiceAccountDir
 func GetServiceAccountToken(ctx context.Context) (string, error) {
 	serviceAccountTokenWatcher.CompareAndSwap(nil, utils.NewLazy(func() (*tokenWatcher, error) {
-		return newTokenWatcher(ctx, DefaultServiceAccountDir, refreshServiceAccountTokenCache, OnCloseServiceAccountTokenWatcher)
+		return newTokenWatcher(ctx, DefaultServiceAccountDir, refreshServiceAccountTokenCache, onCloseServiceAccountTokenWatcher)
 	}))
 	_, err := serviceAccountTokenWatcher.Load().Get()
 	if err != nil {
@@ -105,10 +105,9 @@ func refreshAudienceTokensCache(tokensDir string) error {
 	return nil
 }
 
-func OnCloseAudienceTokensWatcher() {
+func onCloseAudienceTokensWatcher() {
 	audienceTokensWatcher.Store(nil)
 	audienceTokensCache.Clear()
-	logger.Infof("Audience Tokens cache cleared")
 }
 
 func refreshServiceAccountTokenCache(serviceAccountDir string) error {
@@ -120,10 +119,9 @@ func refreshServiceAccountTokenCache(serviceAccountDir string) error {
 	return nil
 }
 
-func OnCloseServiceAccountTokenWatcher() {
+func onCloseServiceAccountTokenWatcher() {
 	serviceAccountTokenWatcher.Store(nil)
 	serviceAccountTokenCache.Store(tokenUpdateResult{})
-	logger.Infof("Service Account Tokens cache cleared")
 }
 
 func readToken(tokenPath string) (string, error) {

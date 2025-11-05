@@ -1,23 +1,50 @@
 package test
 
 import (
+	"context"
+	"os"
 	"testing"
+	"time"
 
 	"github.com/netcracker/qubership-core-lib-go/v3/security/tokensource"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-func TestServiceAccountToken(t *testing.T) {
-	ctx := t.Context()
+var (
+	serviceAccountTokensStorage *ServiceAccountTokenStorage
+	audienceTokensStorage       *AudienceTokensStorage
+)
 
-	storage, err := NewServiceAccountTokenStorage(t.TempDir())
+func beforeEach(t *testing.T) {
+	var err error
+
+	serviceAccountTokensStorage, err = NewServiceAccountTokenStorage(t.TempDir())
 	require.NoError(t, err)
-	tokensource.DefaultServiceAccountDir = storage.ServiceAccountTokenDir
-	logger.Infof("service account token dir is %s", storage.ServiceAccountTokenDir)
+	tokensource.DefaultServiceAccountDir = serviceAccountTokensStorage.ServiceAccountTokenDir
+	logger.Infof("service account token dir is %s", serviceAccountTokensStorage.ServiceAccountTokenDir)
+
+	audienceTokensStorage, err = NewAudienceTokensStorage(t.TempDir())
+	require.NoError(t, err)
+	tokensource.DefaultAudienceTokensDir = audienceTokensStorage.AudienceTokensDir
+	logger.Infof("audience tokens dir is %s", audienceTokensStorage.AudienceTokensDir)
+}
+func afterEach(_ *testing.T) {
+	_ = serviceAccountTokensStorage.Clear()
+	_ = audienceTokensStorage.Clear()
+}
+func TestMain(m *testing.M) {
+	exitCode := m.Run()
+	os.Exit(exitCode)
+}
+func TestServiceAccountToken(t *testing.T) {
+	ctx, cancelCtx := context.WithCancel(t.Context())
+	defer func() { cancelCtx(); time.Sleep(time.Millisecond * 10) }()
+	beforeEach(t)
+	defer afterEach(t)
 
 	serviceAccountTokenInitialValue := "service_account_token_initial_value"
-	err = storage.SaveTokenValue(serviceAccountTokenInitialValue)
+	err := serviceAccountTokensStorage.SaveTokenValue(serviceAccountTokenInitialValue)
 	require.NoError(t, err)
 
 	token, err := tokensource.GetServiceAccountToken(ctx)
@@ -25,80 +52,62 @@ func TestServiceAccountToken(t *testing.T) {
 	assert.Equal(t, serviceAccountTokenInitialValue, token)
 
 	serviceAccountTokenSecondValue := "service_account_token_second_value"
-	err = storage.SaveTokenValue(serviceAccountTokenSecondValue)
+	err = serviceAccountTokensStorage.SaveTokenValue(serviceAccountTokenSecondValue)
 	require.NoError(t, err)
 
 	token, err = tokensource.GetServiceAccountToken(ctx)
 	require.NoError(t, err)
 	assert.Equal(t, serviceAccountTokenSecondValue, token)
-
-	_ = storage.Clear()
-	tokensource.OnCloseServiceAccountTokenWatcher()
 }
-
 func TestNoServiceAccountToken(t *testing.T) {
-	ctx := t.Context()
+	ctx, cancelCtx := context.WithCancel(t.Context())
+	defer func() { cancelCtx(); time.Sleep(time.Millisecond * 10) }()
+	beforeEach(t)
+	defer afterEach(t)
 
-	storage, err := NewServiceAccountTokenStorage(t.TempDir())
-	require.NoError(t, err)
-	tokensource.DefaultServiceAccountDir = storage.ServiceAccountTokenDir
-	logger.Infof("service account token dir is %s", storage.ServiceAccountTokenDir)
-
-	err = storage.DeleteTokenFile()
+	err := serviceAccountTokensStorage.DeleteTokenFile()
 	require.NoError(t, err)
 
 	_, err = tokensource.GetServiceAccountToken(ctx)
 	assert.ErrorContains(t, err, "failed to get token default kubernetes service account token: failed to read token at path")
 
-	err = storage.SaveTokenValue("value")
+	err = serviceAccountTokensStorage.SaveTokenValue("value")
 	require.NoError(t, err)
 
 	token, err := tokensource.GetServiceAccountToken(ctx)
 	require.NoError(t, err)
 	assert.Equal(t, "value", token)
 
-	err = storage.DeleteTokenFile()
+	err = serviceAccountTokensStorage.DeleteTokenFile()
 	require.NoError(t, err)
 
 	_, err = tokensource.GetServiceAccountToken(ctx)
 	assert.ErrorContains(t, err, "failed to get token default kubernetes service account token: failed to read token at path")
-
-	_ = storage.Clear()
-	tokensource.OnCloseServiceAccountTokenWatcher()
 }
-
 func TestNoServiceAccountTokenDir(t *testing.T) {
-	ctx := t.Context()
+	ctx, cancelCtx := context.WithCancel(t.Context())
+	defer func() { cancelCtx(); time.Sleep(time.Millisecond * 10) }()
+	beforeEach(t)
+	defer afterEach(t)
 
-	storage, err := NewServiceAccountTokenStorage(t.TempDir())
-	require.NoError(t, err)
-	tokensource.DefaultServiceAccountDir = storage.ServiceAccountTokenDir
-	logger.Infof("service account token dir is %s", storage.ServiceAccountTokenDir)
-
-	err = storage.Clear()
+	err := serviceAccountTokensStorage.Clear()
 	require.NoError(t, err)
 
 	_, err = tokensource.GetServiceAccountToken(ctx)
 	assert.ErrorContains(t, err, "failed to create token watcher: failed to add path")
-
-	_ = storage.Clear()
-	tokensource.OnCloseServiceAccountTokenWatcher()
 }
-
 func TestAudienceTokens(t *testing.T) {
-	ctx := t.Context()
-
-	storage, err := NewAudienceTokensStorage(t.TempDir())
-	require.NoError(t, err)
-	tokensource.DefaultAudienceTokensDir = storage.AudienceTokensDir
-	logger.Infof("audience tokens dir is %s", storage.AudienceTokensDir)
+	ctx, cancelCtx := context.WithCancel(t.Context())
+	defer func() { cancelCtx(); time.Sleep(time.Millisecond * 10) }()
+	beforeEach(t)
+	defer afterEach(t)
 
 	netcrackerTokenInitialValue := "netcracker_token_initial_value"
-	err = storage.SaveTokenValue(tokensource.AudienceNetcracker, netcrackerTokenInitialValue)
+	err := audienceTokensStorage.SaveTokenValue(tokensource.AudienceNetcracker, netcrackerTokenInitialValue)
 	require.NoError(t, err)
 
 	dbaasTokenInitialValue := "dbaas_token_initial_value"
-	err = storage.SaveTokenValue(tokensource.AudienceDBaaS, dbaasTokenInitialValue)
+	err = audienceTokensStorage.SaveTokenValue(tokensource.AudienceDBaaS, dbaasTokenInitialValue)
 	require.NoError(t, err)
 
 	token, err := tokensource.GetAudienceToken(ctx, tokensource.AudienceNetcracker)
@@ -110,7 +119,7 @@ func TestAudienceTokens(t *testing.T) {
 	assert.Equal(t, dbaasTokenInitialValue, token)
 
 	netcrackerTokenSecondValue := "netcracker_token_second_value"
-	err = storage.SaveTokenValue(tokensource.AudienceNetcracker, netcrackerTokenSecondValue)
+	err = audienceTokensStorage.SaveTokenValue(tokensource.AudienceNetcracker, netcrackerTokenSecondValue)
 	require.NoError(t, err)
 
 	token, err = tokensource.GetAudienceToken(ctx, tokensource.AudienceNetcracker)
@@ -118,59 +127,44 @@ func TestAudienceTokens(t *testing.T) {
 	assert.Equal(t, netcrackerTokenSecondValue, token)
 
 	dbaasTokenSecondValue := "dbaas_token_second_value"
-	err = storage.SaveTokenValue(tokensource.AudienceDBaaS, dbaasTokenSecondValue)
+	err = audienceTokensStorage.SaveTokenValue(tokensource.AudienceDBaaS, dbaasTokenSecondValue)
 	require.NoError(t, err)
 
 	token, err = tokensource.GetAudienceToken(ctx, tokensource.AudienceDBaaS)
 	require.NoError(t, err)
 	assert.Equal(t, dbaasTokenSecondValue, token)
-
-	_ = storage.Clear()
-	tokensource.OnCloseAudienceTokensWatcher()
 }
-
 func TestNoAudienceToken(t *testing.T) {
-	ctx := t.Context()
+	ctx, cancelCtx := context.WithCancel(t.Context())
+	defer func() { cancelCtx(); time.Sleep(time.Millisecond * 10) }()
+	beforeEach(t)
+	defer afterEach(t)
 
-	storage, err := NewAudienceTokensStorage(t.TempDir())
-	require.NoError(t, err)
-	tokensource.DefaultAudienceTokensDir = storage.AudienceTokensDir
-	logger.Infof("audience tokens dir is %s", storage.AudienceTokensDir)
-
-	_, err = tokensource.GetAudienceToken(ctx, tokensource.AudienceNetcracker)
+	_, err := tokensource.GetAudienceToken(ctx, tokensource.AudienceNetcracker)
 	assert.ErrorContains(t, err, "token with audience netcracker was not found")
 
-	err = storage.SaveTokenValue(tokensource.AudienceNetcracker, "value")
+	err = audienceTokensStorage.SaveTokenValue(tokensource.AudienceNetcracker, "value")
 	require.NoError(t, err)
 
 	token, err := tokensource.GetAudienceToken(ctx, tokensource.AudienceNetcracker)
 	require.NoError(t, err)
 	assert.Equal(t, "value", token)
 
-	err = storage.DeleteTokenFile(tokensource.AudienceNetcracker)
+	err = audienceTokensStorage.DeleteTokenFile(tokensource.AudienceNetcracker)
 	require.NoError(t, err)
 
 	_, err = tokensource.GetAudienceToken(ctx, tokensource.AudienceNetcracker)
 	assert.ErrorContains(t, err, "failed to get token by audience: netcracker: failed to read token at path")
-
-	_ = storage.Clear()
-	tokensource.OnCloseAudienceTokensWatcher()
 }
-
 func TestNoAudienceTokensDir(t *testing.T) {
-	ctx := t.Context()
+	ctx, cancelCtx := context.WithCancel(t.Context())
+	defer func() { cancelCtx(); time.Sleep(time.Millisecond * 10) }()
+	beforeEach(t)
+	defer afterEach(t)
 
-	storage, err := NewAudienceTokensStorage(t.TempDir())
-	require.NoError(t, err)
-	tokensource.DefaultAudienceTokensDir = storage.AudienceTokensDir
-	logger.Infof("audience tokens dir is %s", storage.AudienceTokensDir)
-
-	err = storage.Clear()
+	err := audienceTokensStorage.Clear()
 	require.NoError(t, err)
 
 	_, err = tokensource.GetAudienceToken(ctx, tokensource.AudienceNetcracker)
 	assert.ErrorContains(t, err, "failed to create token watcher: failed to refresh tokens cache: failed to get dir entries from tokenDir")
-
-	_ = storage.Clear()
-	tokensource.OnCloseAudienceTokensWatcher()
 }

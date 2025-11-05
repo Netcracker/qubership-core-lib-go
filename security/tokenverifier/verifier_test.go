@@ -31,11 +31,9 @@ const (
 )
 
 var (
-	sub       = token.GetKubernetesSubject(namespace, serviceAccount)
-	ctx       context.Context
-	cancelCtx context.CancelFunc
-	key       *rsa.PrivateKey
-	storage   *test.ServiceAccountTokenStorage
+	sub                        = token.GetKubernetesSubject(namespace, serviceAccount)
+	key                        *rsa.PrivateKey
+	serviceAccountTokenStorage *test.ServiceAccountTokenStorage
 )
 
 var scenarios = []struct {
@@ -187,11 +185,11 @@ var scenarios = []struct {
 func beforeEach(t *testing.T) {
 	key, _ = rsa.GenerateKey(rand.Reader, 2048)
 	test.StartMockServer()
-	storage, _ = test.NewServiceAccountTokenStorage(t.TempDir())
-	tokensource.DefaultServiceAccountDir = storage.ServiceAccountTokenDir
+	serviceAccountTokenStorage, _ = test.NewServiceAccountTokenStorage(t.TempDir())
+	tokensource.DefaultServiceAccountDir = serviceAccountTokenStorage.ServiceAccountTokenDir
 }
-func afterEach() {
-	_ = storage.Clear()
+func afterEach(_ *testing.T) {
+	_ = serviceAccountTokenStorage.Clear()
 	test.StopMockServer()
 }
 func TestMain(m *testing.M) {
@@ -199,13 +197,13 @@ func TestMain(m *testing.M) {
 	os.Exit(exitCode)
 }
 func TestBasicTokenValidations(t *testing.T) {
-	ctx, cancelCtx = context.WithTimeout(context.Background(), time.Minute)
-	defer cancelCtx()
+	ctx, cancelCtx := context.WithCancel(t.Context())
+	defer func() { cancelCtx(); time.Sleep(time.Millisecond * 10) }()
 	beforeEach(t)
-	defer afterEach()
+	defer afterEach(t)
 
 	serviceAccountToken := createServiceAccountToken(t, test.GetMockServerUrl())
-	err := storage.SaveTokenValue(serviceAccountToken)
+	err := serviceAccountTokenStorage.SaveTokenValue(serviceAccountToken)
 	require.NoError(t, err)
 	addProviderHandlerDefaultResponse(serviceAccountToken)
 	addJwksHandlerDefaultResponse(serviceAccountToken)
@@ -232,13 +230,13 @@ func TestBasicTokenValidations(t *testing.T) {
 	}
 }
 func TestCustomValidation(t *testing.T) {
-	ctx, cancelCtx = context.WithTimeout(context.Background(), time.Minute)
-	defer cancelCtx()
+	ctx, cancelCtx := context.WithCancel(t.Context())
+	defer func() { cancelCtx(); time.Sleep(time.Millisecond * 10) }()
 	beforeEach(t)
-	defer afterEach()
+	defer afterEach(t)
 
 	serviceAccountToken := createServiceAccountToken(t, test.GetMockServerUrl())
-	err := storage.SaveTokenValue(serviceAccountToken)
+	err := serviceAccountTokenStorage.SaveTokenValue(serviceAccountToken)
 	require.NoError(t, err)
 	addProviderHandlerDefaultResponse(serviceAccountToken)
 	addJwksHandlerDefaultResponse(serviceAccountToken)
@@ -269,60 +267,60 @@ func TestCustomValidation(t *testing.T) {
 	assert.ErrorContains(t, verificationErr, "subject claim is wrong")
 }
 func TestNoServiceAccountToken(t *testing.T) {
-	ctx, cancelCtx = context.WithTimeout(context.Background(), time.Minute)
-	defer cancelCtx()
+	ctx, cancelCtx := context.WithCancel(t.Context())
+	defer func() { cancelCtx(); time.Sleep(time.Millisecond * 10) }()
 	beforeEach(t)
-	defer afterEach()
+	defer afterEach(t)
 
-	_ = storage.DeleteTokenFile()
+	_ = serviceAccountTokenStorage.DeleteTokenFile()
 
 	_, err := NewKubernetesVerifier(ctx, tokensource.AudienceMaaS)
 	assert.ErrorContains(t, err, "failed to acquire token for kubernetes API (the possible cause is missing kubernetes service account for the microservice.): failed to get token default kubernetes service account token:")
 }
 func TestInvalidServiceAccountToken(t *testing.T) {
-	ctx, cancelCtx = context.WithTimeout(context.Background(), time.Minute)
-	defer cancelCtx()
+	ctx, cancelCtx := context.WithCancel(t.Context())
+	defer func() { cancelCtx(); time.Sleep(time.Millisecond * 10) }()
 	beforeEach(t)
-	defer afterEach()
+	defer afterEach(t)
 
 	serviceAccountToken := "token"
-	err := storage.SaveTokenValue(serviceAccountToken)
+	err := serviceAccountTokenStorage.SaveTokenValue(serviceAccountToken)
 	require.NoError(t, err)
 	_, err = NewKubernetesVerifier(ctx, tokensource.AudienceMaaS)
 	assert.ErrorContains(t, err, "invalid jwt: token is malformed: token contains an invalid number of segments")
 }
 func TestNoServiceAccountTokenIssuer(t *testing.T) {
-	ctx, cancelCtx = context.WithTimeout(context.Background(), time.Minute)
-	defer cancelCtx()
+	ctx, cancelCtx := context.WithCancel(t.Context())
+	defer func() { cancelCtx(); time.Sleep(time.Millisecond * 10) }()
 	beforeEach(t)
-	defer afterEach()
+	defer afterEach(t)
 
 	serviceAccountToken := createServiceAccountToken(t, "")
-	err := storage.SaveTokenValue(serviceAccountToken)
+	err := serviceAccountTokenStorage.SaveTokenValue(serviceAccountToken)
 	require.NoError(t, err)
 	_, err = NewKubernetesVerifier(ctx, tokensource.AudienceMaaS)
 	assert.ErrorContains(t, err, "jwt does not have the issuer claim value")
 }
 func TestInvalidServiceAccountTokenIssuer(t *testing.T) {
-	ctx, cancelCtx = context.WithTimeout(context.Background(), time.Minute)
-	defer cancelCtx()
+	ctx, cancelCtx := context.WithCancel(t.Context())
+	defer func() { cancelCtx(); time.Sleep(time.Millisecond * 10) }()
 	beforeEach(t)
-	defer afterEach()
+	defer afterEach(t)
 
 	serviceAccountToken := createServiceAccountToken(t, "some 	text")
-	err := storage.SaveTokenValue(serviceAccountToken)
+	err := serviceAccountTokenStorage.SaveTokenValue(serviceAccountToken)
 	require.NoError(t, err)
 	_, err = NewKubernetesVerifier(ctx, tokensource.AudienceMaaS)
 	assert.ErrorContains(t, err, "failed to get issuer url: issuer url is invalid: parse \"some \\ttext\": net/url: invalid control character in URL")
 }
 func TestOidcRequestUnauthorizedError(t *testing.T) {
-	ctx, cancelCtx = context.WithTimeout(context.Background(), time.Minute)
-	defer cancelCtx()
+	ctx, cancelCtx := context.WithCancel(t.Context())
+	defer func() { cancelCtx(); time.Sleep(time.Millisecond * 10) }()
 	beforeEach(t)
-	defer afterEach()
+	defer afterEach(t)
 
 	serviceAccountToken := createServiceAccountToken(t, test.GetMockServerUrl())
-	err := storage.SaveTokenValue(serviceAccountToken)
+	err := serviceAccountTokenStorage.SaveTokenValue(serviceAccountToken)
 	require.NoError(t, err)
 	addProviderHandlerDefaultResponse("token")
 
@@ -331,17 +329,17 @@ func TestOidcRequestUnauthorizedError(t *testing.T) {
 
 }
 func TestOidcRequestCertificateError(t *testing.T) {
-	ctx, cancelCtx = context.WithTimeout(context.Background(), time.Minute)
-	defer cancelCtx()
+	ctx, cancelCtx := context.WithCancel(t.Context())
+	defer func() { cancelCtx(); time.Sleep(time.Millisecond * 10) }()
 	beforeEach(t)
-	defer afterEach()
+	defer afterEach(t)
 
 	test.StopMockServer()
 	test.StartMockTLSServer()
 	defer test.StopMockServer()
 
 	serviceAccountToken := createServiceAccountToken(t, test.GetMockServerUrl())
-	err := storage.SaveTokenValue(serviceAccountToken)
+	err := serviceAccountTokenStorage.SaveTokenValue(serviceAccountToken)
 	require.NoError(t, err)
 	addProviderHandlerDefaultResponse(serviceAccountToken)
 
@@ -349,13 +347,13 @@ func TestOidcRequestCertificateError(t *testing.T) {
 	require.ErrorContains(t, err, "failed to send oidc request (the possible cause is outdated base image without kubernetes service account ca.crt, please check your base image version.):")
 }
 func TestOidcResponseParsingError(t *testing.T) {
-	ctx, cancelCtx = context.WithTimeout(context.Background(), time.Minute)
-	defer cancelCtx()
+	ctx, cancelCtx := context.WithCancel(t.Context())
+	defer func() { cancelCtx(); time.Sleep(time.Millisecond * 10) }()
 	beforeEach(t)
-	defer afterEach()
+	defer afterEach(t)
 
 	serviceAccountToken := createServiceAccountToken(t, test.GetMockServerUrl())
-	err := storage.SaveTokenValue(serviceAccountToken)
+	err := serviceAccountTokenStorage.SaveTokenValue(serviceAccountToken)
 	require.NoError(t, err)
 	addProviderHandler(serviceAccountToken, http.StatusOK, []byte("some body"))
 
