@@ -1,6 +1,7 @@
 package test
 
 import (
+	"context"
 	"testing"
 
 	"github.com/netcracker/qubership-core-lib-go/v3/security/tokensource"
@@ -9,7 +10,8 @@ import (
 )
 
 func TestServiceAccountToken(t *testing.T) {
-	ctx := t.Context()
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
 
 	storage, err := NewServiceAccountTokenStorage(t.TempDir())
 	require.NoError(t, err)
@@ -36,7 +38,8 @@ func TestServiceAccountToken(t *testing.T) {
 }
 
 func TestNoServiceAccountToken(t *testing.T) {
-	ctx := t.Context()
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
 
 	storage, err := NewServiceAccountTokenStorage(t.TempDir())
 	require.NoError(t, err)
@@ -66,7 +69,8 @@ func TestNoServiceAccountToken(t *testing.T) {
 }
 
 func TestNoServiceAccountTokenDir(t *testing.T) {
-	ctx := t.Context()
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
 
 	storage, err := NewServiceAccountTokenStorage(t.TempDir())
 	require.NoError(t, err)
@@ -83,7 +87,8 @@ func TestNoServiceAccountTokenDir(t *testing.T) {
 }
 
 func TestAudienceTokens(t *testing.T) {
-	ctx := t.Context()
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
 
 	storage, err := NewAudienceTokensStorage(t.TempDir())
 	require.NoError(t, err)
@@ -126,7 +131,8 @@ func TestAudienceTokens(t *testing.T) {
 }
 
 func TestNoAudienceToken(t *testing.T) {
-	ctx := t.Context()
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
 
 	storage, err := NewAudienceTokensStorage(t.TempDir())
 	require.NoError(t, err)
@@ -153,7 +159,8 @@ func TestNoAudienceToken(t *testing.T) {
 }
 
 func TestNoAudienceTokensDir(t *testing.T) {
-	ctx := t.Context()
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
 
 	storage, err := NewAudienceTokensStorage(t.TempDir())
 	require.NoError(t, err)
