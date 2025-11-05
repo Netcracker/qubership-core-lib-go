@@ -1,7 +1,6 @@
 package tokensource
 
 import (
-	"context"
 	"testing"
 
 	"github.com/netcracker/qubership-core-lib-go/v3/test"
@@ -10,8 +9,7 @@ import (
 )
 
 func TestServiceAccountToken(t *testing.T) {
-	ctx, cancel := context.WithCancel(t.Context())
-	defer cancel()
+	ctx := t.Context()
 
 	storage, err := test.NewServiceAccountTokenStorage(t.TempDir())
 	require.NoError(t, err)
@@ -35,11 +33,11 @@ func TestServiceAccountToken(t *testing.T) {
 	assert.Equal(t, serviceAccountTokenSecondValue, token)
 
 	_ = storage.Clear()
+	OnCloseServiceAccountTokenWatcher()
 }
 
 func TestNoServiceAccountToken(t *testing.T) {
-	ctx, cancel := context.WithCancel(t.Context())
-	defer cancel()
+	ctx := t.Context()
 
 	storage, err := test.NewServiceAccountTokenStorage(t.TempDir())
 	require.NoError(t, err)
@@ -66,11 +64,11 @@ func TestNoServiceAccountToken(t *testing.T) {
 	assert.ErrorContains(t, err, "failed to get token default kubernetes service account token: failed to read token at path")
 
 	_ = storage.Clear()
+	OnCloseServiceAccountTokenWatcher()
 }
 
 func TestNoServiceAccountTokenDir(t *testing.T) {
-	ctx, cancel := context.WithCancel(t.Context())
-	defer cancel()
+	ctx := t.Context()
 
 	storage, err := test.NewServiceAccountTokenStorage(t.TempDir())
 	require.NoError(t, err)
@@ -84,11 +82,11 @@ func TestNoServiceAccountTokenDir(t *testing.T) {
 	assert.ErrorContains(t, err, "failed to create token watcher: failed to add path")
 
 	_ = storage.Clear()
+	OnCloseServiceAccountTokenWatcher()
 }
 
 func TestAudienceTokens(t *testing.T) {
-	ctx, cancel := context.WithCancel(t.Context())
-	defer cancel()
+	ctx := t.Context()
 
 	storage, err := test.NewAudienceTokensStorage(t.TempDir())
 	require.NoError(t, err)
@@ -128,11 +126,11 @@ func TestAudienceTokens(t *testing.T) {
 	assert.Equal(t, dbaasTokenSecondValue, token)
 
 	_ = storage.Clear()
+	OnCloseAudienceTokensWatcher()
 }
 
 func TestNoAudienceToken(t *testing.T) {
-	ctx, cancel := context.WithCancel(t.Context())
-	defer cancel()
+	ctx := t.Context()
 
 	storage, err := test.NewAudienceTokensStorage(t.TempDir())
 	require.NoError(t, err)
@@ -156,11 +154,11 @@ func TestNoAudienceToken(t *testing.T) {
 	assert.ErrorContains(t, err, "failed to get token by audience: netcracker: failed to read token at path")
 
 	_ = storage.Clear()
+	OnCloseAudienceTokensWatcher()
 }
 
 func TestNoAudienceTokensDir(t *testing.T) {
-	ctx, cancel := context.WithCancel(t.Context())
-	defer cancel()
+	ctx := t.Context()
 
 	storage, err := test.NewAudienceTokensStorage(t.TempDir())
 	require.NoError(t, err)
@@ -174,11 +172,11 @@ func TestNoAudienceTokensDir(t *testing.T) {
 	assert.ErrorContains(t, err, "failed to create token watcher: failed to refresh tokens cache: failed to get dir entries from tokenDir")
 
 	_ = storage.Clear()
+	OnCloseAudienceTokensWatcher()
 }
 
 func TestEmptyAudience(t *testing.T) {
-	ctx, cancel := context.WithCancel(t.Context())
-	defer cancel()
+	ctx := t.Context()
 
 	_, err := GetAudienceToken(ctx, "")
 	assert.ErrorContains(t, err, "audience is empty")
