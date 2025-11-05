@@ -3,6 +3,7 @@ package tokensource
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/netcracker/qubership-core-lib-go/v3/test"
 	"github.com/stretchr/testify/assert"
@@ -66,6 +67,8 @@ func TestNoServiceAccountToken(t *testing.T) {
 	assert.ErrorContains(t, err, "failed to get token default kubernetes service account token: failed to read token at path")
 
 	_ = storage.Clear()
+
+	time.Sleep(time.Second)
 }
 
 func TestNoServiceAccountTokenDir(t *testing.T) {
