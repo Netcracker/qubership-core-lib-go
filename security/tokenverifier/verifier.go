@@ -13,9 +13,14 @@ import (
 	"github.com/MicahParks/keyfunc/v3"
 	"github.com/failsafe-go/failsafe-go/failsafehttp"
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/netcracker/qubership-core-lib-go/v3/logging"
 	"github.com/netcracker/qubership-core-lib-go/v3/security/oidc"
 	qubetoken "github.com/netcracker/qubership-core-lib-go/v3/security/token"
 	"github.com/netcracker/qubership-core-lib-go/v3/utils"
+)
+
+var(
+	logger = logging.GetLogger("token-verifier")
 )
 
 type Verifier interface {

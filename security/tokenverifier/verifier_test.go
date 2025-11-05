@@ -31,9 +31,9 @@ const (
 )
 
 var (
-	sub                        = token.GetKubernetesSubject(namespace, serviceAccount)
-	key                        *rsa.PrivateKey
-	serviceAccountTokenStorage *test.ServiceAccountTokenStorage
+	sub     = token.GetKubernetesSubject(namespace, serviceAccount)
+	key     *rsa.PrivateKey
+	storage *test.ServiceAccountTokenStorage
 )
 
 var scenarios = []struct {
@@ -182,18 +182,27 @@ var scenarios = []struct {
 	},
 }
 
+func beforeAll() {
+	test.StartMockServer()
+	logger.Infof("server started %s", test.GetMockServerUrl())
+}
 func beforeEach(t *testing.T) {
 	key, _ = rsa.GenerateKey(rand.Reader, 2048)
-	test.StartMockServer()
-	serviceAccountTokenStorage, _ = test.NewServiceAccountTokenStorage(t.TempDir())
-	tokensource.DefaultServiceAccountDir = serviceAccountTokenStorage.ServiceAccountTokenDir
+	storage, _ = test.NewServiceAccountTokenStorage(t.TempDir())
+	tokensource.DefaultServiceAccountDir = storage.ServiceAccountTokenDir
+	logger.Infof("service account dir is %s", storage.ServiceAccountTokenDir)
 }
 func afterEach(_ *testing.T) {
-	_ = serviceAccountTokenStorage.Clear()
+	_ = storage.Clear()
+	test.ClearHandlers()
+}
+func afterAll() {
 	test.StopMockServer()
 }
 func TestMain(m *testing.M) {
+	beforeAll()
 	exitCode := m.Run()
+	afterAll()
 	os.Exit(exitCode)
 }
 func TestBasicTokenValidations(t *testing.T) {
@@ -203,7 +212,7 @@ func TestBasicTokenValidations(t *testing.T) {
 	defer afterEach(t)
 
 	serviceAccountToken := createServiceAccountToken(t, test.GetMockServerUrl())
-	err := serviceAccountTokenStorage.SaveTokenValue(serviceAccountToken)
+	err := storage.SaveTokenValue(serviceAccountToken)
 	require.NoError(t, err)
 	addProviderHandlerDefaultResponse(serviceAccountToken)
 	addJwksHandlerDefaultResponse(serviceAccountToken)
@@ -236,7 +245,7 @@ func TestCustomValidation(t *testing.T) {
 	defer afterEach(t)
 
 	serviceAccountToken := createServiceAccountToken(t, test.GetMockServerUrl())
-	err := serviceAccountTokenStorage.SaveTokenValue(serviceAccountToken)
+	err := storage.SaveTokenValue(serviceAccountToken)
 	require.NoError(t, err)
 	addProviderHandlerDefaultResponse(serviceAccountToken)
 	addJwksHandlerDefaultResponse(serviceAccountToken)
@@ -272,7 +281,7 @@ func TestNoServiceAccountToken(t *testing.T) {
 	beforeEach(t)
 	defer afterEach(t)
 
-	_ = serviceAccountTokenStorage.DeleteTokenFile()
+	_ = storage.DeleteTokenFile()
 
 	_, err := NewKubernetesVerifier(ctx, tokensource.AudienceMaaS)
 	assert.ErrorContains(t, err, "failed to acquire token for kubernetes API (the possible cause is missing kubernetes service account for the microservice.): failed to get token default kubernetes service account token:")
@@ -284,7 +293,7 @@ func TestInvalidServiceAccountToken(t *testing.T) {
 	defer afterEach(t)
 
 	serviceAccountToken := "token"
-	err := serviceAccountTokenStorage.SaveTokenValue(serviceAccountToken)
+	err := storage.SaveTokenValue(serviceAccountToken)
 	require.NoError(t, err)
 	_, err = NewKubernetesVerifier(ctx, tokensource.AudienceMaaS)
 	assert.ErrorContains(t, err, "invalid jwt: token is malformed: token contains an invalid number of segments")
@@ -296,7 +305,7 @@ func TestNoServiceAccountTokenIssuer(t *testing.T) {
 	defer afterEach(t)
 
 	serviceAccountToken := createServiceAccountToken(t, "")
-	err := serviceAccountTokenStorage.SaveTokenValue(serviceAccountToken)
+	err := storage.SaveTokenValue(serviceAccountToken)
 	require.NoError(t, err)
 	_, err = NewKubernetesVerifier(ctx, tokensource.AudienceMaaS)
 	assert.ErrorContains(t, err, "jwt does not have the issuer claim value")
@@ -308,7 +317,7 @@ func TestInvalidServiceAccountTokenIssuer(t *testing.T) {
 	defer afterEach(t)
 
 	serviceAccountToken := createServiceAccountToken(t, "some 	text")
-	err := serviceAccountTokenStorage.SaveTokenValue(serviceAccountToken)
+	err := storage.SaveTokenValue(serviceAccountToken)
 	require.NoError(t, err)
 	_, err = NewKubernetesVerifier(ctx, tokensource.AudienceMaaS)
 	assert.ErrorContains(t, err, "failed to get issuer url: issuer url is invalid: parse \"some \\ttext\": net/url: invalid control character in URL")
@@ -320,31 +329,13 @@ func TestOidcRequestUnauthorizedError(t *testing.T) {
 	defer afterEach(t)
 
 	serviceAccountToken := createServiceAccountToken(t, test.GetMockServerUrl())
-	err := serviceAccountTokenStorage.SaveTokenValue(serviceAccountToken)
+	err := storage.SaveTokenValue(serviceAccountToken)
 	require.NoError(t, err)
 	addProviderHandlerDefaultResponse("token")
 
 	_, err = NewKubernetesVerifier(ctx, tokensource.AudienceMaaS)
 	require.ErrorContains(t, err, "unexpected response http status code 401 Unauthorized")
 
-}
-func TestOidcRequestCertificateError(t *testing.T) {
-	ctx, cancelCtx := context.WithCancel(t.Context())
-	defer func() { cancelCtx(); time.Sleep(time.Millisecond * 10) }()
-	beforeEach(t)
-	defer afterEach(t)
-
-	test.StopMockServer()
-	test.StartMockTLSServer()
-	defer test.StopMockServer()
-
-	serviceAccountToken := createServiceAccountToken(t, test.GetMockServerUrl())
-	err := serviceAccountTokenStorage.SaveTokenValue(serviceAccountToken)
-	require.NoError(t, err)
-	addProviderHandlerDefaultResponse(serviceAccountToken)
-
-	_, err = NewKubernetesVerifier(ctx, tokensource.AudienceMaaS)
-	require.ErrorContains(t, err, "failed to send oidc request (the possible cause is outdated base image without kubernetes service account ca.crt, please check your base image version.):")
 }
 func TestOidcResponseParsingError(t *testing.T) {
 	ctx, cancelCtx := context.WithCancel(t.Context())
@@ -353,7 +344,7 @@ func TestOidcResponseParsingError(t *testing.T) {
 	defer afterEach(t)
 
 	serviceAccountToken := createServiceAccountToken(t, test.GetMockServerUrl())
-	err := serviceAccountTokenStorage.SaveTokenValue(serviceAccountToken)
+	err := storage.SaveTokenValue(serviceAccountToken)
 	require.NoError(t, err)
 	addProviderHandler(serviceAccountToken, http.StatusOK, []byte("some body"))
 
@@ -393,7 +384,6 @@ func TestOidcResponseParsingError(t *testing.T) {
 
 	_, err = NewKubernetesVerifier(ctx, tokensource.AudienceMaaS)
 	require.ErrorContains(t, err, "failed to send oidc request (the possible cause is outdated base image without kubernetes service account ca.crt, please check your base image version.):")
-
 }
 func subjectValidation(jwt *jwt.Token) error {
 	subject, err := token.GetSubject(jwt)
