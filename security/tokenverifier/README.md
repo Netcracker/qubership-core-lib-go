@@ -66,7 +66,7 @@ func main() {
     ctx := context.Background()
 
     // Create a verifier with your service's audience
-    verifier, err := tokenverifier.New(ctx, "my-service-audience")
+    verifier, err := tokenverifier.NewKubernetesVerifier(ctx, "my-service-audience")
     if err != nil {
         log.Fatalf("Failed to create verifier: %v", err)
     }
@@ -98,7 +98,7 @@ import (
 ctx := context.Background()
 audience := "my-service" // Your service identifier
 
-verifier, err := tokenverifier.New(ctx, audience)
+verifier, err := tokenverifier.NewKubernetesVerifier(ctx, audience)
 if err != nil {
     // Handle error - typically indicates:
     // - Projected volume token not configured
@@ -267,7 +267,7 @@ func AuthMiddleware(verifier tokenverifier.Verifier) func(http.Handler) http.Han
 
 // Usage
 func main() {
-    verifier, _ := tokenverifier.New(context.Background(), "my-service")
+    verifier, _ := tokenverifier.NewKubernetesVerifier(context.Background(), "my-service")
     
     router := http.NewServeMux()
     router.Handle("/api/", AuthMiddleware(verifier)(apiHandler))
@@ -384,7 +384,7 @@ var globalVerifier tokenverifier.Verifier
 
 func init() {
     var err error
-    globalVerifier, err = tokenverifier.New(context.Background(), "my-service")
+    globalVerifier, err = tokenverifier.NewKubernetesVerifier(context.Background(), "my-service")
     if err != nil {
         log.Fatal(err)
     }
@@ -392,7 +392,7 @@ func init() {
 
 // Bad - Creating per request
 func handler(w http.ResponseWriter, r *http.Request) {
-    verifier, _ := tokenverifier.New(r.Context(), "my-service") // Don't do this!
+    verifier, _ := tokenverifier.NewKubernetesVerifier(r.Context(), "my-service") // Don't do this!
 }
 ```
 
@@ -492,7 +492,7 @@ expirationSeconds: 3600  # 1 hour (default)
 
 ```go
 // Verifier
-verifier, _ := tokenverifier.New(ctx, "my-service")
+verifier, _ := tokenverifier.NewKubernetesVerifier(ctx, "my-service")
 
 // Must match deployment
 serviceAccountToken:

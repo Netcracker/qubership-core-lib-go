@@ -6,33 +6,54 @@ import (
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
+	qubetoken "github.com/netcracker/qubership-core-lib-go/v3/security/token"
 	"github.com/netcracker/qubership-core-lib-go/v3/security/tokensource"
+	"github.com/netcracker/qubership-core-lib-go/v3/utils"
+	"golang.org/x/time/rate"
 )
 
 const (
-	retryMaxAttempts     = 5
-	retryBackoffDelay    = time.Millisecond * 500
-	retryBackoffMaxDelay = time.Second * 15
-	retryJitter          = time.Millisecond * 100
-	leewaySec            = 30
-	leeway               = leewaySec * time.Second
+	leewaySec                  = 30
+	leeway                     = leewaySec * time.Second
+	defaultRefreshInterval     = time.Hour
+	defaultRateLimiterInterval = 5 * time.Minute
+	defaultRateLimiterLimit    = 1
 )
 
 type tokenFunction func() (string, error)
 
-func NewKubernetesVerifier(ctx context.Context, audience string, validations ...Validation) (Verifier, error) {
+func NewKubernetesVerifierOverride(ctx context.Context, audience string, override Override, validations ...Validation) (Verifier, error) {
 	validations = append(validations, ValidateIssuedAt)
 	return newKubernetesVerifier(ctx, audience, func() (string, error) {
 		return tokensource.GetServiceAccountToken(ctx)
-	}, validations...)
+	}, override, validations...)
 }
-func newKubernetesVerifier(ctx context.Context, audience string, kubernetesApiToken tokenFunction, validations ...Validation) (Verifier, error) {
+func NewKubernetesVerifier(ctx context.Context, audience string, validations ...Validation) (Verifier, error) {
+	validations = append(validations, ValidateIssuedAt)
+
+	return newKubernetesVerifier(ctx, audience, func() (string, error) {
+		return tokensource.GetServiceAccountToken(ctx)
+	}, Override{RefreshInterval: defaultRefreshInterval, RefreshUnknownKID: rate.NewLimiter(rate.Every(defaultRateLimiterInterval), defaultRateLimiterLimit)}, validations...)
+}
+func newKubernetesVerifier(ctx context.Context, audience string, kubernetesApiToken tokenFunction, override Override, validations ...Validation) (Verifier, error) {
 	trustedIssuer, err := getTrustedIssuer(kubernetesApiToken)
 	if err != nil {
 		return nil, err
 	}
 	httpClient := CreateHttpClient(newSecureTransport(kubernetesApiToken))
-	keyFunc, err := CreateKeyFunction(ctx, httpClient, trustedIssuer)
+	refreshInterval := defaultRefreshInterval
+	if override.RefreshInterval > 0 {
+		refreshInterval = override.RefreshInterval
+	}
+	refreshUnknownKID := rate.NewLimiter(rate.Every(defaultRateLimiterInterval), defaultRateLimiterLimit)
+	if override.RefreshUnknownKID != nil {
+		refreshUnknownKID = override.RefreshUnknownKID
+	}
+	keyFunc, err := CreateKeyFunction(ctx, KeyFuncOptions{
+		HttpClient:        &httpClient,
+		TrustedIssuer:     trustedIssuer,
+		RefreshInterval:   refreshInterval,
+		RefreshUnknownKID: refreshUnknownKID})
 	if err != nil {
 		return nil, err
 	}
@@ -64,4 +85,15 @@ func createJwtParser(trustedIssuer, audience string) *jwt.Parser {
 		jwt.WithIssuer(trustedIssuer),
 		jwt.WithAudience(audience)}
 	return jwt.NewParser(opts...)
+}
+func ValidateIssuedAt(token *jwt.Token) error {
+	issuedAt, err := qubetoken.GetIssuedAt(token)
+	if err != nil {
+		return err
+	}
+	current := time.Now()
+	if current.Before(issuedAt.Add(-leeway)) {
+		return utils.NewError(fmt.Sprintf("current time is before issuedAt more than %v sec", leewaySec), jwt.ErrTokenUsedBeforeIssued)
+	}
+	return nil
 }

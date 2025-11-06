@@ -11,6 +11,13 @@ import (
 	"github.com/netcracker/qubership-core-lib-go/v3/utils"
 )
 
+// Kid header. The key ID is a hint indicating which key was used to secure the JWS.
+//   - OpenID Connect Core 1.0, Section 10.1 “Signing”:
+//     https://openid.net/specs/openid-connect-core-1_0.html#Signing
+const (
+	Kid = "kid"
+)
+
 // Standard JWT claim names used in OpenID Connect and JSON Web Tokens (JWT).
 // These constants represent the registered claim names defined in:
 //   - OpenID Connect Core 1.0, Section 2 “ID Token”:
@@ -96,15 +103,6 @@ func GetIssuedAt(token *jwt.Token) (*jwt.NumericDate, error) {
 func GetId(token *jwt.Token) (string, error) {
 	return GetStringValue(token, Jti)
 }
-func getMapClaims(token *jwt.Token) (jwt.MapClaims, error) {
-	if token == nil || token.Claims == nil {
-		return nil, fmt.Errorf("token is nil")
-	}
-	if claims, ok := token.Claims.(jwt.MapClaims); ok {
-		return claims, nil
-	}
-	return nil, utils.NewError(fmt.Sprintf("expected jwt.MapClaims, but got %T", token.Claims), ErrTokenClaimsUnsupported)
-}
 func Value(claims jwt.MapClaims, claim string) (any, error) {
 	if value, found := claims[claim]; found {
 		return value, nil
@@ -162,10 +160,6 @@ func NumericDateValue(claims jwt.MapClaims, claim string) (*jwt.NumericDate, err
 	}
 	return nil, utils.NewError(fmt.Sprintf(claimIsInvalid, claim, "float64 or json.Number", value), jwt.ErrInvalidType)
 }
-func newNumericDateFromSeconds(f float64) *jwt.NumericDate {
-	round, frac := math.Modf(f)
-	return jwt.NewNumericDate(time.Unix(int64(round), int64(frac*1e9)))
-}
 func MapValue(claims jwt.MapClaims, claim string) (jwt.MapClaims, error) {
 	value, err := Value(claims, claim)
 	if err != nil {
@@ -175,4 +169,17 @@ func MapValue(claims jwt.MapClaims, claim string) (jwt.MapClaims, error) {
 		return mapValue, nil
 	}
 	return nil, utils.NewError(fmt.Sprintf(claimIsInvalid, claim, "map[string]any", value), jwt.ErrInvalidType)
+}
+func getMapClaims(token *jwt.Token) (jwt.MapClaims, error) {
+	if token == nil || token.Claims == nil {
+		return nil, fmt.Errorf("token is nil")
+	}
+	if claims, ok := token.Claims.(jwt.MapClaims); ok {
+		return claims, nil
+	}
+	return nil, utils.NewError(fmt.Sprintf("expected jwt.MapClaims, but got %T", token.Claims), ErrTokenClaimsUnsupported)
+}
+func newNumericDateFromSeconds(f float64) *jwt.NumericDate {
+	round, frac := math.Modf(f)
+	return jwt.NewNumericDate(time.Unix(int64(round), int64(frac*1e9)))
 }
