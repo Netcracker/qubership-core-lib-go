@@ -1,6 +1,6 @@
 module github.com/netcracker/qubership-core-lib-go/v3
 
-go 1.25.3
+go 1.25.4
 
 require (
 	github.com/MicahParks/jwkset v0.11.0
