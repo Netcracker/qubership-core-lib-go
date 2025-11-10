@@ -8,12 +8,10 @@ import (
 	"math/big"
 	"net/http"
 	"testing"
-	"time"
 
 	"github.com/MicahParks/jwkset"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/netcracker/qubership-core-lib-go/v3/security/oidc"
-	"github.com/netcracker/qubership-core-lib-go/v3/security/token"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -41,25 +39,6 @@ func CreateUnsignedTokenFromPayload(t *testing.T, filePath string) *jwt.Token {
 	return &jwt.Token{
 		Claims: claims,
 	}
-}
-func CreateServiceAccountToken(t *testing.T, issuer, kid string, key crypto.PrivateKey) string {
-	return CreateSignedTokenString(t, kid, key, token.KubernetesClaims{
-		RegisteredClaims: jwt.RegisteredClaims{
-			Issuer:    issuer,
-			Subject:   token.GetKubernetesSubject(Namespace, ServiceAccount),
-			Audience:  jwt.ClaimStrings{KubernetesAudience},
-			ExpiresAt: jwt.NewNumericDate(time.Now().Add(1 * time.Hour)),
-			NotBefore: jwt.NewNumericDate(time.Now()),
-			IssuedAt:  jwt.NewNumericDate(time.Now()),
-		},
-		KubernetesIo: token.KubernetesIoClaim{
-			Namespace: Namespace,
-			ServiceAccount: token.ServiceAccountClaim{
-				Name: ServiceAccount,
-				Uid:  Uuid,
-			},
-		},
-	})
 }
 func ToHexBase64(a *big.Int) string {
 	return base64.RawURLEncoding.EncodeToString(a.Bytes())

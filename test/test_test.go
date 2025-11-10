@@ -15,6 +15,10 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+const (
+	k8sPayload = "../test/test_data/k8sPayload.json"
+)
+
 var (
 	serviceAccountTokensStorage *ServiceAccountTokenStorage
 	audienceTokensStorage       *AudienceTokensStorage
@@ -186,11 +190,12 @@ func TestMockServer(t *testing.T) {
 	defaultKeys = make(map[string]*rsa.PrivateKey)
 	defaultKeys[DefaultKid] = defaultKey
 
-	serviceAccountToken := CreateServiceAccountToken(t, GetMockServerUrl(), DefaultKid, defaultKey)
-	err := serviceAccountTokensStorage.SaveTokenValue(serviceAccountToken)
+	unsignedToken := CreateUnsignedTokenFromPayload(t, k8sPayload)
+	signedToken := CreateSignedTokenString(t, DefaultKid, defaultKey, unsignedToken.Claims)
+	err := serviceAccountTokensStorage.SaveTokenValue(signedToken)
 	require.NoError(t, err)
-	AddDefaultKubernetesProviderHandler(serviceAccountToken, GetMockServerUrl())
-	AddDefaultKubernetesJwksHandler(serviceAccountToken, defaultKeys)
+	AddDefaultKubernetesProviderHandler(signedToken, GetMockServerUrl())
+	AddDefaultKubernetesJwksHandler(signedToken, defaultKeys)
 
 	url, err := oidc.GetProviderUrl(GetMockServerUrl())
 	assert.NoError(t, err)
@@ -198,7 +203,6 @@ func TestMockServer(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, http.StatusUnauthorized, httpResponse.StatusCode)
 	defer httpResponse.Body.Close()
-
 	ClearHandlers()
 	StopMockServer()
 }
