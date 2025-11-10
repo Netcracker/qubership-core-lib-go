@@ -29,11 +29,11 @@ func NewKubernetesVerifierOverride(ctx context.Context, audience string, overrid
 	}, override, validations...)
 }
 func NewKubernetesVerifier(ctx context.Context, audience string, validations ...Validation) (Verifier, error) {
-	validations = append(validations, ValidateIssuedAt)
-
-	return newKubernetesVerifier(ctx, audience, func() (string, error) {
-		return tokensource.GetServiceAccountToken(ctx)
-	}, Override{RefreshInterval: defaultRefreshInterval, RefreshUnknownKID: rate.NewLimiter(rate.Every(defaultRateLimiterInterval), defaultRateLimiterLimit)}, validations...)
+	return NewKubernetesVerifierOverride(
+		ctx,
+		audience,
+		Override{RefreshInterval: defaultRefreshInterval, RefreshUnknownKID: rate.NewLimiter(rate.Every(defaultRateLimiterInterval), defaultRateLimiterLimit)},
+		validations...)
 }
 func newKubernetesVerifier(ctx context.Context, audience string, kubernetesApiToken tokenFunction, override Override, validations ...Validation) (Verifier, error) {
 	trustedIssuer, err := getTrustedIssuer(kubernetesApiToken)
