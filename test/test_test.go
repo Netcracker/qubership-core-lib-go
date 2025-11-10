@@ -2,10 +2,14 @@ package test
 
 import (
 	"context"
+	"crypto/rand"
+	"crypto/rsa"
+	"net/http"
 	"os"
 	"testing"
 	"time"
 
+	"github.com/netcracker/qubership-core-lib-go/v3/security/oidc"
 	"github.com/netcracker/qubership-core-lib-go/v3/security/tokensource"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -14,6 +18,8 @@ import (
 var (
 	serviceAccountTokensStorage *ServiceAccountTokenStorage
 	audienceTokensStorage       *AudienceTokensStorage
+	defaultKey                  *rsa.PrivateKey
+	defaultKeys                 map[string]*rsa.PrivateKey
 )
 
 func beforeEach(t *testing.T) {
@@ -167,4 +173,32 @@ func TestNoAudienceTokensDir(t *testing.T) {
 
 	_, err = tokensource.GetAudienceToken(ctx, tokensource.AudienceNetcracker)
 	assert.ErrorContains(t, err, "failed to create token watcher: failed to refresh tokens cache: failed to get dir entries from tokenDir")
+}
+func TestMockServer(t *testing.T) {
+	_, cancelCtx := context.WithCancel(t.Context())
+	defer func() { cancelCtx(); time.Sleep(time.Millisecond * 10) }()
+	beforeEach(t)
+	defer afterEach(t)
+
+	StartMockServer()
+	logger.Infof("server started %s", GetMockServerUrl())
+	defaultKey, _ = rsa.GenerateKey(rand.Reader, 2048)
+	defaultKeys = make(map[string]*rsa.PrivateKey)
+	defaultKeys[DefaultKid] = defaultKey
+
+	serviceAccountToken := CreateServiceAccountToken(t, GetMockServerUrl(), DefaultKid, defaultKey)
+	err := serviceAccountTokensStorage.SaveTokenValue(serviceAccountToken)
+	require.NoError(t, err)
+	AddDefaultKubernetesProviderHandler(serviceAccountToken, GetMockServerUrl())
+	AddDefaultKubernetesJwksHandler(serviceAccountToken, defaultKeys)
+
+	url, err := oidc.GetProviderUrl(GetMockServerUrl())
+	assert.NoError(t, err)
+	httpResponse, err := http.DefaultClient.Get(url)
+	assert.NoError(t, err)
+	assert.Equal(t, http.StatusUnauthorized, httpResponse.StatusCode)
+	defer httpResponse.Body.Close()
+
+	ClearHandlers()
+	StopMockServer()
 }
