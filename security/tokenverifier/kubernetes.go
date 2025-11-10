@@ -14,9 +14,9 @@ import (
 
 const (
 	leewaySec                  = 30
-	leeway                     = leewaySec * time.Second
-	defaultRefreshInterval     = time.Hour
-	defaultRateLimiterInterval = 5 * time.Minute
+	leeway                     = time.Second * leewaySec
+	defaultRefreshInterval     = time.Hour * 24
+	defaultRateLimiterInterval = time.Minute * 5
 	defaultRateLimiterLimit    = 1
 )
 
