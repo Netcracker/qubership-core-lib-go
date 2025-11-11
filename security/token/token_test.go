@@ -572,3 +572,21 @@ func Test_GetNamespace(t *testing.T) {
 	assert.ErrorIs(t, err, ErrTokenClaimMissing)
 	assert.ErrorContains(t, err, "token is missing claim: kubernetes.io is missed")
 }
+func Test_GetRegisteredClaims(t *testing.T) {
+	claims := KubernetesClaims{
+		RegisteredClaims: jwt.RegisteredClaims{
+			Subject:   "system:serviceaccount:namespace:service",
+			Audience:  jwt.ClaimStrings{"audience1"},
+			ExpiresAt: jwt.NewNumericDate(time.Unix(1757656985, 0)),
+			NotBefore: jwt.NewNumericDate(time.Unix(1757656385, 0)),
+			IssuedAt:  jwt.NewNumericDate(time.Unix(1757656385, 0)),
+			Issuer:    "https://kubernetes.default.svc.cluster.local",
+			ID:        "cca3c408-f65c-4daa-a45e-5e390ffe0540",
+		},
+	}
+
+	token := test.CreateUnsignedTokenFromPayload(t, k8sPayload)
+	value, err := GetRegisteredClaims(token)
+	assert.Nil(t, err)
+	assert.Equal(t, claims.RegisteredClaims, value)
+}

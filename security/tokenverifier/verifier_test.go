@@ -258,7 +258,10 @@ func TestSignatureValidation(t *testing.T) {
 	require.Nil(t, vErr)
 	actualKubernetesIoClaim, getClaimErr := token.GetKubernetesIo(actualToken)
 	assert.Nil(t, getClaimErr)
+	actualRegisteredClaims, getClaimErr := token.GetRegisteredClaims(actualToken)
+	assert.Nil(t, getClaimErr)
 	assert.Equal(t, claims.KubernetesIo, actualKubernetesIoClaim, "unexpected kubernetes.io claim")
+	assert.Equal(t, claims.RegisteredClaims, actualRegisteredClaims, "unexpected registered claims")
 }
 func TestBasicTokenValidations(t *testing.T) {
 	ctx, cancelCtx := context.WithCancel(t.Context())
@@ -286,7 +289,10 @@ func TestBasicTokenValidations(t *testing.T) {
 			if assert.NotNil(t, actualToken, "test %q: expected claims, got nil", scenario.name) {
 				actualKubernetesIoClaim, getClaimErr := token.GetKubernetesIo(actualToken)
 				assert.Nil(t, getClaimErr)
+				actualRegisteredClaims, getClaimErr := token.GetRegisteredClaims(actualToken)
+				assert.Nil(t, getClaimErr)
 				assert.Equal(t, scenario.claims.KubernetesIo, actualKubernetesIoClaim, "test %q: unexpected kubernetes.io claim", scenario.name)
+				assert.Equal(t, scenario.claims.RegisteredClaims, actualRegisteredClaims, "test %q: unexpected registered claims", scenario.name)
 			}
 		} else {
 			assert.ErrorContains(t, vErr, scenario.errorMessage)
@@ -651,7 +657,10 @@ func TestJwksResponseInternalServerErrorFourAttempts(t *testing.T) {
 	require.Nil(t, vErr)
 	actualKubernetesIoClaim, getClaimErr := token.GetKubernetesIo(actualToken)
 	assert.Nil(t, getClaimErr)
+	actualRegisteredClaims, getClaimErr := token.GetRegisteredClaims(actualToken)
+	assert.Nil(t, getClaimErr)
 	assert.Equal(t, claims.KubernetesIo, actualKubernetesIoClaim, "unexpected kubernetes.io claim")
+	assert.Equal(t, claims.RegisteredClaims, actualRegisteredClaims, "unexpected registered claims")
 }
 func subjectValidation(jwt *jwt.Token) error {
 	subject, err := token.GetSubject(jwt)

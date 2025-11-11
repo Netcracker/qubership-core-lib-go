@@ -170,6 +170,28 @@ func MapValue(claims jwt.MapClaims, claim string) (jwt.MapClaims, error) {
 	}
 	return nil, utils.NewError(fmt.Sprintf(claimIsInvalid, claim, "map[string]any", value), jwt.ErrInvalidType)
 }
+func GetRegisteredClaims(token *jwt.Token) (jwt.RegisteredClaims, error) {
+	claims, err := getMapClaims(token)
+	if err != nil {
+		return jwt.RegisteredClaims{}, err
+	}
+	issuer, _ := StringValue(claims, Iss)
+	subject, _ := StringValue(claims, Sub)
+	audience, _ := ClaimStringsValue(claims, Aud)
+	expiredAt, _ := NumericDateValue(claims, Exp)
+	notBefore, _ := NumericDateValue(claims, Nbf)
+	issuedAt, _ := NumericDateValue(claims, Iat)
+	id, _ := StringValue(claims, Jti)
+	return jwt.RegisteredClaims{
+		Issuer:    issuer,
+		Subject:   subject,
+		Audience:  audience,
+		ExpiresAt: expiredAt,
+		NotBefore: notBefore,
+		IssuedAt:  issuedAt,
+		ID:        id,
+	}, nil
+}
 func getMapClaims(token *jwt.Token) (jwt.MapClaims, error) {
 	if token == nil || token.Claims == nil {
 		return nil, fmt.Errorf("token is nil")
