@@ -590,3 +590,53 @@ func Test_GetRegisteredClaims(t *testing.T) {
 	assert.Nil(t, err)
 	assert.Equal(t, claims.RegisteredClaims, value)
 }
+func Test_HasRole(t *testing.T) {
+	token := test.CreateUnsignedTokenFromPayload(t, keycloakPayload)
+	result, err := HasRole(token, "ROLE_ROLE1")
+	assert.Nil(t, err)
+	assert.True(t, result)
+
+	result, err = HasRole(token, "ROLE_ROLE3")
+	assert.Nil(t, err)
+	assert.False(t, result)
+
+	token = test.CreateUnsignedTokenFromPayload(t, k8sPayload)
+	_, err = HasRole(token, "ROLE_ROLE1")
+	assert.ErrorContains(t, err, "token is missing claim: realm_access is missed")
+}
+func Test_HasAnyRole(t *testing.T) {
+	token := test.CreateUnsignedTokenFromPayload(t, keycloakPayload)
+	result, err := HasAnyRole(token, []string{"ROLE_ROLE1", "ROLE_ROLE3"})
+	assert.Nil(t, err)
+	assert.True(t, result)
+
+	result, err = HasAnyRole(token, []string{"ROLE_ROLE4", "ROLE_ROLE3"})
+	assert.Nil(t, err)
+	assert.False(t, result)
+
+	token = test.CreateUnsignedTokenFromPayload(t, k8sPayload)
+	_, err = HasAnyRole(token, []string{"ROLE_ROLE1", "ROLE_ROLE3"})
+	assert.ErrorContains(t, err, "token is missing claim: realm_access is missed")
+}
+func Test_HasAllRoles(t *testing.T) {
+	token := test.CreateUnsignedTokenFromPayload(t, keycloakPayload)
+	result, err := HasAllRoles(token, []string{"ROLE_ROLE1", "ROLE_ROLE3"})
+	assert.Nil(t, err)
+	assert.False(t, result)
+
+	result, err = HasAllRoles(token, []string{"ROLE_ROLE2", "ROLE_ROLE1"})
+	assert.Nil(t, err)
+	assert.True(t, result)
+
+	result, err = HasAllRoles(token, []string{"ROLE_ROLE1", "ROLE_ROLE2"})
+	assert.Nil(t, err)
+	assert.True(t, result)
+
+	result, err = HasAllRoles(token, []string{"ROLE_ROLE4", "ROLE_ROLE3"})
+	assert.Nil(t, err)
+	assert.False(t, result)
+
+	token = test.CreateUnsignedTokenFromPayload(t, k8sPayload)
+	_, err = HasAllRoles(token, []string{"ROLE_ROLE1", "ROLE_ROLE3"})
+	assert.ErrorContains(t, err, "token is missing claim: realm_access is missed")
+}

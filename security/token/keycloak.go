@@ -65,3 +65,46 @@ func GetRoles(token *jwt.Token) (jwt.ClaimStrings, error) {
 	}
 	return roles, nil
 }
+func HasRole(token *jwt.Token, desiredRole string) (bool, error) {
+	roles, err := GetRoles(token)
+	if err != nil {
+		return false, err
+	}
+	for _, role := range roles {
+		if desiredRole == role {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+func HasAnyRole(token *jwt.Token, desiredRoles []string) (bool, error) {
+	roles, err := GetRoles(token)
+	if err != nil {
+		return false, err
+	}
+	for _, role := range roles {
+		for _, desiredRole := range desiredRoles {
+			if desiredRole == role {
+				return true, nil
+			}
+		}
+	}
+	return false, nil
+}
+func HasAllRoles(token *jwt.Token, desiredRoles []string) (bool, error) {
+	roles, err := GetRoles(token)
+	if err != nil {
+		return false, err
+	}
+	roleMap := make(map[string]struct{}, len(roles))
+	for _, role := range roles {
+		roleMap[role] = struct{}{}
+	}
+
+	for _, desired := range desiredRoles {
+		if _, ok := roleMap[desired]; !ok {
+			return false, nil
+		}
+	}
+	return true, nil
+}
