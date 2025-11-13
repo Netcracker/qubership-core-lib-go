@@ -37,23 +37,6 @@ func StartMockServer() {
 	}
 }
 
-func StartMockTLSServer() {
-	if !started {
-		mockServer = httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			requestPath := r.URL.Path
-			for _, handler := range mockHandlers {
-				if handler.pathMatcher(requestPath) {
-					handler.handle(w, r)
-					return
-				}
-			}
-		}))
-		started = true
-	} else {
-		logger.Error("Can't start mock server - it is already running")
-	}
-}
-
 func StopMockServer() {
 	mockServer.Close()
 	ClearHandlers()

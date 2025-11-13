@@ -23,8 +23,7 @@ const (
 	k8sNoNodeNamePayload           = "../token/test_data/k8sNoNodeNamePayload.json"
 	k8sNoNamespacePayload          = "../token/test_data/k8sNoNamespacePayload.json"
 	k8sPayload                     = "../token/test_data/k8sPayload.json"
-	keycloakPayload                = "../token/test_data/keycloakPayload.json"
-	keycloakNoRolesPayload         = "../token/test_data/keycloakNoRolesPayload.json"
+
 )
 
 func Test_GetValue(t *testing.T) {
@@ -231,71 +230,11 @@ func Test_GetId(t *testing.T) {
 	assert.Nil(t, err)
 	assert.Equal(t, "cca3c408-f65c-4daa-a45e-5e390ffe0540", value)
 }
-func Test_GetFamilyName(t *testing.T) {
-	token := test.CreateUnsignedTokenFromPayload(t, keycloakPayload)
-	value, err := GetFamilyName(token)
-	assert.Nil(t, err)
-	assert.Equal(t, "family_name", value)
-}
-func Test_GetGivenName(t *testing.T) {
-	token := test.CreateUnsignedTokenFromPayload(t, keycloakPayload)
-	value, err := GetGivenName(token)
-	assert.Nil(t, err)
-	assert.Equal(t, "given_name", value)
-}
-func Test_GetEmail(t *testing.T) {
-	token := test.CreateUnsignedTokenFromPayload(t, keycloakPayload)
-	value, err := GetEmail(token)
-	assert.Nil(t, err)
-	assert.Equal(t, "email@gmail.com", value)
-}
-func Test_GetPhoneNumber(t *testing.T) {
-	token := test.CreateUnsignedTokenFromPayload(t, keycloakPayload)
-	value, err := GetPhoneNumber(token)
-	assert.Nil(t, err)
-	assert.Equal(t, "77777777", value)
-}
-func Test_GetPreferredUsername(t *testing.T) {
-	token := test.CreateUnsignedTokenFromPayload(t, keycloakPayload)
-	value, err := GetPreferredUsername(token)
-	assert.Nil(t, err)
-	assert.Equal(t, "preferred_username", value)
-}
-func Test_GetRealmAccess(t *testing.T) {
-	token := test.CreateUnsignedTokenFromPayload(t, noClaimsPayload)
-	value, err := GetRealmAccess(token)
-	assert.ErrorIs(t, err, ErrTokenClaimMissing)
-	assert.ErrorContains(t, err, "token is missing claim: realm_access is missed")
-
-	token = test.CreateUnsignedTokenFromPayload(t, keycloakPayload)
-	value, err = GetRealmAccess(token)
-	assert.Nil(t, err)
-	expectedValue := RealmAccessClaim{
-		Roles: []string{"ROLE_ROLE1", "ROLE_ROLE2"},
-	}
-	assert.Equal(t, expectedValue, value)
-}
-func Test_GetRoles(t *testing.T) {
-	token := test.CreateUnsignedTokenFromPayload(t, noClaimsPayload)
-	value, err := GetRoles(token)
-	assert.ErrorIs(t, err, ErrTokenClaimMissing)
-	assert.ErrorContains(t, err, "token is missing claim: realm_access is missed")
-
-	token = test.CreateUnsignedTokenFromPayload(t, keycloakNoRolesPayload)
-	value, err = GetRoles(token)
-	assert.ErrorIs(t, err, ErrTokenClaimMissing)
-	assert.ErrorContains(t, err, "token is missing claim: roles is missed")
-
-	token = test.CreateUnsignedTokenFromPayload(t, keycloakPayload)
-	value, err = GetRoles(token)
-	assert.Nil(t, err)
-	assert.Equal(t, jwt.ClaimStrings{"ROLE_ROLE1", "ROLE_ROLE2"}, value)
-}
 func Test_GetKubernetesSubject(t *testing.T) {
 	assert.Equal(t, "system:serviceaccount:namespace:serviceAccount", GetKubernetesSubject("namespace", "serviceAccount"))
 }
 func Test_IsKubernetesToken(t *testing.T) {
-	token := test.CreateUnsignedTokenFromPayload(t, keycloakPayload)
+	token := test.CreateUnsignedTokenFromPayload(t, noClaimsPayload)
 	value := IsKubernetesToken(token)
 	assert.False(t, value)
 
@@ -589,54 +528,4 @@ func Test_GetRegisteredClaims(t *testing.T) {
 	value, err := GetRegisteredClaims(token)
 	assert.Nil(t, err)
 	assert.Equal(t, claims.RegisteredClaims, value)
-}
-func Test_HasRole(t *testing.T) {
-	token := test.CreateUnsignedTokenFromPayload(t, keycloakPayload)
-	result, err := HasRole(token, "ROLE_ROLE1")
-	assert.Nil(t, err)
-	assert.True(t, result)
-
-	result, err = HasRole(token, "ROLE_ROLE3")
-	assert.Nil(t, err)
-	assert.False(t, result)
-
-	token = test.CreateUnsignedTokenFromPayload(t, k8sPayload)
-	_, err = HasRole(token, "ROLE_ROLE1")
-	assert.ErrorContains(t, err, "token is missing claim: realm_access is missed")
-}
-func Test_HasAnyRole(t *testing.T) {
-	token := test.CreateUnsignedTokenFromPayload(t, keycloakPayload)
-	result, err := HasAnyRole(token, []string{"ROLE_ROLE1", "ROLE_ROLE3"})
-	assert.Nil(t, err)
-	assert.True(t, result)
-
-	result, err = HasAnyRole(token, []string{"ROLE_ROLE4", "ROLE_ROLE3"})
-	assert.Nil(t, err)
-	assert.False(t, result)
-
-	token = test.CreateUnsignedTokenFromPayload(t, k8sPayload)
-	_, err = HasAnyRole(token, []string{"ROLE_ROLE1", "ROLE_ROLE3"})
-	assert.ErrorContains(t, err, "token is missing claim: realm_access is missed")
-}
-func Test_HasAllRoles(t *testing.T) {
-	token := test.CreateUnsignedTokenFromPayload(t, keycloakPayload)
-	result, err := HasAllRoles(token, []string{"ROLE_ROLE1", "ROLE_ROLE3"})
-	assert.Nil(t, err)
-	assert.False(t, result)
-
-	result, err = HasAllRoles(token, []string{"ROLE_ROLE2", "ROLE_ROLE1"})
-	assert.Nil(t, err)
-	assert.True(t, result)
-
-	result, err = HasAllRoles(token, []string{"ROLE_ROLE1", "ROLE_ROLE2"})
-	assert.Nil(t, err)
-	assert.True(t, result)
-
-	result, err = HasAllRoles(token, []string{"ROLE_ROLE4", "ROLE_ROLE3"})
-	assert.Nil(t, err)
-	assert.False(t, result)
-
-	token = test.CreateUnsignedTokenFromPayload(t, k8sPayload)
-	_, err = HasAllRoles(token, []string{"ROLE_ROLE1", "ROLE_ROLE3"})
-	assert.ErrorContains(t, err, "token is missing claim: realm_access is missed")
 }
