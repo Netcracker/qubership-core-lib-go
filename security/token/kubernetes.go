@@ -4,7 +4,6 @@ import (
 	"fmt"
 
 	"github.com/golang-jwt/jwt/v5"
-	"github.com/netcracker/qubership-core-lib-go/v3/utils"
 )
 
 // Kubernetes-related claim and identifier constants.
@@ -95,7 +94,7 @@ func GetServiceAccountId(token *jwt.Token) (string, error) {
 		return "", err
 	}
 	if serviceAccount.Uid == "" {
-		return "", utils.NewError(fmt.Sprintf(claimIsMissed, Uid), ErrTokenClaimMissing)
+		return "", fmt.Errorf(claimIsMissed, ErrTokenClaimMissing, Uid)
 	}
 	return serviceAccount.Uid, nil
 }
@@ -105,7 +104,7 @@ func GetServiceAccountName(token *jwt.Token) (string, error) {
 		return "", err
 	}
 	if serviceAccount.Name == "" {
-		return "", utils.NewError(fmt.Sprintf(claimIsMissed, Name), ErrTokenClaimMissing)
+		return "", fmt.Errorf(claimIsMissed, ErrTokenClaimMissing, Name)
 	}
 	return serviceAccount.Name, nil
 }
@@ -122,7 +121,7 @@ func GetNodeId(token *jwt.Token) (string, error) {
 		return "", err
 	}
 	if node.Uid == "" {
-		return "", utils.NewError(fmt.Sprintf(claimIsMissed, Uid), ErrTokenClaimMissing)
+		return "", fmt.Errorf(claimIsMissed, ErrTokenClaimMissing, Uid)
 	}
 	return node.Uid, nil
 }
@@ -132,7 +131,7 @@ func GetNodeName(token *jwt.Token) (string, error) {
 		return "", err
 	}
 	if node.Name == "" {
-		return "", utils.NewError(fmt.Sprintf(claimIsMissed, Name), ErrTokenClaimMissing)
+		return "", fmt.Errorf(claimIsMissed, ErrTokenClaimMissing, Name)
 	}
 	return node.Name, nil
 }
@@ -149,7 +148,7 @@ func GetPodId(token *jwt.Token) (string, error) {
 		return "", err
 	}
 	if pod.Uid == "" {
-		return "", utils.NewError(fmt.Sprintf(claimIsMissed, Uid), ErrTokenClaimMissing)
+		return "", fmt.Errorf(claimIsMissed, ErrTokenClaimMissing, Uid)
 	}
 	return pod.Uid, nil
 }
@@ -159,7 +158,7 @@ func GetPodName(token *jwt.Token) (string, error) {
 		return "", err
 	}
 	if pod.Name == "" {
-		return "", utils.NewError(fmt.Sprintf(claimIsMissed, Name), ErrTokenClaimMissing)
+		return "", fmt.Errorf(claimIsMissed, ErrTokenClaimMissing, Name)
 	}
 	return pod.Name, nil
 }

@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
-	"github.com/netcracker/qubership-core-lib-go/v3/utils"
 )
 
 // Kid header. The key ID is a hint indicating which key was used to secure the JWS.
@@ -38,8 +37,8 @@ const (
 )
 
 const (
-	claimIsInvalid = "%s is invalid, expected %s, but got %T"
-	claimIsMissed  = "%s is missed"
+	claimIsInvalid = "%w: %s is invalid, expected %s, but got %T"
+	claimIsMissed  = "%w: %s is missed"
 )
 
 var (
@@ -107,7 +106,7 @@ func Value(claims jwt.MapClaims, claim string) (any, error) {
 	if value, found := claims[claim]; found {
 		return value, nil
 	}
-	return nil, utils.NewError(fmt.Sprintf(claimIsMissed, claim), ErrTokenClaimMissing)
+	return nil, fmt.Errorf(claimIsMissed, ErrTokenClaimMissing, claim)
 }
 func StringValue(claims jwt.MapClaims, claim string) (string, error) {
 	value, err := Value(claims, claim)
@@ -117,7 +116,7 @@ func StringValue(claims jwt.MapClaims, claim string) (string, error) {
 	if stringValue, ok := value.(string); ok {
 		return stringValue, nil
 	}
-	return "", utils.NewError(fmt.Sprintf(claimIsInvalid, claim, "string", value), jwt.ErrInvalidType)
+	return "", fmt.Errorf(claimIsInvalid, jwt.ErrInvalidType, claim, "string", value)
 }
 func ClaimStringsValue(claims jwt.MapClaims, claim string) (jwt.ClaimStrings, error) {
 	value, err := Value(claims, claim)
@@ -135,11 +134,11 @@ func ClaimStringsValue(claims jwt.MapClaims, claim string) (jwt.ClaimStrings, er
 			if vs, ok := vv.(string); ok {
 				array = append(array, vs)
 			} else {
-				return nil, utils.NewError(fmt.Sprintf(claimIsInvalid, claim, "string", vv), jwt.ErrInvalidType)
+				return nil, fmt.Errorf(claimIsInvalid, jwt.ErrInvalidType, claim, "string", vv)
 			}
 		}
 	default:
-		return nil, utils.NewError(fmt.Sprintf(claimIsInvalid, claim, "string or []string", value), jwt.ErrInvalidType)
+		return nil, fmt.Errorf(claimIsInvalid, jwt.ErrInvalidType, claim, "string or []string", value)
 	}
 	return array, nil
 }
@@ -158,7 +157,7 @@ func NumericDateValue(claims jwt.MapClaims, claim string) (*jwt.NumericDate, err
 		v, _ := date.Float64()
 		return newNumericDateFromSeconds(v), nil
 	}
-	return nil, utils.NewError(fmt.Sprintf(claimIsInvalid, claim, "float64 or json.Number", value), jwt.ErrInvalidType)
+	return nil, fmt.Errorf(claimIsInvalid, jwt.ErrInvalidType, claim, "float64 or json.Number", value)
 }
 func MapValue(claims jwt.MapClaims, claim string) (jwt.MapClaims, error) {
 	value, err := Value(claims, claim)
@@ -168,7 +167,7 @@ func MapValue(claims jwt.MapClaims, claim string) (jwt.MapClaims, error) {
 	if mapValue, ok := value.(map[string]any); ok {
 		return mapValue, nil
 	}
-	return nil, utils.NewError(fmt.Sprintf(claimIsInvalid, claim, "map[string]any", value), jwt.ErrInvalidType)
+	return nil, fmt.Errorf(claimIsInvalid, jwt.ErrInvalidType, claim, "map[string]any", value)
 }
 func GetRegisteredClaims(token *jwt.Token) (jwt.RegisteredClaims, error) {
 	claims, err := getMapClaims(token)
@@ -199,7 +198,7 @@ func getMapClaims(token *jwt.Token) (jwt.MapClaims, error) {
 	if claims, ok := token.Claims.(jwt.MapClaims); ok {
 		return claims, nil
 	}
-	return nil, utils.NewError(fmt.Sprintf("expected jwt.MapClaims, but got %T", token.Claims), ErrTokenClaimsUnsupported)
+	return nil, fmt.Errorf("%w: expected jwt.MapClaims, but got %T", ErrTokenClaimsUnsupported, token.Claims)
 }
 func newNumericDateFromSeconds(f float64) *jwt.NumericDate {
 	round, frac := math.Modf(f)

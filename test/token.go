@@ -7,12 +7,10 @@ import (
 	"encoding/json"
 	"math/big"
 	"net/http"
-	"testing"
 
 	"github.com/MicahParks/jwkset"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/netcracker/qubership-core-lib-go/v3/security/oidc"
-	"github.com/stretchr/testify/assert"
 )
 
 const (
@@ -24,18 +22,16 @@ const (
 	KubernetesAudience = "https://kubernetes.default.svc.cluster.local"
 )
 
-func CreateSignedTokenString(t *testing.T, kid string, key crypto.PrivateKey, claims jwt.Claims) string {
+func CreateSignedTokenString(kid string, key crypto.PrivateKey, claims jwt.Claims) string {
 	unsignedToken := jwt.NewWithClaims(jwt.SigningMethodRS256, claims)
 	unsignedToken.Header["kid"] = kid
-	signedToken, err := unsignedToken.SignedString(key)
-	assert.Nil(t, err)
+	signedToken, _ := unsignedToken.SignedString(key)
 	return signedToken
 }
-func CreateUnsignedTokenFromPayload(t *testing.T, filePath string) *jwt.Token {
-	payload := LoadFileContent(t, filePath)
+func CreateUnsignedTokenFromPayload(filePath string) *jwt.Token {
+	payload := LoadFileContent(filePath)
 	var claims jwt.MapClaims
-	err := json.Unmarshal(payload, &claims)
-	assert.Nil(t, err)
+	_ = json.Unmarshal(payload, &claims)
 	return &jwt.Token{
 		Claims: claims,
 	}

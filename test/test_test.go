@@ -190,8 +190,8 @@ func TestMockServer(t *testing.T) {
 	defaultKeys = make(map[string]*rsa.PrivateKey)
 	defaultKeys[DefaultKid] = defaultKey
 
-	unsignedToken := CreateUnsignedTokenFromPayload(t, k8sPayload)
-	signedToken := CreateSignedTokenString(t, DefaultKid, defaultKey, unsignedToken.Claims)
+	unsignedToken := CreateUnsignedTokenFromPayload(k8sPayload)
+	signedToken := CreateSignedTokenString(DefaultKid, defaultKey, unsignedToken.Claims)
 	err := serviceAccountTokensStorage.SaveTokenValue(signedToken)
 	require.NoError(t, err)
 	AddDefaultKubernetesProviderHandler(signedToken, GetMockServerUrl())

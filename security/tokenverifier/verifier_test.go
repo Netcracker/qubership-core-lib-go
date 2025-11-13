@@ -241,7 +241,7 @@ func TestSignatureValidation(t *testing.T) {
 	}
 
 	key, _ := rsa.GenerateKey(rand.Reader, 2048)
-	rawToken := test.CreateSignedTokenString(t, customKid, key, claims)
+	rawToken := test.CreateSignedTokenString(customKid, key, claims)
 
 	token, vErr := maasTokenVerifier.Verify(ctx, rawToken)
 	assert.NotNil(t, token)
@@ -282,7 +282,7 @@ func TestBasicTokenValidations(t *testing.T) {
 		if scenario.claims.Issuer == "" {
 			scenario.claims.Issuer = test.GetMockServerUrl()
 		}
-		rawToken := test.CreateSignedTokenString(t, test.DefaultKid, defaultKey, scenario.claims)
+		rawToken := test.CreateSignedTokenString(test.DefaultKid, defaultKey, scenario.claims)
 		actualToken, vErr := maasTokenVerifier.Verify(ctx, rawToken)
 		if scenario.errorMessage == "" {
 			assert.NoError(t, vErr, "test %q: expected no error, got: %v", scenario.name, vErr)
@@ -332,7 +332,7 @@ func TestCustomValidation(t *testing.T) {
 		},
 	}
 
-	rawToken := test.CreateSignedTokenString(t, test.DefaultKid, defaultKey, claims)
+	rawToken := test.CreateSignedTokenString(test.DefaultKid, defaultKey, claims)
 	token, verificationErr := maasTokenVerifier.Verify(ctx, rawToken)
 	assert.NotNil(t, token)
 	assert.ErrorContains(t, verificationErr, "subject claim is wrong")
@@ -508,7 +508,7 @@ func TestJwksRequestUnauthorizedError(t *testing.T) {
 	maasTokenVerifier, err := NewKubernetesVerifier(ctx, tokensource.AudienceMaaS)
 	assert.NoError(t, err)
 
-	rawToken := test.CreateSignedTokenString(t, test.DefaultKid, defaultKey, scenarios[0].claims)
+	rawToken := test.CreateSignedTokenString(test.DefaultKid, defaultKey, scenarios[0].claims)
 	token, vErr := maasTokenVerifier.Verify(ctx, rawToken)
 	assert.NotNil(t, token)
 	assert.ErrorContains(t, vErr, "token is unverifiable: error while executing keyfunc: key not found \"kid-1\"\nfailed keyfunc: could not read JWK from storage")
@@ -528,7 +528,7 @@ func TestJwksRequestInvalidPlainText(t *testing.T) {
 	maasTokenVerifier, err := NewKubernetesVerifier(ctx, tokensource.AudienceMaaS)
 	assert.NoError(t, err)
 
-	rawToken := test.CreateSignedTokenString(t, test.DefaultKid, defaultKey, scenarios[0].claims)
+	rawToken := test.CreateSignedTokenString(test.DefaultKid, defaultKey, scenarios[0].claims)
 	token, vErr := maasTokenVerifier.Verify(ctx, rawToken)
 	assert.NotNil(t, token)
 	assert.ErrorContains(t, vErr, "token is unverifiable: error while executing keyfunc: key not found \"kid-1\"\nfailed keyfunc: could not read JWK from storage")
@@ -548,7 +548,7 @@ func TestJwksResponseInvalidJson(t *testing.T) {
 	maasTokenVerifier, err := NewKubernetesVerifier(ctx, tokensource.AudienceMaaS)
 	assert.NoError(t, err)
 
-	rawToken := test.CreateSignedTokenString(t, test.DefaultKid, defaultKey, scenarios[0].claims)
+	rawToken := test.CreateSignedTokenString(test.DefaultKid, defaultKey, scenarios[0].claims)
 	token, vErr := maasTokenVerifier.Verify(ctx, rawToken)
 	assert.NotNil(t, token)
 	assert.ErrorContains(t, vErr, "token is unverifiable: error while executing keyfunc: key not found \"kid-1\"\nfailed keyfunc: could not read JWK from storage")
@@ -568,7 +568,7 @@ func TestJwksResponseInvalidNil(t *testing.T) {
 	maasTokenVerifier, err := NewKubernetesVerifier(ctx, tokensource.AudienceMaaS)
 	assert.NoError(t, err)
 
-	rawToken := test.CreateSignedTokenString(t, test.DefaultKid, defaultKey, scenarios[0].claims)
+	rawToken := test.CreateSignedTokenString(test.DefaultKid, defaultKey, scenarios[0].claims)
 	token, vErr := maasTokenVerifier.Verify(ctx, rawToken)
 	assert.NotNil(t, token)
 	assert.ErrorContains(t, vErr, "token is unverifiable: error while executing keyfunc: key not found \"kid-1\"\nfailed keyfunc: could not read JWK from storage")
@@ -594,7 +594,7 @@ func TestJwksResponseInternalServerErrorFiveAttempts(t *testing.T) {
 	maasTokenVerifier, err := NewKubernetesVerifier(ctx, tokensource.AudienceMaaS)
 	assert.NoError(t, err)
 
-	rawToken := test.CreateSignedTokenString(t, test.DefaultKid, defaultKey, scenarios[0].claims)
+	rawToken := test.CreateSignedTokenString(test.DefaultKid, defaultKey, scenarios[0].claims)
 	token, vErr := maasTokenVerifier.Verify(ctx, rawToken)
 	assert.NotNil(t, token)
 	assert.ErrorContains(t, vErr, "token is unverifiable: error while executing keyfunc: key not found \"kid-1\"\nfailed keyfunc: could not read JWK from storage")
@@ -658,7 +658,7 @@ func TestJwksResponseInternalServerErrorFourAttempts(t *testing.T) {
 		},
 	}
 
-	rawToken := test.CreateSignedTokenString(t, test.DefaultKid, defaultKey, claims)
+	rawToken := test.CreateSignedTokenString(test.DefaultKid, defaultKey, claims)
 	actualToken, vErr := maasTokenVerifier.Verify(ctx, rawToken)
 	assert.Nil(t, vErr)
 	actualKubernetesIoClaim, getClaimErr := qubetoken.GetKubernetesIo(actualToken)
@@ -679,7 +679,7 @@ func subjectValidation(jwt *jwt.Token) error {
 	}
 }
 func createServiceAccountToken(t *testing.T, issuer, kid string, key crypto.PrivateKey) string {
-	return test.CreateSignedTokenString(t, kid, key, qubetoken.KubernetesClaims{
+	return test.CreateSignedTokenString(kid, key, qubetoken.KubernetesClaims{
 		RegisteredClaims: jwt.RegisteredClaims{
 			Issuer:    issuer,
 			Subject:   qubetoken.GetKubernetesSubject(test.Namespace, test.ServiceAccount),
