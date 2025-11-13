@@ -41,11 +41,11 @@ func NewVerifier(parser *jwt.Parser, keyFunc keyfunc.Keyfunc, validations ...Val
 func (vf *TokenVerifier) Verify(ctx context.Context, rawToken string) (*jwt.Token, error) {
 	token, err := vf.parser.Parse(rawToken, vf.keyFunc.KeyfuncCtx(ctx))
 	if err != nil {
-		return nil, err
+		return token, err
 	}
 	for _, validation := range vf.validations {
 		if validationErr := validation(token); validationErr != nil {
-			return nil, validationErr
+			return token, validationErr
 		}
 	}
 	return token, nil
