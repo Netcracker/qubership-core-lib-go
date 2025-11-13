@@ -1,16 +1,21 @@
 package test
 
 import (
+	"context"
 	"crypto"
+	"crypto/rand"
 	"crypto/rsa"
 	"encoding/base64"
 	"encoding/json"
 	"math/big"
 	"net/http"
+	"os"
+	"path/filepath"
 
 	"github.com/MicahParks/jwkset"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/netcracker/qubership-core-lib-go/v3/security/oidc"
+	"github.com/netcracker/qubership-core-lib-go/v3/security/tokensource"
 )
 
 const (
@@ -22,13 +27,31 @@ const (
 	KubernetesAudience = "https://kubernetes.default.svc.cluster.local"
 )
 
-func CreateSignedTokenString(kid string, key crypto.PrivateKey, claims jwt.Claims) string {
+var (
+	DefaultKey  *rsa.PrivateKey
+	DefaultKeys map[string]*rsa.PrivateKey
+)
+
+func init() {
+	DefaultKey, _ = rsa.GenerateKey(rand.Reader, 2048)
+	DefaultKeys = make(map[string]*rsa.PrivateKey)
+	DefaultKeys[DefaultKid] = DefaultKey
+}
+func LoadFileContent(filePath string) []byte {
+	absPath, _ := filepath.Abs(filePath)
+	content, _ := os.ReadFile(absPath)
+	return content
+}
+func CreateSignedToken(kid string, key crypto.PrivateKey, claims jwt.Claims) string {
 	unsignedToken := jwt.NewWithClaims(jwt.SigningMethodRS256, claims)
 	unsignedToken.Header["kid"] = kid
 	signedToken, _ := unsignedToken.SignedString(key)
 	return signedToken
 }
-func CreateUnsignedTokenFromPayload(filePath string) *jwt.Token {
+func CreateDefaultSignedToken(claims jwt.Claims) string {
+	return CreateSignedToken(DefaultKid, DefaultKey, claims)
+}
+func CreateUnsignedTokenFromFile(filePath string) *jwt.Token {
 	payload := LoadFileContent(filePath)
 	var claims jwt.MapClaims
 	_ = json.Unmarshal(payload, &claims)
@@ -85,4 +108,22 @@ func AddKubernetesHandler(path, serviceAccountToken string, statusCode int, resp
 				logger.Infof("request to %s, response %v:%s", path, http.StatusOK, string(responseBody))
 			}
 		})
+}
+type MockTokenSource struct {
+	AudienceToken string
+	AudienceTokenError error
+	ServiceAccountToken string
+	ServiceAccountTokenError error
+}
+func (t MockTokenSource) GetAudienceToken(_ context.Context, _ tokensource.TokenAudience) (string, error) {
+	if t.AudienceTokenError != nil {
+		return "", t.AudienceTokenError
+	}
+	return t.AudienceToken, nil
+}
+func (t MockTokenSource) GetServiceAccountToken(_ context.Context) (string, error) {
+	if t.ServiceAccountTokenError != nil {
+		return "", t.ServiceAccountTokenError
+	}
+	return t.ServiceAccountToken, nil
 }
