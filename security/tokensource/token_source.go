@@ -44,13 +44,16 @@ var (
 	serviceAccountTokenCache atomic.Value
 )
 
+type DefaultTokenFileProvider struct {
+}
+
 // GetAudienceToken gets token by audience. Do not store the token. Always call GetAudienceToken again to get a fresh token. Default tokens directory can be overridden using global variable DefaultAudienceTokensDir
-func GetAudienceToken(ctx context.Context, audience TokenAudience) (string, error) {
+func (dtfp *DefaultTokenFileProvider) GetAudienceToken(ctx context.Context, audience TokenAudience) (string, error) {
 	if audience == "" {
 		return "", fmt.Errorf("audience is empty")
 	}
 	audienceTokensWatcher.CompareAndSwap(nil, utils.NewLazy(func() (*tokenWatcher, error) {
-		return newTokenWatcher(ctx, DefaultAudienceTokensDir, refreshAudienceTokensCache, onCloseAudienceTokensWatcher)
+		return newTokenWatcher(ctx, DefaultAudienceTokensDir, dtfp.refreshAudienceTokensCache, dtfp.onCloseAudienceTokensWatcher)
 	}))
 	_, err := audienceTokensWatcher.Load().Get()
 	if err != nil {
@@ -68,9 +71,9 @@ func GetAudienceToken(ctx context.Context, audience TokenAudience) (string, erro
 }
 
 // GetServiceAccountToken gets the default service account token located at /var/run/secrets/kubernetes.io/serviceaccount. Do not store the token. Always call GetServiceAccountToken again to get a fresh token. Default service account token directory can be overridden using global variable DefaultServiceAccountDir
-func GetServiceAccountToken(ctx context.Context) (string, error) {
+func (dtfp *DefaultTokenFileProvider) GetServiceAccountToken(ctx context.Context) (string, error) {
 	serviceAccountTokenWatcher.CompareAndSwap(nil, utils.NewLazy(func() (*tokenWatcher, error) {
-		return newTokenWatcher(ctx, DefaultServiceAccountDir, refreshServiceAccountTokenCache, onCloseServiceAccountTokenWatcher)
+		return newTokenWatcher(ctx, DefaultServiceAccountDir, dtfp.refreshServiceAccountTokenCache, dtfp.onCloseServiceAccountTokenWatcher)
 	}))
 	_, err := serviceAccountTokenWatcher.Load().Get()
 	if err != nil {
@@ -89,14 +92,14 @@ type tokenUpdateResult struct {
 	err   error
 }
 
-func refreshAudienceTokensCache(tokensDir string) error {
+func (dtfp *DefaultTokenFileProvider) refreshAudienceTokensCache(tokensDir string) error {
 	entries, err := os.ReadDir(tokensDir)
 	if err != nil {
 		return fmt.Errorf("failed to get dir entries from tokenDir %s: %w", tokensDir, err)
 	}
 	for _, tokenDir := range entries {
 		audience := tokenDir.Name()
-		token, err := readToken(filepath.Join(tokensDir, audience, "token"))
+		token, err := dtfp.readToken(filepath.Join(tokensDir, audience, "token"))
 		audienceTokensCache.Store(TokenAudience(audience), tokenUpdateResult{
 			value: token,
 			err:   err,
@@ -105,13 +108,13 @@ func refreshAudienceTokensCache(tokensDir string) error {
 	return nil
 }
 
-func onCloseAudienceTokensWatcher() {
+func (dtfp *DefaultTokenFileProvider) onCloseAudienceTokensWatcher() {
 	audienceTokensWatcher.Store(nil)
 	audienceTokensCache.Clear()
 }
 
-func refreshServiceAccountTokenCache(serviceAccountDir string) error {
-	token, err := readToken(filepath.Join(serviceAccountDir, "token"))
+func (dtfp *DefaultTokenFileProvider) refreshServiceAccountTokenCache(serviceAccountDir string) error {
+	token, err := dtfp.readToken(filepath.Join(serviceAccountDir, "token"))
 	serviceAccountTokenCache.Store(tokenUpdateResult{
 		value: token,
 		err:   err,
@@ -119,12 +122,12 @@ func refreshServiceAccountTokenCache(serviceAccountDir string) error {
 	return nil
 }
 
-func onCloseServiceAccountTokenWatcher() {
+func (dtfp *DefaultTokenFileProvider) onCloseServiceAccountTokenWatcher() {
 	serviceAccountTokenWatcher.Store(nil)
 	serviceAccountTokenCache.Store(tokenUpdateResult{})
 }
 
-func readToken(tokenPath string) (string, error) {
+func (dtfp *DefaultTokenFileProvider) readToken(tokenPath string) (string, error) {
 	freshToken, err := os.ReadFile(tokenPath)
 	if err != nil {
 		return "", fmt.Errorf("failed to read token at path %s: %w", tokenPath, err)
