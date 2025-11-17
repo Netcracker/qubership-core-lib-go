@@ -9,8 +9,6 @@ import (
 	"encoding/json"
 	"math/big"
 	"net/http"
-	"os"
-	"path/filepath"
 
 	"github.com/MicahParks/jwkset"
 	"github.com/golang-jwt/jwt/v5"
@@ -29,36 +27,39 @@ const (
 	KubernetesAudience = "https://kubernetes.default.svc.cluster.local"
 )
 
-
 var (
-	logger       = logging.GetLogger("security-test")
+	logger      = logging.GetLogger("security-test")
 	DefaultKey  *rsa.PrivateKey
 	DefaultKeys map[string]*rsa.PrivateKey
 )
 
 func init() {
-	DefaultKey, _ = rsa.GenerateKey(rand.Reader, 2048)
+	var err error
+	DefaultKey, err = rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		panic(err)
+	}
 	DefaultKeys = make(map[string]*rsa.PrivateKey)
 	DefaultKeys[DefaultKid] = DefaultKey
-}
-func LoadFileContent(filePath string) []byte {
-	absPath, _ := filepath.Abs(filePath)
-	content, _ := os.ReadFile(absPath)
-	return content
 }
 func CreateSignedToken(kid string, key crypto.PrivateKey, claims jwt.Claims) string {
 	unsignedToken := jwt.NewWithClaims(jwt.SigningMethodRS256, claims)
 	unsignedToken.Header["kid"] = kid
-	signedToken, _ := unsignedToken.SignedString(key)
+	signedToken, err := unsignedToken.SignedString(key)
+	if err != nil {
+		panic(err)
+	}
 	return signedToken
 }
 func CreateDefaultSignedToken(claims jwt.Claims) string {
 	return CreateSignedToken(DefaultKid, DefaultKey, claims)
 }
-func CreateUnsignedTokenFromFile(filePath string) *jwt.Token {
-	payload := LoadFileContent(filePath)
+func CreateUnsignedToken(payload []byte) *jwt.Token {
 	var claims jwt.MapClaims
-	_ = json.Unmarshal(payload, &claims)
+	err := json.Unmarshal(payload, &claims)
+	if err != nil {
+		panic(err)
+	}
 	return &jwt.Token{
 		Claims: claims,
 	}
@@ -71,7 +72,10 @@ func AddDefaultKubernetesProviderHandler(serviceAccountToken, issuer string) {
 		Issuer:  issuer,
 		JwksUri: issuer + JwksSubPath,
 	}
-	responseBody, _ := json.Marshal(response)
+	responseBody, err := json.Marshal(response)
+	if err != nil {
+		panic(err)
+	}
 	AddKubernetesProviderHandler(serviceAccountToken, http.StatusOK, responseBody)
 }
 func AddKubernetesProviderHandler(serviceAccountToken string, statusCode int, responseBody []byte) {
@@ -92,7 +96,10 @@ func AddDefaultKubernetesJwksHandler(serviceAccountToken string, privateKeys map
 	jwks := &jwkset.JWKSMarshal{
 		Keys: keySet,
 	}
-	responseBody, _ := json.Marshal(jwks)
+	responseBody, err := json.Marshal(jwks)
+	if err != nil {
+		panic(err)
+	}
 	AddKubernetesJwksHandler(serviceAccountToken, http.StatusOK, responseBody)
 }
 func AddKubernetesJwksHandler(serviceAccountToken string, statusCode int, responseBody []byte) {
@@ -108,7 +115,10 @@ func AddKubernetesHandler(path, serviceAccountToken string, statusCode int, resp
 			}
 			if responseBody != nil {
 				responseWriter.WriteHeader(statusCode)
-				_, _ = responseWriter.Write(responseBody)
+				_, err := responseWriter.Write(responseBody)
+				if err != nil {
+					panic(err)
+				}
 				logger.Infof("request to %s, response %v:%s", path, http.StatusOK, string(responseBody))
 			}
 		})

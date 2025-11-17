@@ -1,6 +1,7 @@
 package token
 
 import (
+	_ "embed"
 	"testing"
 	"time"
 
@@ -9,20 +10,33 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-const (
-	noClaimsPayload                = "../token/test_data/noClaims.json"
-	k8sMultiAudPayload             = "../token/test_data/k8sMultiAudPayload.json"
-	k8sNoServiceAccountPayload     = "../token/test_data/k8sNoServiceAccountPayload.json"
-	k8sNoServiceAccountIdPayload   = "../token/test_data/k8sNoServiceAccountIdPayload.json"
-	k8sNoServiceAccountNamePayload = "../token/test_data/k8sNoServiceAccountNamePayload.json"
-	k8sNoPodPayload                = "../token/test_data/k8sNoPodPayload.json"
-	k8sNoPodIdPayload              = "../token/test_data/k8sNoPodIdPayload.json"
-	k8sNoPodNamePayload            = "../token/test_data/k8sNoPodNamePayload.json"
-	k8sNoNodePayload               = "../token/test_data/k8sNoNodePayload.json"
-	k8sNoNodeIdPayload             = "../token/test_data/k8sNoNodeIdPayload.json"
-	k8sNoNodeNamePayload           = "../token/test_data/k8sNoNodeNamePayload.json"
-	k8sNoNamespacePayload          = "../token/test_data/k8sNoNamespacePayload.json"
-	k8sPayload                     = "../token/test_data/k8sPayload.json"
+var (
+	//go:embed test_data/noClaims.json
+	noClaimsPayload []byte
+	//go:embed test_data/k8sMultiAudPayload.json
+	k8sMultiAudPayload []byte
+	//go:embed test_data/k8sNoServiceAccountPayload.json
+	k8sNoServiceAccountPayload []byte
+	//go:embed test_data/k8sNoServiceAccountIdPayload.json
+	k8sNoServiceAccountIdPayload []byte
+	//go:embed test_data/k8sNoServiceAccountNamePayload.json
+	k8sNoServiceAccountNamePayload []byte
+	//go:embed test_data/k8sNoPodPayload.json
+	k8sNoPodPayload []byte
+	//go:embed test_data/k8sNoPodIdPayload.json
+	k8sNoPodIdPayload []byte
+	//go:embed test_data/k8sNoPodNamePayload.json
+	k8sNoPodNamePayload []byte
+	//go:embed test_data/k8sNoNodePayload.json
+	k8sNoNodePayload []byte
+	//go:embed test_data/k8sNoNodeIdPayload.json
+	k8sNoNodeIdPayload []byte
+	//go:embed test_data/k8sNoNodeNamePayload.json
+	k8sNoNodeNamePayload []byte
+	//go:embed test_data/k8sNoNamespacePayload.json
+	k8sNoNamespacePayload []byte
+	//go:embed test_data/k8sPayload.json
+	k8sPayload []byte
 )
 
 func Test_GetValue(t *testing.T) {
@@ -36,12 +50,12 @@ func Test_GetValue(t *testing.T) {
 	assert.ErrorIs(t, err, ErrTokenClaimsUnsupported)
 	assert.ErrorContains(t, err, "token has unsupported claims implementation: expected jwt.MapClaims, but got token.KubernetesClaims")
 
-	token := test.CreateUnsignedTokenFromFile(noClaimsPayload)
+	token := test.CreateUnsignedToken(noClaimsPayload)
 	value, err = GetValue(token, Iss)
 	assert.ErrorIs(t, err, ErrTokenClaimMissing)
 	assert.ErrorContains(t, err, "token is missing claim: iss is missed")
 
-	token = test.CreateUnsignedTokenFromFile(k8sMultiAudPayload)
+	token = test.CreateUnsignedToken(k8sMultiAudPayload)
 	value, err = GetValue(token, Iss)
 	assert.Nil(t, err)
 	assert.Equal(t, "https://kubernetes.default.svc.cluster.local", value)
@@ -57,17 +71,17 @@ func Test_GetStringValue(t *testing.T) {
 	assert.ErrorIs(t, err, ErrTokenClaimsUnsupported)
 	assert.ErrorContains(t, err, "token has unsupported claims implementation: expected jwt.MapClaims, but got token.KubernetesClaims")
 
-	token := test.CreateUnsignedTokenFromFile(noClaimsPayload)
+	token := test.CreateUnsignedToken(noClaimsPayload)
 	value, err = GetStringValue(token, Iss)
 	assert.ErrorIs(t, err, ErrTokenClaimMissing)
 	assert.ErrorContains(t, err, "token is missing claim: iss is missed")
 
-	token = test.CreateUnsignedTokenFromFile(k8sMultiAudPayload)
+	token = test.CreateUnsignedToken(k8sMultiAudPayload)
 	value, err = GetStringValue(token, Aud)
 	assert.ErrorIs(t, err, jwt.ErrInvalidType)
 	assert.ErrorContains(t, err, "invalid type for claim: aud is invalid, expected string, but got []interface {}")
 
-	token = test.CreateUnsignedTokenFromFile(k8sMultiAudPayload)
+	token = test.CreateUnsignedToken(k8sMultiAudPayload)
 	value, err = GetStringValue(token, Iss)
 	assert.Nil(t, err)
 	assert.Equal(t, "https://kubernetes.default.svc.cluster.local", value)
@@ -83,22 +97,22 @@ func Test_GetClaimStringsValue(t *testing.T) {
 	assert.ErrorIs(t, err, ErrTokenClaimsUnsupported)
 	assert.ErrorContains(t, err, "token has unsupported claims implementation: expected jwt.MapClaims, but got token.KubernetesClaims")
 
-	token := test.CreateUnsignedTokenFromFile(noClaimsPayload)
+	token := test.CreateUnsignedToken(noClaimsPayload)
 	value, err = GetClaimStringsValue(token, Aud)
 	assert.ErrorIs(t, err, ErrTokenClaimMissing)
 	assert.ErrorContains(t, err, "token is missing claim: aud is missed")
 
-	token = test.CreateUnsignedTokenFromFile(k8sMultiAudPayload)
+	token = test.CreateUnsignedToken(k8sMultiAudPayload)
 	value, err = GetClaimStringsValue(token, Exp)
 	assert.ErrorIs(t, err, jwt.ErrInvalidType)
 	assert.ErrorContains(t, err, "invalid type for claim: exp is invalid, expected string or []string, but got float64")
 
-	token = test.CreateUnsignedTokenFromFile(k8sMultiAudPayload)
+	token = test.CreateUnsignedToken(k8sMultiAudPayload)
 	value, err = GetClaimStringsValue(token, Aud)
 	assert.Nil(t, err)
 	assert.Equal(t, jwt.ClaimStrings{"audience1", "audience2"}, value)
 
-	token = test.CreateUnsignedTokenFromFile(k8sPayload)
+	token = test.CreateUnsignedToken(k8sPayload)
 	value, err = GetClaimStringsValue(token, Aud)
 	assert.Nil(t, err)
 	assert.Equal(t, jwt.ClaimStrings{"audience1"}, value)
@@ -126,17 +140,17 @@ func Test_GetNumericDateValue(t *testing.T) {
 	assert.ErrorIs(t, err, ErrTokenClaimsUnsupported)
 	assert.ErrorContains(t, err, "token has unsupported claims implementation: expected jwt.MapClaims, but got token.KubernetesClaims")
 
-	token := test.CreateUnsignedTokenFromFile(noClaimsPayload)
+	token := test.CreateUnsignedToken(noClaimsPayload)
 	value, err = GetNumericDateValue(token, Exp)
 	assert.ErrorIs(t, err, ErrTokenClaimMissing)
 	assert.ErrorContains(t, err, "token is missing claim: exp is missed")
 
-	token = test.CreateUnsignedTokenFromFile(k8sMultiAudPayload)
+	token = test.CreateUnsignedToken(k8sMultiAudPayload)
 	value, err = GetNumericDateValue(token, Aud)
 	assert.ErrorIs(t, err, jwt.ErrInvalidType)
 	assert.ErrorContains(t, err, "invalid type for claim: aud is invalid, expected float64 or json.Number, but got []interface {}")
 
-	token = test.CreateUnsignedTokenFromFile(k8sMultiAudPayload)
+	token = test.CreateUnsignedToken(k8sMultiAudPayload)
 	value, err = GetNumericDateValue(token, Exp)
 	assert.Nil(t, err)
 	assert.Equal(t, jwt.NewNumericDate(time.Unix(1757656985, 0)), value)
@@ -152,12 +166,12 @@ func Test_GetMapValue(t *testing.T) {
 	assert.ErrorIs(t, err, ErrTokenClaimsUnsupported)
 	assert.ErrorContains(t, err, "token has unsupported claims implementation: expected jwt.MapClaims, but got token.KubernetesClaims")
 
-	token := test.CreateUnsignedTokenFromFile(noClaimsPayload)
+	token := test.CreateUnsignedToken(noClaimsPayload)
 	value, err = GetMapValue(token, KubernetesIo)
 	assert.ErrorIs(t, err, ErrTokenClaimMissing)
 	assert.ErrorContains(t, err, "token is missing claim: kubernetes.io is missed")
 
-	token = test.CreateUnsignedTokenFromFile(k8sMultiAudPayload)
+	token = test.CreateUnsignedToken(k8sMultiAudPayload)
 	value, err = GetMapValue(token, Aud)
 	assert.ErrorIs(t, err, jwt.ErrInvalidType)
 	assert.ErrorContains(t, err, "invalid type for claim: aud is invalid, expected map[string]any, but got []interface {}")
@@ -177,54 +191,54 @@ func Test_GetMapValue(t *testing.T) {
 			Uid:  "530f2aa0-ed7b-4923-886b-2223a0dadae4",
 		},
 	}
-	token = test.CreateUnsignedTokenFromFile(k8sMultiAudPayload)
+	token = test.CreateUnsignedToken(k8sMultiAudPayload)
 	value, err = GetMapValue(token, KubernetesIo)
 	assert.Nil(t, err)
 	assert.Equal(t, claims, value)
 }
 func Test_GetIssuer(t *testing.T) {
-	token := test.CreateUnsignedTokenFromFile(k8sMultiAudPayload)
+	token := test.CreateUnsignedToken(k8sMultiAudPayload)
 	value, err := GetIssuer(token)
 	assert.Nil(t, err)
 	assert.Equal(t, "https://kubernetes.default.svc.cluster.local", value)
 }
 func Test_GetSubject(t *testing.T) {
-	token := test.CreateUnsignedTokenFromFile(k8sMultiAudPayload)
+	token := test.CreateUnsignedToken(k8sMultiAudPayload)
 	value, err := GetSubject(token)
 	assert.Nil(t, err)
 	assert.Equal(t, "system:serviceaccount:namespace:service", value)
 }
 func Test_GetAudience(t *testing.T) {
-	token := test.CreateUnsignedTokenFromFile(k8sMultiAudPayload)
+	token := test.CreateUnsignedToken(k8sMultiAudPayload)
 	value, err := GetAudience(token)
 	assert.Nil(t, err)
 	assert.Equal(t, jwt.ClaimStrings{"audience1", "audience2"}, value)
 
-	token = test.CreateUnsignedTokenFromFile(k8sPayload)
+	token = test.CreateUnsignedToken(k8sPayload)
 	value, err = GetAudience(token)
 	assert.Nil(t, err)
 	assert.Equal(t, jwt.ClaimStrings{"audience1"}, value)
 }
 func Test_GetExpirationTime(t *testing.T) {
-	token := test.CreateUnsignedTokenFromFile(k8sMultiAudPayload)
+	token := test.CreateUnsignedToken(k8sMultiAudPayload)
 	value, err := GetExpirationTime(token)
 	assert.Nil(t, err)
 	assert.Equal(t, jwt.NewNumericDate(time.Unix(1757656985, 0)), value)
 }
 func Test_GetIssuedAt(t *testing.T) {
-	token := test.CreateUnsignedTokenFromFile(k8sMultiAudPayload)
+	token := test.CreateUnsignedToken(k8sMultiAudPayload)
 	value, err := GetIssuedAt(token)
 	assert.Nil(t, err)
 	assert.Equal(t, jwt.NewNumericDate(time.Unix(1757656385, 0)), value)
 }
 func Test_GetNotBefore(t *testing.T) {
-	token := test.CreateUnsignedTokenFromFile(k8sMultiAudPayload)
+	token := test.CreateUnsignedToken(k8sMultiAudPayload)
 	value, err := GetNotBefore(token)
 	assert.Nil(t, err)
 	assert.Equal(t, jwt.NewNumericDate(time.Unix(1757656385, 0)), value)
 }
 func Test_GetId(t *testing.T) {
-	token := test.CreateUnsignedTokenFromFile(k8sMultiAudPayload)
+	token := test.CreateUnsignedToken(k8sMultiAudPayload)
 	value, err := GetId(token)
 	assert.Nil(t, err)
 	assert.Equal(t, "cca3c408-f65c-4daa-a45e-5e390ffe0540", value)
@@ -233,16 +247,16 @@ func Test_GetKubernetesSubject(t *testing.T) {
 	assert.Equal(t, "system:serviceaccount:namespace:serviceAccount", GetKubernetesSubject("namespace", "serviceAccount"))
 }
 func Test_IsKubernetesToken(t *testing.T) {
-	token := test.CreateUnsignedTokenFromFile(noClaimsPayload)
+	token := test.CreateUnsignedToken(noClaimsPayload)
 	value := IsKubernetesToken(token)
 	assert.False(t, value)
 
-	token = test.CreateUnsignedTokenFromFile(k8sPayload)
+	token = test.CreateUnsignedToken(k8sPayload)
 	value = IsKubernetesToken(token)
 	assert.True(t, value)
 }
 func Test_GetKubernetesIo(t *testing.T) {
-	token := test.CreateUnsignedTokenFromFile(k8sPayload)
+	token := test.CreateUnsignedToken(k8sPayload)
 	value, err := GetKubernetesIo(token)
 	assert.Nil(t, err)
 	expectedValue := KubernetesIoClaim{
@@ -262,7 +276,7 @@ func Test_GetKubernetesIo(t *testing.T) {
 	}
 	assert.Equal(t, expectedValue, value)
 
-	token = test.CreateUnsignedTokenFromFile(k8sNoPodPayload)
+	token = test.CreateUnsignedToken(k8sNoPodPayload)
 	value, err = GetKubernetesIo(token)
 	assert.Nil(t, err)
 	expectedValue = KubernetesIoClaim{
@@ -278,7 +292,7 @@ func Test_GetKubernetesIo(t *testing.T) {
 	}
 	assert.Equal(t, expectedValue, value)
 
-	token = test.CreateUnsignedTokenFromFile(k8sNoNodePayload)
+	token = test.CreateUnsignedToken(k8sNoNodePayload)
 	value, err = GetKubernetesIo(token)
 	assert.Nil(t, err)
 	expectedValue = KubernetesIoClaim{
@@ -294,7 +308,7 @@ func Test_GetKubernetesIo(t *testing.T) {
 	}
 	assert.Equal(t, expectedValue, value)
 
-	token = test.CreateUnsignedTokenFromFile(k8sNoServiceAccountPayload)
+	token = test.CreateUnsignedToken(k8sNoServiceAccountPayload)
 	value, err = GetKubernetesIo(token)
 	assert.Nil(t, err)
 	expectedValue = KubernetesIoClaim{
@@ -310,7 +324,7 @@ func Test_GetKubernetesIo(t *testing.T) {
 	}
 	assert.Equal(t, expectedValue, value)
 
-	token = test.CreateUnsignedTokenFromFile(k8sNoNamespacePayload)
+	token = test.CreateUnsignedToken(k8sNoNamespacePayload)
 	value, err = GetKubernetesIo(token)
 	assert.Nil(t, err)
 	expectedValue = KubernetesIoClaim{
@@ -329,13 +343,13 @@ func Test_GetKubernetesIo(t *testing.T) {
 	}
 	assert.Equal(t, expectedValue, value)
 
-	token = test.CreateUnsignedTokenFromFile(noClaimsPayload)
+	token = test.CreateUnsignedToken(noClaimsPayload)
 	value, err = GetKubernetesIo(token)
 	assert.ErrorIs(t, err, ErrTokenClaimMissing)
 	assert.ErrorContains(t, err, "token is missing claim: kubernetes.io is missed")
 }
 func Test_GetServiceAccount(t *testing.T) {
-	token := test.CreateUnsignedTokenFromFile(k8sPayload)
+	token := test.CreateUnsignedToken(k8sPayload)
 	value, err := GetServiceAccount(token)
 	assert.Nil(t, err)
 	expectedValue := ServiceAccountClaim{
@@ -350,7 +364,7 @@ func Test_GetServiceAccount(t *testing.T) {
 	assert.Nil(t, err)
 	assert.Equal(t, "530f2aa0-ed7b-4923-886b-2223a0dadae4", stringValue)
 
-	token = test.CreateUnsignedTokenFromFile(k8sNoServiceAccountIdPayload)
+	token = test.CreateUnsignedToken(k8sNoServiceAccountIdPayload)
 	value, err = GetServiceAccount(token)
 	assert.Nil(t, err)
 	expectedValue = ServiceAccountClaim{
@@ -364,7 +378,7 @@ func Test_GetServiceAccount(t *testing.T) {
 	assert.ErrorIs(t, err, ErrTokenClaimMissing)
 	assert.ErrorContains(t, err, "token is missing claim: uid is missed")
 
-	token = test.CreateUnsignedTokenFromFile(k8sNoServiceAccountNamePayload)
+	token = test.CreateUnsignedToken(k8sNoServiceAccountNamePayload)
 	value, err = GetServiceAccount(token)
 	assert.Nil(t, err)
 	expectedValue = ServiceAccountClaim{
@@ -378,7 +392,7 @@ func Test_GetServiceAccount(t *testing.T) {
 	assert.Nil(t, err)
 	assert.Equal(t, "530f2aa0-ed7b-4923-886b-2223a0dadae4", stringValue)
 
-	token = test.CreateUnsignedTokenFromFile(noClaimsPayload)
+	token = test.CreateUnsignedToken(noClaimsPayload)
 	value, err = GetServiceAccount(token)
 	assert.ErrorIs(t, err, ErrTokenClaimMissing)
 	assert.ErrorContains(t, err, "token is missing claim: kubernetes.io is missed")
@@ -390,7 +404,7 @@ func Test_GetServiceAccount(t *testing.T) {
 	assert.ErrorContains(t, err, "token is missing claim: kubernetes.io is missed")
 }
 func Test_GetNode(t *testing.T) {
-	token := test.CreateUnsignedTokenFromFile(k8sPayload)
+	token := test.CreateUnsignedToken(k8sPayload)
 	value, err := GetNode(token)
 	assert.Nil(t, err)
 	expectedValue := NodeClaim{
@@ -405,7 +419,7 @@ func Test_GetNode(t *testing.T) {
 	assert.Nil(t, err)
 	assert.Equal(t, "225d44ac-4729-4277-bd20-450859a10d0f", stringValue)
 
-	token = test.CreateUnsignedTokenFromFile(k8sNoNodeIdPayload)
+	token = test.CreateUnsignedToken(k8sNoNodeIdPayload)
 	value, err = GetNode(token)
 	assert.Nil(t, err)
 	expectedValue = NodeClaim{
@@ -419,7 +433,7 @@ func Test_GetNode(t *testing.T) {
 	assert.ErrorIs(t, err, ErrTokenClaimMissing)
 	assert.ErrorContains(t, err, "token is missing claim: uid is missed")
 
-	token = test.CreateUnsignedTokenFromFile(k8sNoNodeNamePayload)
+	token = test.CreateUnsignedToken(k8sNoNodeNamePayload)
 	value, err = GetNode(token)
 	assert.Nil(t, err)
 	expectedValue = NodeClaim{
@@ -433,7 +447,7 @@ func Test_GetNode(t *testing.T) {
 	assert.Nil(t, err)
 	assert.Equal(t, "225d44ac-4729-4277-bd20-450859a10d0f", stringValue)
 
-	token = test.CreateUnsignedTokenFromFile(noClaimsPayload)
+	token = test.CreateUnsignedToken(noClaimsPayload)
 	value, err = GetNode(token)
 	assert.ErrorIs(t, err, ErrTokenClaimMissing)
 	assert.ErrorContains(t, err, "token is missing claim: kubernetes.io is missed")
@@ -445,7 +459,7 @@ func Test_GetNode(t *testing.T) {
 	assert.ErrorContains(t, err, "token is missing claim: kubernetes.io is missed")
 }
 func Test_GetPod(t *testing.T) {
-	token := test.CreateUnsignedTokenFromFile(k8sPayload)
+	token := test.CreateUnsignedToken(k8sPayload)
 	value, err := GetPod(token)
 	assert.Nil(t, err)
 	expectedValue := PodClaim{
@@ -460,7 +474,7 @@ func Test_GetPod(t *testing.T) {
 	assert.Nil(t, err)
 	assert.Equal(t, "6b52c6a5-614f-484d-a329-80de170a45e6", stringValue)
 
-	token = test.CreateUnsignedTokenFromFile(k8sNoPodIdPayload)
+	token = test.CreateUnsignedToken(k8sNoPodIdPayload)
 	value, err = GetPod(token)
 	assert.Nil(t, err)
 	expectedValue = PodClaim{
@@ -474,7 +488,7 @@ func Test_GetPod(t *testing.T) {
 	assert.ErrorIs(t, err, ErrTokenClaimMissing)
 	assert.ErrorContains(t, err, "token is missing claim: uid is missed")
 
-	token = test.CreateUnsignedTokenFromFile(k8sNoPodNamePayload)
+	token = test.CreateUnsignedToken(k8sNoPodNamePayload)
 	value, err = GetPod(token)
 	assert.Nil(t, err)
 	expectedValue = PodClaim{
@@ -488,7 +502,7 @@ func Test_GetPod(t *testing.T) {
 	assert.Nil(t, err)
 	assert.Equal(t, "6b52c6a5-614f-484d-a329-80de170a45e6", stringValue)
 
-	token = test.CreateUnsignedTokenFromFile(noClaimsPayload)
+	token = test.CreateUnsignedToken(noClaimsPayload)
 	value, err = GetPod(token)
 	assert.ErrorIs(t, err, ErrTokenClaimMissing)
 	assert.ErrorContains(t, err, "token is missing claim: kubernetes.io is missed")
@@ -500,12 +514,12 @@ func Test_GetPod(t *testing.T) {
 	assert.ErrorContains(t, err, "token is missing claim: kubernetes.io is missed")
 }
 func Test_GetNamespace(t *testing.T) {
-	token := test.CreateUnsignedTokenFromFile(k8sPayload)
+	token := test.CreateUnsignedToken(k8sPayload)
 	value, err := GetNamespace(token)
 	assert.Nil(t, err)
 	assert.Equal(t, "namespace", value)
 
-	token = test.CreateUnsignedTokenFromFile(noClaimsPayload)
+	token = test.CreateUnsignedToken(noClaimsPayload)
 	value, err = GetNamespace(token)
 	assert.ErrorIs(t, err, ErrTokenClaimMissing)
 	assert.ErrorContains(t, err, "token is missing claim: kubernetes.io is missed")
@@ -523,7 +537,7 @@ func Test_GetRegisteredClaims(t *testing.T) {
 		},
 	}
 
-	token := test.CreateUnsignedTokenFromFile(k8sPayload)
+	token := test.CreateUnsignedToken(k8sPayload)
 	value, err := GetRegisteredClaims(token)
 	assert.Nil(t, err)
 	assert.Equal(t, claims.RegisteredClaims, value)
