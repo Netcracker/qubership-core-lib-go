@@ -14,8 +14,10 @@ import (
 
 	"github.com/MicahParks/jwkset"
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/netcracker/qubership-core-lib-go/v3/logging"
 	"github.com/netcracker/qubership-core-lib-go/v3/security/oidc"
 	"github.com/netcracker/qubership-core-lib-go/v3/security/tokensource"
+	mockServer "github.com/netcracker/qubership-core-lib-go/v3/test"
 )
 
 const (
@@ -27,7 +29,9 @@ const (
 	KubernetesAudience = "https://kubernetes.default.svc.cluster.local"
 )
 
+
 var (
+	logger       = logging.GetLogger("security-test")
 	DefaultKey  *rsa.PrivateKey
 	DefaultKeys map[string]*rsa.PrivateKey
 )
@@ -95,7 +99,7 @@ func AddKubernetesJwksHandler(serviceAccountToken string, statusCode int, respon
 	AddKubernetesHandler(JwksSubPath, serviceAccountToken, statusCode, responseBody)
 }
 func AddKubernetesHandler(path, serviceAccountToken string, statusCode int, responseBody []byte) {
-	AddHandler(Contains(path),
+	mockServer.AddHandler(mockServer.Contains(path),
 		func(responseWriter http.ResponseWriter, request *http.Request) {
 			if request.Header.Get("Authorization") != "Bearer "+serviceAccountToken {
 				responseWriter.WriteHeader(http.StatusUnauthorized)
@@ -109,12 +113,14 @@ func AddKubernetesHandler(path, serviceAccountToken string, statusCode int, resp
 			}
 		})
 }
+
 type MockTokenSource struct {
-	AudienceToken string
-	AudienceTokenError error
-	ServiceAccountToken string
+	AudienceToken            string
+	AudienceTokenError       error
+	ServiceAccountToken      string
 	ServiceAccountTokenError error
 }
+
 func (t MockTokenSource) GetAudienceToken(_ context.Context, _ tokensource.TokenAudience) (string, error) {
 	if t.AudienceTokenError != nil {
 		return "", t.AudienceTokenError
