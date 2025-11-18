@@ -8,14 +8,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-type mockTokenSource struct {
-	token string
-}
-
-func (mt mockTokenSource) Token() (string, error) {
-	return mt.token, nil
-}
-
 type mockRoundTripper struct {
 	called bool
 	token  string
@@ -31,9 +23,8 @@ func (m *mockRoundTripper) RoundTrip(r *http.Request) (*http.Response, error) {
 
 func TestNewHttpClient(t *testing.T) {
 	validToken := "valid_token"
-	mockTs := mockTokenSource{token: validToken}
 	transport := newSecureTransport(func() (string, error) {
-		return mockTs.Token()
+		return validToken, nil
 	})
 	mockTransport := &mockRoundTripper{
 		token: validToken,

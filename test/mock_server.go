@@ -9,10 +9,10 @@ import (
 )
 
 var (
+	logger       = logging.GetLogger("test")
 	mockHandlers []mockHandler
 	mockServer   *httptest.Server
 	started      = false
-	logger logging.Logger
 )
 
 type mockHandler struct {

@@ -2,143 +2,51 @@ package tokenverifier
 
 import (
 	"context"
-	"fmt"
-	"net/http"
-	"net/url"
 	"time"
 
-	"github.com/coreos/go-oidc/v3/oidc"
-	"github.com/failsafe-go/failsafe-go/failsafehttp"
+	"github.com/MicahParks/keyfunc/v3"
 	"github.com/golang-jwt/jwt/v5"
-	"github.com/netcracker/qubership-core-lib-go/v3/security/tokensource"
+	"github.com/netcracker/qubership-core-lib-go/v3/logging"
+	"golang.org/x/time/rate"
 )
 
-const (
-	retryMaxAttempts     = 5
-	retryBackoffDelay    = time.Millisecond * 500
-	retryBackoffMaxDelay = time.Second * 15
-	retryJitter          = time.Millisecond * 100
+var (
+	logger = logging.GetLogger("token-verifier")
 )
-
-type Claims struct {
-	jwt.RegisteredClaims
-	Kubernetes K8sClaims `json:"kubernetes.io"`
-}
-
-type K8sClaims struct {
-	Namespace      string              `json:"namespace,omitempty"`
-	ServiceAccount ServiceAccountClaim `json:"serviceaccount"`
-	Node           NodeClaim           `json:"node"`
-	Pod            PodClaim            `json:"pod"`
-	WarnAfter      *jwt.NumericDate    `json:"warnafter,omitempty"`
-}
-
-type ServiceAccountClaim struct {
-	Name string `json:"name,omitempty"`
-	Uid  string `json:"uid,omitempty"`
-}
-
-type NodeClaim struct {
-	Name string `json:"name,omitempty"`
-	Uid  string `json:"uid,omitempty"`
-}
-
-type PodClaim struct {
-	Name string `json:"name,omitempty"`
-	Uid  string `json:"uid,omitempty"`
-}
 
 type Verifier interface {
-	Verify(ctx context.Context, rawToken string) (*Claims, error)
+	Verify(ctx context.Context, rawToken string) (*jwt.Token, error)
 }
 
-type verifier struct {
-	oidcVerifier *oidc.IDTokenVerifier
+type Override struct {
+	RefreshInterval   time.Duration
+	RefreshUnknownKID *rate.Limiter
 }
 
-type getTokenFunc func() (string, error)
-
-func New(ctx context.Context, audience string) (Verifier, error) {
-	return newVerifier(ctx, audience, func() (string, error) {
-		return tokensource.GetServiceAccountToken(ctx)
-	})
+type TokenVerifier struct {
+	parser      *jwt.Parser
+	keyFunc     keyfunc.Keyfunc
+	validations []Validation
 }
 
-func newVerifier(ctx context.Context, audience string, getToken getTokenFunc) (*verifier, error) {
-	secureTransport := newSecureTransport(getToken)
-	policy := failsafehttp.NewRetryPolicyBuilder().
-		WithMaxAttempts(retryMaxAttempts).
-		WithBackoff(retryBackoffDelay, retryBackoffMaxDelay).
-		WithJitter(retryJitter).
-		HandleIf(decideRetry).
-		Build()
-	secureClient := http.Client{
-		Transport: failsafehttp.NewRoundTripper(secureTransport, policy),
-	}
-	ctx = oidc.ClientContext(ctx, &secureClient)
+type Validation func(token *jwt.Token) error
 
-	rawToken, err := getToken()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get k8s projected volume token (possibly projected volume token misconfigured in k8s deployment): %w", err)
-	}
-	issuer, err := getIssuer(rawToken)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get jwt issuer from the k8s projected volume token: %w", err)
-	}
-	provider, err := oidc.NewProvider(ctx, issuer)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create oidc provider: %w", err)
-	}
-	v := provider.Verifier(&oidc.Config{ClientID: audience})
-
-	return &verifier{
-		oidcVerifier: v,
+func NewVerifier(parser *jwt.Parser, keyFunc keyfunc.Keyfunc, validations ...Validation) (*TokenVerifier, error) {
+	return &TokenVerifier{
+		parser:      parser,
+		keyFunc:     keyFunc,
+		validations: validations,
 	}, nil
 }
-
-func (vf *verifier) Verify(ctx context.Context, rawToken string) (*Claims, error) {
-	token, err := vf.oidcVerifier.Verify(ctx, rawToken)
+func (vf *TokenVerifier) Verify(ctx context.Context, rawToken string) (*jwt.Token, error) {
+	token, err := vf.parser.Parse(rawToken, vf.keyFunc.KeyfuncCtx(ctx))
 	if err != nil {
-		return nil, fmt.Errorf("failed to verify token: %w", err)
+		return token, err
 	}
-	claims := Claims{}
-	err = token.Claims(&claims)
-	if err != nil {
-		return nil, fmt.Errorf("required claims not present: %w", err)
+	for _, validation := range vf.validations {
+		if validationErr := validation(token); validationErr != nil {
+			return token, validationErr
+		}
 	}
-	return &claims, nil
-}
-
-func getIssuer(rawToken string) (string, error) {
-	claims := jwt.RegisteredClaims{}
-	_, _, err := jwt.NewParser().ParseUnverified(rawToken, &claims) // NOSONAR
-	if err != nil {
-		return "", fmt.Errorf("invalid jwt: %w", err)
-	}
-	if claims.Issuer == "" {
-		return "", fmt.Errorf("jwt token does not have issuer value: %w", err)
-	}
-	return claims.Issuer, nil
-}
-
-func decideRetry(r *http.Response, err error) bool {
-	_, isUrlErr := err.(*url.Error)
-	switch {
-	case isUrlErr:
-		return false
-	case err != nil:
-		return true
-	case isStatus5xx(r.StatusCode):
-		return true
-	default:
-		return false
-	}
-}
-
-func isStatus5xx(code int) bool {
-	statusGroup := code / 100
-	if statusGroup == 5 {
-		return true
-	}
-	return false
+	return token, nil
 }
