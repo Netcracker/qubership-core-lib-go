@@ -16,11 +16,11 @@ import (
 	. "github.com/MicahParks/jwkset"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/netcracker/qubership-core-lib-go/v3/security/oidc"
-	test2 "github.com/netcracker/qubership-core-lib-go/v3/security/test"
+	qubetest "github.com/netcracker/qubership-core-lib-go/v3/security/test"
 	qubetoken "github.com/netcracker/qubership-core-lib-go/v3/security/token"
 	"github.com/netcracker/qubership-core-lib-go/v3/security/tokensource"
 	"github.com/netcracker/qubership-core-lib-go/v3/serviceloader"
-	"github.com/netcracker/qubership-core-lib-go/v3/test"
+	mockServer "github.com/netcracker/qubership-core-lib-go/v3/test"
 	"github.com/stretchr/testify/assert"
 	"golang.org/x/time/rate"
 )
@@ -30,8 +30,8 @@ const (
 )
 
 var (
-	sub                 = qubetoken.GetKubernetesSubject(test2.Namespace, test2.ServiceAccount)
-	mockTokenSource     = test2.MockTokenSource{}
+	sub                 = qubetoken.GetKubernetesSubject(qubetest.Namespace, qubetest.ServiceAccount)
+	mockTokenSource     = qubetest.MockTokenSource{}
 	serviceAccountToken string
 )
 
@@ -51,10 +51,10 @@ var scenarios = []struct {
 				IssuedAt:  jwt.NewNumericDate(time.Now()),
 			},
 			KubernetesIo: qubetoken.KubernetesIoClaim{
-				Namespace: test2.Namespace,
+				Namespace: qubetest.Namespace,
 				ServiceAccount: qubetoken.ServiceAccountClaim{
-					Name: test2.ServiceAccount,
-					Uid:  test2.Uuid,
+					Name: qubetest.ServiceAccount,
+					Uid:  qubetest.Uuid,
 				},
 			},
 		},
@@ -71,10 +71,10 @@ var scenarios = []struct {
 				IssuedAt:  jwt.NewNumericDate(time.Now()),
 			},
 			KubernetesIo: qubetoken.KubernetesIoClaim{
-				Namespace: test2.Namespace,
+				Namespace: qubetest.Namespace,
 				ServiceAccount: qubetoken.ServiceAccountClaim{
-					Name: test2.ServiceAccount,
-					Uid:  test2.Uuid,
+					Name: qubetest.ServiceAccount,
+					Uid:  qubetest.Uuid,
 				},
 			},
 		},
@@ -91,10 +91,10 @@ var scenarios = []struct {
 				IssuedAt:  jwt.NewNumericDate(time.Now()),
 			},
 			KubernetesIo: qubetoken.KubernetesIoClaim{
-				Namespace: test2.Namespace,
+				Namespace: qubetest.Namespace,
 				ServiceAccount: qubetoken.ServiceAccountClaim{
-					Name: test2.ServiceAccount,
-					Uid:  test2.Uuid,
+					Name: qubetest.ServiceAccount,
+					Uid:  qubetest.Uuid,
 				},
 			},
 		},
@@ -112,10 +112,10 @@ var scenarios = []struct {
 				IssuedAt:  jwt.NewNumericDate(time.Now()),
 			},
 			KubernetesIo: qubetoken.KubernetesIoClaim{
-				Namespace: test2.Namespace,
+				Namespace: qubetest.Namespace,
 				ServiceAccount: qubetoken.ServiceAccountClaim{
-					Name: test2.ServiceAccount,
-					Uid:  test2.Uuid,
+					Name: qubetest.ServiceAccount,
+					Uid:  qubetest.Uuid,
 				},
 			},
 		},
@@ -131,10 +131,10 @@ var scenarios = []struct {
 				IssuedAt:  jwt.NewNumericDate(time.Now()),
 			},
 			KubernetesIo: qubetoken.KubernetesIoClaim{
-				Namespace: test2.Namespace,
+				Namespace: qubetest.Namespace,
 				ServiceAccount: qubetoken.ServiceAccountClaim{
-					Name: test2.ServiceAccount,
-					Uid:  test2.Uuid,
+					Name: qubetest.ServiceAccount,
+					Uid:  qubetest.Uuid,
 				},
 			},
 		},
@@ -150,10 +150,10 @@ var scenarios = []struct {
 				NotBefore: jwt.NewNumericDate(time.Now()),
 			},
 			KubernetesIo: qubetoken.KubernetesIoClaim{
-				Namespace: test2.Namespace,
+				Namespace: qubetest.Namespace,
 				ServiceAccount: qubetoken.ServiceAccountClaim{
-					Name: test2.ServiceAccount,
-					Uid:  test2.Uuid,
+					Name: qubetest.ServiceAccount,
+					Uid:  qubetest.Uuid,
 				},
 			},
 		},
@@ -170,10 +170,10 @@ var scenarios = []struct {
 				IssuedAt:  jwt.NewNumericDate(time.Now().Add(1 * time.Minute)),
 			},
 			KubernetesIo: qubetoken.KubernetesIoClaim{
-				Namespace: test2.Namespace,
+				Namespace: qubetest.Namespace,
 				ServiceAccount: qubetoken.ServiceAccountClaim{
-					Name: test2.ServiceAccount,
-					Uid:  test2.Uuid,
+					Name: qubetest.ServiceAccount,
+					Uid:  qubetest.Uuid,
 				},
 			},
 		},
@@ -182,18 +182,19 @@ var scenarios = []struct {
 }
 
 func beforeAll() {
-	test.StartMockServer()
+	mockServer.StartMockServer()
+	qubetest.MustInitDefaultTestKeys()
 	serviceloader.Register(1, &mockTokenSource)
-	serviceAccountToken = createServiceAccountToken(test.GetMockServerUrl())
+	serviceAccountToken = createServiceAccountToken(mockServer.GetMockServerUrl())
 	mockTokenSource.ServiceAccountToken = serviceAccountToken
 
-	logger.Infof("server started %s", test.GetMockServerUrl())
+	logger.Infof("server started %s", mockServer.GetMockServerUrl())
 }
 func afterEach() {
-	test.ClearHandlers()
+	mockServer.ClearHandlers()
 }
 func afterAll() {
-	test.StopMockServer()
+	mockServer.StopMockServer()
 }
 func TestMain(m *testing.M) {
 	beforeAll()
@@ -205,8 +206,8 @@ func TestSignatureValidation(t *testing.T) {
 	ctx, cancelCtx := context.WithCancel(t.Context())
 	defer func() { cancelCtx(); afterEach() }()
 
-	test2.AddDefaultKubernetesProviderHandler(serviceAccountToken, test.GetMockServerUrl())
-	test2.AddDefaultKubernetesJwksHandler(serviceAccountToken, test2.DefaultKeys)
+	qubetest.MustAddDefaultKubernetesProviderHandler(serviceAccountToken, mockServer.GetMockServerUrl())
+	qubetest.MustAddDefaultKubernetesJwksHandler(serviceAccountToken, qubetest.DefaultKeys)
 
 	maasTokenVerifier, err := NewKubernetesVerifierOverride(ctx, tokensource.AudienceMaaS, Override{
 		RefreshUnknownKID: rate.NewLimiter(rate.Every(1*time.Second), 1),
@@ -220,30 +221,30 @@ func TestSignatureValidation(t *testing.T) {
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(1 * time.Hour)),
 			NotBefore: jwt.NewNumericDate(time.Now()),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
-			Issuer:    test.GetMockServerUrl(),
+			Issuer:    mockServer.GetMockServerUrl(),
 		},
 		KubernetesIo: qubetoken.KubernetesIoClaim{
-			Namespace: test2.Namespace,
+			Namespace: qubetest.Namespace,
 			ServiceAccount: qubetoken.ServiceAccountClaim{
-				Name: test2.ServiceAccount,
-				Uid:  test2.Uuid,
+				Name: qubetest.ServiceAccount,
+				Uid:  qubetest.Uuid,
 			},
 		},
 	}
 
 	key, _ := rsa.GenerateKey(rand.Reader, 2048)
-	rawToken := test2.CreateSignedToken(customKid, key, claims)
+	rawToken := qubetest.MustCreateSignedToken(customKid, key, claims)
 
 	token, vErr := maasTokenVerifier.Verify(ctx, rawToken)
 	assert.NotNil(t, token)
 	assert.ErrorContains(t, vErr, "token is unverifiable: error while executing keyfunc: key not found \"kid-2\"\nfailed keyfunc: could not read JWK from storage")
 
-	test.ClearHandlers()
+	mockServer.ClearHandlers()
 
 	customKeys := make(map[string]*rsa.PrivateKey)
-	customKeys[test2.DefaultKid] = test2.DefaultKey
+	customKeys[qubetest.DefaultKid] = qubetest.DefaultKey
 	customKeys[customKid] = key
-	test2.AddDefaultKubernetesJwksHandler(serviceAccountToken, customKeys)
+	qubetest.MustAddDefaultKubernetesJwksHandler(serviceAccountToken, customKeys)
 
 	actualToken, vErr := maasTokenVerifier.Verify(ctx, rawToken)
 	assert.Nil(t, vErr)
@@ -258,17 +259,17 @@ func TestBasicTokenValidations(t *testing.T) {
 	ctx, cancelCtx := context.WithCancel(t.Context())
 	defer func() { cancelCtx(); afterEach() }()
 
-	test2.AddDefaultKubernetesProviderHandler(serviceAccountToken, test.GetMockServerUrl())
-	test2.AddDefaultKubernetesJwksHandler(serviceAccountToken, test2.DefaultKeys)
+	qubetest.MustAddDefaultKubernetesProviderHandler(serviceAccountToken, mockServer.GetMockServerUrl())
+	qubetest.MustAddDefaultKubernetesJwksHandler(serviceAccountToken, qubetest.DefaultKeys)
 
 	maasTokenVerifier, err := NewKubernetesVerifier(ctx, tokensource.AudienceMaaS)
 	assert.NoError(t, err)
 
 	for _, scenario := range scenarios {
 		if scenario.claims.Issuer == "" {
-			scenario.claims.Issuer = test.GetMockServerUrl()
+			scenario.claims.Issuer = mockServer.GetMockServerUrl()
 		}
-		rawToken := test2.CreateDefaultSignedToken(scenario.claims)
+		rawToken := qubetest.MustCreateDefaultSignedToken(scenario.claims)
 		actualToken, vErr := maasTokenVerifier.Verify(ctx, rawToken)
 		if scenario.errorMessage == "" {
 			assert.NoError(t, vErr, "test %q: expected no error, got: %v", scenario.name, vErr)
@@ -289,8 +290,8 @@ func TestCustomValidation(t *testing.T) {
 	ctx, cancelCtx := context.WithCancel(t.Context())
 	defer func() { cancelCtx(); afterEach() }()
 
-	test2.AddDefaultKubernetesProviderHandler(serviceAccountToken, test.GetMockServerUrl())
-	test2.AddDefaultKubernetesJwksHandler(serviceAccountToken, test2.DefaultKeys)
+	qubetest.MustAddDefaultKubernetesProviderHandler(serviceAccountToken, mockServer.GetMockServerUrl())
+	qubetest.MustAddDefaultKubernetesJwksHandler(serviceAccountToken, qubetest.DefaultKeys)
 
 	maasTokenVerifier, err := NewKubernetesVerifier(ctx, tokensource.AudienceMaaS, subjectValidation)
 	assert.NoError(t, err)
@@ -302,18 +303,18 @@ func TestCustomValidation(t *testing.T) {
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(1 * time.Hour)),
 			NotBefore: jwt.NewNumericDate(time.Now()),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
-			Issuer:    test.GetMockServerUrl(),
+			Issuer:    mockServer.GetMockServerUrl(),
 		},
 		KubernetesIo: qubetoken.KubernetesIoClaim{
-			Namespace: test2.Namespace,
+			Namespace: qubetest.Namespace,
 			ServiceAccount: qubetoken.ServiceAccountClaim{
-				Name: test2.ServiceAccount,
-				Uid:  test2.Uuid,
+				Name: qubetest.ServiceAccount,
+				Uid:  qubetest.Uuid,
 			},
 		},
 	}
 
-	rawToken := test2.CreateDefaultSignedToken(claims)
+	rawToken := qubetest.MustCreateDefaultSignedToken(claims)
 	token, verificationErr := maasTokenVerifier.Verify(ctx, rawToken)
 	assert.NotNil(t, token)
 	assert.ErrorContains(t, verificationErr, "subject claim is wrong")
@@ -358,7 +359,7 @@ func TestOidcRequestUnauthorizedError(t *testing.T) {
 	ctx, cancelCtx := context.WithCancel(t.Context())
 	defer func() { cancelCtx(); afterEach() }()
 
-	test2.AddDefaultKubernetesProviderHandler("token", test.GetMockServerUrl())
+	qubetest.MustAddDefaultKubernetesProviderHandler("token", mockServer.GetMockServerUrl())
 
 	_, err := NewKubernetesVerifier(ctx, tokensource.AudienceMaaS)
 	assert.ErrorContains(t, err, "unexpected response http status code 401 Unauthorized")
@@ -367,7 +368,7 @@ func TestOidcResponseInvalidPlainText(t *testing.T) {
 	ctx, cancelCtx := context.WithCancel(t.Context())
 	defer func() { cancelCtx(); afterEach() }()
 
-	test2.AddKubernetesProviderHandler(serviceAccountToken, http.StatusOK, []byte("some body"))
+	qubetest.AddKubernetesProviderHandler(serviceAccountToken, http.StatusOK, []byte("some body"))
 
 	_, err := NewKubernetesVerifier(ctx, tokensource.AudienceMaaS)
 	assert.ErrorContains(t, err, "oidc: failed to decode provider discovery object: expected content-type = application/json, got \"text/plain; charset=utf-8\": invalid character 's' looking for beginning of value")
@@ -376,7 +377,7 @@ func TestOidcResponseInvalidJson(t *testing.T) {
 	ctx, cancelCtx := context.WithCancel(t.Context())
 	defer func() { cancelCtx(); afterEach() }()
 
-	test2.AddKubernetesProviderHandler(serviceAccountToken, http.StatusOK, []byte("{}"))
+	qubetest.AddKubernetesProviderHandler(serviceAccountToken, http.StatusOK, []byte("{}"))
 
 	_, err := NewKubernetesVerifier(ctx, tokensource.AudienceMaaS)
 	assert.ErrorContains(t, err, "failed to create HTTP client storage for \"\": failed to parse given URL \"\": parse \"\": empty url\nfailed to create new JWK Set client")
@@ -385,7 +386,7 @@ func TestOidcResponseInvalidNil(t *testing.T) {
 	ctx, cancelCtx := context.WithCancel(t.Context())
 	defer func() { cancelCtx(); afterEach() }()
 
-	test2.AddKubernetesProviderHandler(serviceAccountToken, http.StatusOK, nil)
+	qubetest.AddKubernetesProviderHandler(serviceAccountToken, http.StatusOK, nil)
 
 	_, err := NewKubernetesVerifier(ctx, tokensource.AudienceMaaS)
 	assert.ErrorContains(t, err, "oidc: failed to decode provider discovery object: expected content-type = application/json, got \"\": unexpected end of JSON input")
@@ -396,7 +397,7 @@ func TestOidcResponseInternalServerErrorFiveAttempts(t *testing.T) {
 	defer func() { cancelCtx(); afterEach() }()
 
 	counter := 0
-	test.AddHandler(test.Contains(oidc.ProviderSubPath),
+	mockServer.AddHandler(mockServer.Contains(oidc.ProviderSubPath),
 		func(responseWriter http.ResponseWriter, request *http.Request) {
 			responseWriter.WriteHeader(http.StatusInternalServerError)
 			logger.Infof("attempt %v: request to %s, response %v", counter, oidc.ProviderSubPath, http.StatusInternalServerError)
@@ -411,16 +412,16 @@ func TestOidcResponseInternalServerErrorFourAttempts(t *testing.T) {
 	defer func() { cancelCtx(); afterEach() }()
 
 	counter := 0
-	test2.AddDefaultKubernetesJwksHandler(serviceAccountToken, test2.DefaultKeys)
-	test.AddHandler(test.Contains(oidc.ProviderSubPath),
+	qubetest.MustAddDefaultKubernetesJwksHandler(serviceAccountToken, qubetest.DefaultKeys)
+	mockServer.AddHandler(mockServer.Contains(oidc.ProviderSubPath),
 		func(responseWriter http.ResponseWriter, request *http.Request) {
 			if counter < 4 {
 				responseWriter.WriteHeader(http.StatusInternalServerError)
 				logger.Infof("attempt %v: request to %s, response %v", counter, oidc.ProviderSubPath, http.StatusInternalServerError)
 			} else {
 				response := oidc.ProviderResponse{
-					Issuer:  test.GetMockServerUrl(),
-					JwksUri: test.GetMockServerUrl() + test2.JwksSubPath,
+					Issuer:  mockServer.GetMockServerUrl(),
+					JwksUri: mockServer.GetMockServerUrl() + qubetest.JwksSubPath,
 				}
 				responseWriter.WriteHeader(http.StatusOK)
 				responseBody, _ := json.Marshal(response)
@@ -437,13 +438,13 @@ func TestJwksRequestUnauthorizedError(t *testing.T) {
 	ctx, cancelCtx := context.WithCancel(t.Context())
 	defer func() { cancelCtx(); afterEach() }()
 
-	test2.AddDefaultKubernetesProviderHandler(serviceAccountToken, test.GetMockServerUrl())
-	test2.AddDefaultKubernetesJwksHandler("token", test2.DefaultKeys)
+	qubetest.MustAddDefaultKubernetesProviderHandler(serviceAccountToken, mockServer.GetMockServerUrl())
+	qubetest.MustAddDefaultKubernetesJwksHandler("token", qubetest.DefaultKeys)
 
 	maasTokenVerifier, err := NewKubernetesVerifier(ctx, tokensource.AudienceMaaS)
 	assert.NoError(t, err)
 
-	rawToken := test2.CreateDefaultSignedToken(scenarios[0].claims)
+	rawToken := qubetest.MustCreateDefaultSignedToken(scenarios[0].claims)
 	token, vErr := maasTokenVerifier.Verify(ctx, rawToken)
 	assert.NotNil(t, token)
 	assert.ErrorContains(t, vErr, "token is unverifiable: error while executing keyfunc: key not found \"kid-1\"\nfailed keyfunc: could not read JWK from storage")
@@ -452,13 +453,13 @@ func TestJwksRequestInvalidPlainText(t *testing.T) {
 	ctx, cancelCtx := context.WithCancel(t.Context())
 	defer func() { cancelCtx(); afterEach() }()
 
-	test2.AddDefaultKubernetesProviderHandler(serviceAccountToken, test.GetMockServerUrl())
-	test2.AddKubernetesJwksHandler(serviceAccountToken, http.StatusOK, []byte("some body"))
+	qubetest.MustAddDefaultKubernetesProviderHandler(serviceAccountToken, mockServer.GetMockServerUrl())
+	qubetest.AddKubernetesJwksHandler(serviceAccountToken, http.StatusOK, []byte("some body"))
 
 	maasTokenVerifier, err := NewKubernetesVerifier(ctx, tokensource.AudienceMaaS)
 	assert.NoError(t, err)
 
-	rawToken := test2.CreateDefaultSignedToken(scenarios[0].claims)
+	rawToken := qubetest.MustCreateDefaultSignedToken(scenarios[0].claims)
 	token, vErr := maasTokenVerifier.Verify(ctx, rawToken)
 	assert.NotNil(t, token)
 	assert.ErrorContains(t, vErr, "token is unverifiable: error while executing keyfunc: key not found \"kid-1\"\nfailed keyfunc: could not read JWK from storage")
@@ -467,13 +468,13 @@ func TestJwksResponseInvalidJson(t *testing.T) {
 	ctx, cancelCtx := context.WithCancel(t.Context())
 	defer func() { cancelCtx(); afterEach() }()
 
-	test2.AddDefaultKubernetesProviderHandler(serviceAccountToken, test.GetMockServerUrl())
-	test2.AddKubernetesJwksHandler(serviceAccountToken, http.StatusOK, []byte("{}"))
+	qubetest.MustAddDefaultKubernetesProviderHandler(serviceAccountToken, mockServer.GetMockServerUrl())
+	qubetest.AddKubernetesJwksHandler(serviceAccountToken, http.StatusOK, []byte("{}"))
 
 	maasTokenVerifier, err := NewKubernetesVerifier(ctx, tokensource.AudienceMaaS)
 	assert.NoError(t, err)
 
-	rawToken := test2.CreateDefaultSignedToken(scenarios[0].claims)
+	rawToken := qubetest.MustCreateDefaultSignedToken(scenarios[0].claims)
 	token, vErr := maasTokenVerifier.Verify(ctx, rawToken)
 	assert.NotNil(t, token)
 	assert.ErrorContains(t, vErr, "token is unverifiable: error while executing keyfunc: key not found \"kid-1\"\nfailed keyfunc: could not read JWK from storage")
@@ -482,13 +483,13 @@ func TestJwksResponseInvalidNil(t *testing.T) {
 	ctx, cancelCtx := context.WithCancel(t.Context())
 	defer func() { cancelCtx(); afterEach() }()
 
-	test2.AddDefaultKubernetesProviderHandler(serviceAccountToken, test.GetMockServerUrl())
-	test2.AddKubernetesJwksHandler(serviceAccountToken, http.StatusOK, nil)
+	qubetest.MustAddDefaultKubernetesProviderHandler(serviceAccountToken, mockServer.GetMockServerUrl())
+	qubetest.AddKubernetesJwksHandler(serviceAccountToken, http.StatusOK, nil)
 
 	maasTokenVerifier, err := NewKubernetesVerifier(ctx, tokensource.AudienceMaaS)
 	assert.NoError(t, err)
 
-	rawToken := test2.CreateDefaultSignedToken(scenarios[0].claims)
+	rawToken := qubetest.MustCreateDefaultSignedToken(scenarios[0].claims)
 	token, vErr := maasTokenVerifier.Verify(ctx, rawToken)
 	assert.NotNil(t, token)
 	assert.ErrorContains(t, vErr, "token is unverifiable: error while executing keyfunc: key not found \"kid-1\"\nfailed keyfunc: could not read JWK from storage")
@@ -497,19 +498,19 @@ func TestJwksResponseInternalServerErrorFiveAttempts(t *testing.T) {
 	ctx, cancelCtx := context.WithCancel(t.Context())
 	defer func() { cancelCtx(); afterEach() }()
 
-	test2.AddDefaultKubernetesProviderHandler(serviceAccountToken, test.GetMockServerUrl())
+	qubetest.MustAddDefaultKubernetesProviderHandler(serviceAccountToken, mockServer.GetMockServerUrl())
 	counter := 0
-	test.AddHandler(test.Contains(test2.JwksSubPath),
+	mockServer.AddHandler(mockServer.Contains(qubetest.JwksSubPath),
 		func(responseWriter http.ResponseWriter, request *http.Request) {
 			responseWriter.WriteHeader(http.StatusInternalServerError)
-			logger.Infof("attempt %v: request to %s, response %v", counter, test2.JwksSubPath, http.StatusInternalServerError)
+			logger.Infof("attempt %v: request to %s, response %v", counter, qubetest.JwksSubPath, http.StatusInternalServerError)
 			counter++
 		})
 
 	maasTokenVerifier, err := NewKubernetesVerifier(ctx, tokensource.AudienceMaaS)
 	assert.NoError(t, err)
 
-	rawToken := test2.CreateDefaultSignedToken(scenarios[0].claims)
+	rawToken := qubetest.MustCreateDefaultSignedToken(scenarios[0].claims)
 	token, vErr := maasTokenVerifier.Verify(ctx, rawToken)
 	assert.NotNil(t, token)
 	assert.ErrorContains(t, vErr, "token is unverifiable: error while executing keyfunc: key not found \"kid-1\"\nfailed keyfunc: could not read JWK from storage")
@@ -518,23 +519,23 @@ func TestJwksResponseInternalServerErrorFourAttempts(t *testing.T) {
 	ctx, cancelCtx := context.WithCancel(t.Context())
 	defer func() { cancelCtx(); afterEach() }()
 
-	test2.AddDefaultKubernetesProviderHandler(serviceAccountToken, test.GetMockServerUrl())
+	qubetest.MustAddDefaultKubernetesProviderHandler(serviceAccountToken, mockServer.GetMockServerUrl())
 	counter := 0
-	test.AddHandler(test.Contains(test2.JwksSubPath),
+	mockServer.AddHandler(mockServer.Contains(qubetest.JwksSubPath),
 		func(responseWriter http.ResponseWriter, request *http.Request) {
 			if counter < 4 {
 				responseWriter.WriteHeader(http.StatusInternalServerError)
-				logger.Infof("attempt %v: request to %s, response %v", counter, test2.JwksSubPath, http.StatusInternalServerError)
+				logger.Infof("attempt %v: request to %s, response %v", counter, qubetest.JwksSubPath, http.StatusInternalServerError)
 			} else {
 				var keySet []JWKMarshal
-				for kid, privateKey := range test2.DefaultKeys {
+				for kid, privateKey := range qubetest.DefaultKeys {
 					keySet = append(keySet, JWKMarshal{
 						KTY: "RSA",
 						KID: kid,
 						ALG: ALG(jwt.SigningMethodRS256.Alg()),
 						USE: "sig",
-						N:   test2.ToHexBase64(privateKey.N),
-						E:   test2.ToHexBase64(big.NewInt(int64(privateKey.E))),
+						N:   qubetest.ToHexBase64(privateKey.N),
+						E:   qubetest.ToHexBase64(big.NewInt(int64(privateKey.E))),
 					})
 				}
 				jwks := &JWKSMarshal{
@@ -542,7 +543,7 @@ func TestJwksResponseInternalServerErrorFourAttempts(t *testing.T) {
 				}
 				responseBody, _ := json.Marshal(jwks)
 				_, _ = responseWriter.Write(responseBody)
-				logger.Infof("attempt %v: request to %s, response %v:%s", counter, test2.JwksSubPath, http.StatusOK, string(responseBody))
+				logger.Infof("attempt %v: request to %s, response %v:%s", counter, qubetest.JwksSubPath, http.StatusOK, string(responseBody))
 			}
 			counter++
 		})
@@ -557,18 +558,18 @@ func TestJwksResponseInternalServerErrorFourAttempts(t *testing.T) {
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(1 * time.Hour)),
 			NotBefore: jwt.NewNumericDate(time.Now()),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
-			Issuer:    test.GetMockServerUrl(),
+			Issuer:    mockServer.GetMockServerUrl(),
 		},
 		KubernetesIo: qubetoken.KubernetesIoClaim{
-			Namespace: test2.Namespace,
+			Namespace: qubetest.Namespace,
 			ServiceAccount: qubetoken.ServiceAccountClaim{
-				Name: test2.ServiceAccount,
-				Uid:  test2.Uuid,
+				Name: qubetest.ServiceAccount,
+				Uid:  qubetest.Uuid,
 			},
 		},
 	}
 
-	rawToken := test2.CreateDefaultSignedToken(claims)
+	rawToken := qubetest.MustCreateDefaultSignedToken(claims)
 	actualToken, vErr := maasTokenVerifier.Verify(ctx, rawToken)
 	assert.Nil(t, vErr)
 	actualKubernetesIoClaim, getClaimErr := qubetoken.GetKubernetesIo(actualToken)
@@ -589,20 +590,20 @@ func subjectValidation(jwt *jwt.Token) error {
 	}
 }
 func createServiceAccountToken(issuer string) string {
-	return test2.CreateDefaultSignedToken(qubetoken.KubernetesClaims{
+	return qubetest.MustCreateDefaultSignedToken(qubetoken.KubernetesClaims{
 		RegisteredClaims: jwt.RegisteredClaims{
 			Issuer:    issuer,
-			Subject:   qubetoken.GetKubernetesSubject(test2.Namespace, test2.ServiceAccount),
-			Audience:  jwt.ClaimStrings{test2.KubernetesAudience},
+			Subject:   qubetoken.GetKubernetesSubject(qubetest.Namespace, qubetest.ServiceAccount),
+			Audience:  jwt.ClaimStrings{qubetest.KubernetesAudience},
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(1 * time.Hour)),
 			NotBefore: jwt.NewNumericDate(time.Now()),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
 		},
 		KubernetesIo: qubetoken.KubernetesIoClaim{
-			Namespace: test2.Namespace,
+			Namespace: qubetest.Namespace,
 			ServiceAccount: qubetoken.ServiceAccountClaim{
-				Name: test2.ServiceAccount,
-				Uid:  test2.Uuid,
+				Name: qubetest.ServiceAccount,
+				Uid:  qubetest.Uuid,
 			},
 		},
 	})

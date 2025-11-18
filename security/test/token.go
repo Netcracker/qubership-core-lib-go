@@ -33,7 +33,7 @@ var (
 	DefaultKeys map[string]*rsa.PrivateKey
 )
 
-func init() {
+func MustInitDefaultTestKeys() {
 	var err error
 	DefaultKey, err = rsa.GenerateKey(rand.Reader, 2048)
 	if err != nil {
@@ -42,7 +42,7 @@ func init() {
 	DefaultKeys = make(map[string]*rsa.PrivateKey)
 	DefaultKeys[DefaultKid] = DefaultKey
 }
-func CreateSignedToken(kid string, key crypto.PrivateKey, claims jwt.Claims) string {
+func MustCreateSignedToken(kid string, key crypto.PrivateKey, claims jwt.Claims) string {
 	unsignedToken := jwt.NewWithClaims(jwt.SigningMethodRS256, claims)
 	unsignedToken.Header["kid"] = kid
 	signedToken, err := unsignedToken.SignedString(key)
@@ -51,10 +51,10 @@ func CreateSignedToken(kid string, key crypto.PrivateKey, claims jwt.Claims) str
 	}
 	return signedToken
 }
-func CreateDefaultSignedToken(claims jwt.Claims) string {
-	return CreateSignedToken(DefaultKid, DefaultKey, claims)
+func MustCreateDefaultSignedToken(claims jwt.Claims) string {
+	return MustCreateSignedToken(DefaultKid, DefaultKey, claims)
 }
-func CreateUnsignedToken(payload []byte) *jwt.Token {
+func MustCreateUnsignedToken(payload []byte) *jwt.Token {
 	var claims jwt.MapClaims
 	err := json.Unmarshal(payload, &claims)
 	if err != nil {
@@ -67,7 +67,7 @@ func CreateUnsignedToken(payload []byte) *jwt.Token {
 func ToHexBase64(a *big.Int) string {
 	return base64.RawURLEncoding.EncodeToString(a.Bytes())
 }
-func AddDefaultKubernetesProviderHandler(serviceAccountToken, issuer string) {
+func MustAddDefaultKubernetesProviderHandler(serviceAccountToken, issuer string) {
 	response := oidc.ProviderResponse{
 		Issuer:  issuer,
 		JwksUri: issuer + JwksSubPath,
@@ -81,7 +81,7 @@ func AddDefaultKubernetesProviderHandler(serviceAccountToken, issuer string) {
 func AddKubernetesProviderHandler(serviceAccountToken string, statusCode int, responseBody []byte) {
 	AddKubernetesHandler(oidc.ProviderSubPath, serviceAccountToken, statusCode, responseBody)
 }
-func AddDefaultKubernetesJwksHandler(serviceAccountToken string, privateKeys map[string]*rsa.PrivateKey) {
+func MustAddDefaultKubernetesJwksHandler(serviceAccountToken string, privateKeys map[string]*rsa.PrivateKey) {
 	var keySet []jwkset.JWKMarshal
 	for kid, privateKey := range privateKeys {
 		keySet = append(keySet, jwkset.JWKMarshal{
