@@ -207,7 +207,7 @@ func TestSignatureValidation(t *testing.T) {
 	defer func() { cancelCtx(); afterEach() }()
 
 	qubetest.MustAddDefaultKubernetesProviderHandler(serviceAccountToken, mockServer.GetMockServerUrl())
-	qubetest.MustAddDefaultKubernetesJwksHandler(serviceAccountToken, qubetest.DefaultKeys)
+	qubetest.MustAddDefaultKubernetesJwksHandler(serviceAccountToken, qubetest.DefaultPublicKeys)
 
 	maasTokenVerifier, err := NewKubernetesVerifierOverride(ctx, tokensource.AudienceMaaS, Override{
 		RefreshUnknownKID: rate.NewLimiter(rate.Every(1*time.Second), 1),
@@ -241,9 +241,9 @@ func TestSignatureValidation(t *testing.T) {
 
 	mockServer.ClearHandlers()
 
-	customKeys := make(map[string]*rsa.PrivateKey)
-	customKeys[qubetest.DefaultKid] = qubetest.DefaultKey
-	customKeys[customKid] = key
+	customKeys := make(map[string]rsa.PublicKey)
+	customKeys[qubetest.DefaultKid] = qubetest.DefaultPrivateKey.PublicKey
+	customKeys[customKid] = key.PublicKey
 	qubetest.MustAddDefaultKubernetesJwksHandler(serviceAccountToken, customKeys)
 
 	actualToken, vErr := maasTokenVerifier.Verify(ctx, rawToken)
@@ -260,7 +260,7 @@ func TestBasicTokenValidations(t *testing.T) {
 	defer func() { cancelCtx(); afterEach() }()
 
 	qubetest.MustAddDefaultKubernetesProviderHandler(serviceAccountToken, mockServer.GetMockServerUrl())
-	qubetest.MustAddDefaultKubernetesJwksHandler(serviceAccountToken, qubetest.DefaultKeys)
+	qubetest.MustAddDefaultKubernetesJwksHandler(serviceAccountToken, qubetest.DefaultPublicKeys)
 
 	maasTokenVerifier, err := NewKubernetesVerifier(ctx, tokensource.AudienceMaaS)
 	assert.NoError(t, err)
@@ -291,7 +291,7 @@ func TestCustomValidation(t *testing.T) {
 	defer func() { cancelCtx(); afterEach() }()
 
 	qubetest.MustAddDefaultKubernetesProviderHandler(serviceAccountToken, mockServer.GetMockServerUrl())
-	qubetest.MustAddDefaultKubernetesJwksHandler(serviceAccountToken, qubetest.DefaultKeys)
+	qubetest.MustAddDefaultKubernetesJwksHandler(serviceAccountToken, qubetest.DefaultPublicKeys)
 
 	maasTokenVerifier, err := NewKubernetesVerifier(ctx, tokensource.AudienceMaaS, subjectValidation)
 	assert.NoError(t, err)
@@ -412,7 +412,7 @@ func TestOidcResponseInternalServerErrorFourAttempts(t *testing.T) {
 	defer func() { cancelCtx(); afterEach() }()
 
 	counter := 0
-	qubetest.MustAddDefaultKubernetesJwksHandler(serviceAccountToken, qubetest.DefaultKeys)
+	qubetest.MustAddDefaultKubernetesJwksHandler(serviceAccountToken, qubetest.DefaultPublicKeys)
 	mockServer.AddHandler(mockServer.Contains(oidc.ProviderSubPath),
 		func(responseWriter http.ResponseWriter, request *http.Request) {
 			if counter < 4 {
@@ -439,7 +439,7 @@ func TestJwksRequestUnauthorizedError(t *testing.T) {
 	defer func() { cancelCtx(); afterEach() }()
 
 	qubetest.MustAddDefaultKubernetesProviderHandler(serviceAccountToken, mockServer.GetMockServerUrl())
-	qubetest.MustAddDefaultKubernetesJwksHandler("token", qubetest.DefaultKeys)
+	qubetest.MustAddDefaultKubernetesJwksHandler("token", qubetest.DefaultPublicKeys)
 
 	maasTokenVerifier, err := NewKubernetesVerifier(ctx, tokensource.AudienceMaaS)
 	assert.NoError(t, err)
@@ -528,14 +528,14 @@ func TestJwksResponseInternalServerErrorFourAttempts(t *testing.T) {
 				logger.Infof("attempt %v: request to %s, response %v", counter, qubetest.JwksSubPath, http.StatusInternalServerError)
 			} else {
 				var keySet []JWKMarshal
-				for kid, privateKey := range qubetest.DefaultKeys {
+				for kid, publicKey := range qubetest.DefaultPublicKeys {
 					keySet = append(keySet, JWKMarshal{
 						KTY: "RSA",
 						KID: kid,
 						ALG: ALG(jwt.SigningMethodRS256.Alg()),
 						USE: "sig",
-						N:   qubetest.ToHexBase64(privateKey.N),
-						E:   qubetest.ToHexBase64(big.NewInt(int64(privateKey.E))),
+						N:   qubetest.ToHexBase64(publicKey.N),
+						E:   qubetest.ToHexBase64(big.NewInt(int64(publicKey.E))),
 					})
 				}
 				jwks := &JWKSMarshal{

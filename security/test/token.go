@@ -28,19 +28,20 @@ const (
 )
 
 var (
-	logger      = logging.GetLogger("security-test")
-	DefaultKey  *rsa.PrivateKey
-	DefaultKeys map[string]*rsa.PrivateKey
+	logger            = logging.GetLogger("security-test")
+	DefaultPrivateKey *rsa.PrivateKey
+	DefaultPublicKeys map[string]rsa.PublicKey
 )
 
 func MustInitDefaultTestKeys() {
 	var err error
-	DefaultKey, err = rsa.GenerateKey(rand.Reader, 2048)
+	DefaultPrivateKey, err = rsa.GenerateKey(rand.Reader, 2048)
 	if err != nil {
 		panic(err)
 	}
-	DefaultKeys = make(map[string]*rsa.PrivateKey)
-	DefaultKeys[DefaultKid] = DefaultKey
+
+	DefaultPublicKeys = make(map[string]rsa.PublicKey)
+	DefaultPublicKeys[DefaultKid] = DefaultPrivateKey.PublicKey
 }
 func MustCreateSignedToken(kid string, key crypto.PrivateKey, claims jwt.Claims) string {
 	unsignedToken := jwt.NewWithClaims(jwt.SigningMethodRS256, claims)
@@ -52,7 +53,7 @@ func MustCreateSignedToken(kid string, key crypto.PrivateKey, claims jwt.Claims)
 	return signedToken
 }
 func MustCreateDefaultSignedToken(claims jwt.Claims) string {
-	return MustCreateSignedToken(DefaultKid, DefaultKey, claims)
+	return MustCreateSignedToken(DefaultKid, DefaultPrivateKey, claims)
 }
 func MustCreateUnsignedToken(payload []byte) *jwt.Token {
 	var claims jwt.MapClaims
@@ -81,16 +82,16 @@ func MustAddDefaultKubernetesProviderHandler(serviceAccountToken, issuer string)
 func AddKubernetesProviderHandler(serviceAccountToken string, statusCode int, responseBody []byte) {
 	AddKubernetesHandler(oidc.ProviderSubPath, serviceAccountToken, statusCode, responseBody)
 }
-func MustAddDefaultKubernetesJwksHandler(serviceAccountToken string, privateKeys map[string]*rsa.PrivateKey) {
+func MustAddDefaultKubernetesJwksHandler(serviceAccountToken string, publicKeys map[string]rsa.PublicKey) {
 	var keySet []jwkset.JWKMarshal
-	for kid, privateKey := range privateKeys {
+	for kid, publicKey := range publicKeys {
 		keySet = append(keySet, jwkset.JWKMarshal{
 			KTY: "RSA",
 			KID: kid,
 			ALG: jwkset.ALG(jwt.SigningMethodRS256.Alg()),
 			USE: "sig",
-			N:   ToHexBase64(privateKey.N),
-			E:   ToHexBase64(big.NewInt(int64(privateKey.E))),
+			N:   ToHexBase64(publicKey.N),
+			E:   ToHexBase64(big.NewInt(int64(publicKey.E))),
 		})
 	}
 	jwks := &jwkset.JWKSMarshal{
