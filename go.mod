@@ -18,7 +18,7 @@ require (
 	github.com/pkg/errors v0.9.1
 	github.com/stretchr/testify v1.11.1
 	github.com/viney-shih/go-lock v1.1.2
-	golang.org/x/time v0.9.0
+	golang.org/x/time v0.14.0
 )
 
 require (
