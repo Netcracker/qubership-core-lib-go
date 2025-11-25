@@ -21,4 +21,14 @@ func Test_GetProviderUrl(t *testing.T) {
 	url, err = GetProviderUrl("http://localhost:8080/")
 	assert.NoError(t, err)
 	assert.Equal(t, "http://localhost:8080/.well-known/openid-configuration", url)
+
+	//Azure issuers
+	url, err = GetProviderUrl("http://localhost:8080/any_uid/any_uid/")
+	assert.NoError(t, err)
+	assert.Equal(t, "http://localhost:8080/any_uid/any_uid/.well-known/openid-configuration", url)
+
+	//AWS issuers(symbol '/' is absent in the end)
+	url, err = GetProviderUrl("http://localhost:8080/any_uid/any_uid")
+	assert.NoError(t, err)
+	assert.Equal(t, "http://localhost:8080/any_uid/any_uid/.well-known/openid-configuration", url)
 }

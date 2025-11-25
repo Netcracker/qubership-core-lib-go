@@ -3,6 +3,7 @@ package oidc
 import (
 	"fmt"
 	"net/url"
+	"path"
 )
 
 // ProviderResponse represents the JSON object returned by the OpenID Provider Configuration endpoint.
@@ -24,10 +25,6 @@ const (
 	ProviderSubPath = "/.well-known/openid-configuration"
 )
 
-var (
-	providerUrl = &url.URL{Path: ProviderSubPath}
-)
-
 // GetProviderUrl returns the full OpenID Provider Configuration endpoint URL for a given issuer.
 // It ensures the issuer does not end with a trailing slash, and then appends
 // the standard well-known configuration subpath.
@@ -36,5 +33,6 @@ func GetProviderUrl(issuer string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("issuer url is invalid: %w", err)
 	}
-	return issuerUrl.ResolveReference(providerUrl).String(), nil
+	issuerUrl.Path = path.Join(issuerUrl.Path, ProviderSubPath)
+	return issuerUrl.String(), nil
 }
