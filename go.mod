@@ -5,7 +5,7 @@ go 1.25.4
 require (
 	github.com/MicahParks/jwkset v0.11.0
 	github.com/MicahParks/keyfunc/v3 v3.7.0
-	github.com/failsafe-go/failsafe-go v0.9.1
+	github.com/failsafe-go/failsafe-go v0.9.2
 	github.com/fsnotify/fsnotify v1.9.0
 	github.com/golang-jwt/jwt/v5 v5.3.0
 	github.com/knadh/koanf/maps v0.1.2
