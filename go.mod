@@ -1,11 +1,11 @@
 module github.com/netcracker/qubership-core-lib-go/v3
 
-go 1.25.4
+go 1.25.5
 
 require (
 	github.com/MicahParks/jwkset v0.11.0
 	github.com/MicahParks/keyfunc/v3 v3.7.0
-	github.com/failsafe-go/failsafe-go v0.9.2
+	github.com/failsafe-go/failsafe-go v0.9.3
 	github.com/fsnotify/fsnotify v1.9.0
 	github.com/golang-jwt/jwt/v5 v5.3.0
 	github.com/knadh/koanf/maps v0.1.2
@@ -22,9 +22,10 @@ require (
 )
 
 require (
-	github.com/bits-and-blooms/bitset v1.24.0 // indirect
+	github.com/bits-and-blooms/bitset v1.24.4 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/go-viper/mapstructure/v2 v2.4.0 // indirect
+	github.com/influxdata/tdigest v0.0.1 // indirect
 	github.com/mitchellh/copystructure v1.2.0 // indirect
 	github.com/mitchellh/reflectwalk v1.0.2 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
