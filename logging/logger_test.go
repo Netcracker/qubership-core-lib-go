@@ -174,9 +174,9 @@ func customLogFormat(r *Record) []byte {
 }
 
 func customLogMessage(r *Record, b *bytes.Buffer, color int, lvl string) (int, error) {
-	timeFormat := "2006-01-02"
+	TimeFormat := "2006-01-02"
 	return fmt.Fprintf(b, "[%s] \x1b[%dm[%s]\x1b[0m [packageName=%s] %s",
-		r.Time.Format(timeFormat),
+		r.Time.Format(TimeFormat),
 		color,
 		lvl,
 		"testPackageName",

@@ -10,7 +10,7 @@ import (
 )
 
 const (
-	timeFormat           = "2006-01-02T15:04:05.000"
+	TimeFormat           = "2006-01-02T15:04:05.000"
 	CallerPropertyName   = "caller"
 	valuePlaceholder     = "-"
 	RequestIdContextName = "X-Request-Id"   // see implementation in github.com/netcracker/qubership-core-lib-go/v3/context-propagation/xrequestid
@@ -57,16 +57,16 @@ func (format *defaultFormat) logFormat(r *Record, b *bytes.Buffer, color int, lv
 		return format.messageFormat(r, b, color, lvl)
 	}
 	return fmt.Fprintf(b, "[%s] [%s] [request_id=%s] [tenant_id=%s] [thread=-] [class=%s] %s",
-		r.Time.Format(timeFormat),
+		r.Time.Format(TimeFormat),
 		lvl,
-		getValueOrPlaceholder(r.Ctx, RequestIdContextName),
-		getValueOrPlaceholder(r.Ctx, TenantContextName),
+		GetValueOrPlaceholder(r.Ctx, RequestIdContextName),
+		GetValueOrPlaceholder(r.Ctx, TenantContextName),
 		ConstructCallerValueByRecord(r),
 		JoinStringsWithSpace(AssembleDefaultCustomLogFields(r.Ctx), r.Message),
 	)
 }
 
-func getValueOrPlaceholder(ctx context.Context, key string) string {
+func GetValueOrPlaceholder(ctx context.Context, key string) string {
 	if ctx != nil {
 		value := ctx.Value(key)
 		if value != nil {
@@ -89,7 +89,7 @@ func constructCallerValue(ctx context.Context, loggerName string) string {
 		result = loggerName
 	}
 
-	if callerVal := getValueOrPlaceholder(ctx, CallerPropertyName); callerVal != valuePlaceholder {
+	if callerVal := GetValueOrPlaceholder(ctx, CallerPropertyName); callerVal != valuePlaceholder {
 		result += "." + callerVal
 	}
 
@@ -115,7 +115,7 @@ func assembleCustomLogFields(customLogFields string, ctx context.Context) string
 	finalString := customLogFields
 	for _, field := range fields {
 		fieldName := strings.TrimRight(strings.TrimLeft(field, "%{"), "}")
-		fieldValue := getValueOrPlaceholder(ctx, fieldName)
+		fieldValue := GetValueOrPlaceholder(ctx, fieldName)
 		finalString = strings.ReplaceAll(finalString, field, fieldValue)
 	}
 	return finalString
