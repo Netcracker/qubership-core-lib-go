@@ -14,10 +14,10 @@ var errorLogger Logger
 var errorLog error
 
 func customErrorMessageFormat(r *Record, b *bytes.Buffer, color int, lvl string) (int, error) {
-	timeFormat := "2006-01-02"
+	TimeFormat := "2006-01-02"
 	errorLogger.Info("blocking log")
 	return fmt.Fprintf(b, "[%s] \x1b[%dm[%s]\x1b[0m [requestId=%s] [caller=%s] %s",
-		r.Time.Format(timeFormat),
+		r.Time.Format(TimeFormat),
 		color,
 		lvl,
 		"some-id",
