@@ -7,14 +7,14 @@ require (
 	github.com/MicahParks/keyfunc/v3 v3.7.0
 	github.com/failsafe-go/failsafe-go v0.9.5
 	github.com/fsnotify/fsnotify v1.9.0
-	github.com/golang-jwt/jwt/v5 v5.3.0
+	github.com/golang-jwt/jwt/v5 v5.3.1
 	github.com/knadh/koanf/maps v0.1.2
 	github.com/knadh/koanf/parsers/json v0.1.0
 	github.com/knadh/koanf/parsers/yaml v0.1.0
 	github.com/knadh/koanf/providers/env v1.1.0
 	github.com/knadh/koanf/providers/file v1.2.1
 	github.com/knadh/koanf/providers/rawbytes v0.1.0
-	github.com/knadh/koanf/v2 v2.3.0
+	github.com/knadh/koanf/v2 v2.3.2
 	github.com/pkg/errors v0.9.1
 	github.com/stretchr/testify v1.11.1
 	github.com/viney-shih/go-lock v1.1.2
