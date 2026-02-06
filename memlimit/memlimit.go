@@ -14,8 +14,8 @@ func init() {
 
 	logger := logging.GetLogger("memlimit")
 	if memlimit > 0 {
-		logger.Info("GOMEMLIMIT set to %d bytes (0.9 of cgroup's memory limit)", memlimit)
+		logger.Info("MEMORY LIMIT set to %d bytes (0.9 of cgroup's memory limit)", memlimit)
 	} else {
-		logger.Info("failed to set GOMEMLIMIT")
+		logger.Info("failed to set MEMORY LIMIT")
 	}
 }
