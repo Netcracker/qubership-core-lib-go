@@ -16,6 +16,6 @@
 |configloader|Allows to download properties from different property sources|[Readme](configloader/README.md)|
 |logging|Module for convenient logging|[Readme](logging/README.md)|
 |context-propagation|Allows to propagate contexts|[Readme](context-propagation/README.md)|
-|memlimit|Sets soft memory limit - 0.9 from cgroup limits at startup|[Readme](memlimit/README.md)|
+|memlimit|Sets soft memory limit - 0.9 from cgroup memory limit at startup|[Readme](memlimit/README.md)|
 |tokensource|Util for getting k8s tokens|[Readme](security/tokensource/README.md)|
 |tokenverifier|Util for verifying k8s projected volume tokens|[Readme](security/tokensource/README.md)|
