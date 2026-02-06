@@ -3,6 +3,7 @@ module github.com/netcracker/qubership-core-lib-go/v3
 go 1.25.7
 
 require (
+	github.com/KimMachineGun/automemlimit v0.7.5
 	github.com/MicahParks/jwkset v0.11.0
 	github.com/MicahParks/keyfunc/v3 v3.7.0
 	github.com/failsafe-go/failsafe-go v0.9.5
@@ -28,6 +29,7 @@ require (
 	github.com/influxdata/tdigest v0.0.1 // indirect
 	github.com/mitchellh/copystructure v1.2.0 // indirect
 	github.com/mitchellh/reflectwalk v1.0.2 // indirect
+	github.com/pbnjay/memory v0.0.0-20210728143218-7b4eea64cf58 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	golang.org/x/sync v0.15.0 // indirect
 	golang.org/x/sys v0.33.0 // indirect
