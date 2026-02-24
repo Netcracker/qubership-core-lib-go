@@ -33,7 +33,7 @@ const (
 var (
 	sub                     = qubetoken.GetKubernetesSubject(qubetest.Namespace, qubetest.ServiceAccount)
 	mockTokenSource         = qubetest.MockTokenSource{}
-	mockCloudProviderSource = qubetest.MockCloudProviderSource{CloudProvider: cloudprovidergetter.CloudProviderEKS}
+	mockCloudProviderGetter = qubetest.MockCloudProviderGetter{CloudProvider: cloudprovidergetter.CloudProviderEKS}
 	serviceAccountToken     string
 )
 
@@ -187,7 +187,7 @@ func beforeAll() {
 	mockServer.StartMockServer()
 	qubetest.MustInitDefaultTestKeys()
 	serviceloader.Register(1, &mockTokenSource)
-	serviceloader.Register(1, &mockCloudProviderSource)
+	serviceloader.Register(1, &mockCloudProviderGetter)
 	serviceAccountToken = createServiceAccountToken(mockServer.GetMockServerUrl())
 	mockTokenSource.ServiceAccountToken = serviceAccountToken
 

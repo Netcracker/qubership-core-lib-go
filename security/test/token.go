@@ -146,12 +146,12 @@ func (t MockTokenSource) GetServiceAccountToken(_ context.Context) (string, erro
 	return t.ServiceAccountToken, nil
 }
 
-type MockCloudProviderSource struct {
+type MockCloudProviderGetter struct {
 	CloudProvider cloudprovidergetter.CloudProvider
 	Error         error
 }
 
-func (s MockCloudProviderSource) GetCloudProvider(ctx context.Context) cloudprovidergetter.CloudProvider {
+func (s MockCloudProviderGetter) GetCloudProvider(ctx context.Context) cloudprovidergetter.CloudProvider {
 	if s.Error != nil {
 		return ""
 	}
