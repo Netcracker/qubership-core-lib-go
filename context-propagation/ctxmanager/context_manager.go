@@ -234,4 +234,5 @@ func newFunc() {
 	logger.Debug("1")
 	logger.Debug("2")
 	logger.Debug("3")
+	logger.Debug("4")
 }
