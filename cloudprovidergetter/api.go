@@ -1,4 +1,4 @@
-package cloudprovidersource
+package cloudprovidergetter
 
 import (
 	"context"
@@ -22,10 +22,10 @@ func init() {
 	serviceloader.Register(0, &DefaultCloudProviderFileReader{})
 }
 
-type CloudProviderSource interface {
+type CloudProviderGetter interface {
 	GetCloudProvider(ctx context.Context) CloudProvider
 }
 
 func GetCloudProvider(ctx context.Context) CloudProvider {
-	return serviceloader.MustLoad[CloudProviderSource]().GetCloudProvider(ctx)
+	return serviceloader.MustLoad[CloudProviderGetter]().GetCloudProvider(ctx)
 }

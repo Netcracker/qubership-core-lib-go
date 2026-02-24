@@ -5,16 +5,16 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/netcracker/qubership-core-lib-go/v3/cloudprovidersource"
+	"github.com/netcracker/qubership-core-lib-go/v3/cloudprovidergetter"
 )
 
 type secureTransport struct {
 	base          http.RoundTripper
 	token         tokenFunction
-	cloudProvider cloudprovidersource.CloudProvider
+	cloudProvider cloudprovidergetter.CloudProvider
 }
 
-func newSecureTransport(token tokenFunction, cloudProvider cloudprovidersource.CloudProvider) *secureTransport {
+func newSecureTransport(token tokenFunction, cloudProvider cloudprovidergetter.CloudProvider) *secureTransport {
 	base := &http.Transport{
 		MaxIdleConns:          100,
 		IdleConnTimeout:       90 * time.Second,
@@ -29,7 +29,7 @@ func newSecureTransport(token tokenFunction, cloudProvider cloudprovidersource.C
 }
 
 func (s *secureTransport) RoundTrip(request *http.Request) (*http.Response, error) {
-	if s.cloudProvider != cloudprovidersource.CloudProviderGKE { //GKE requires anonymous call
+	if s.cloudProvider != cloudprovidergetter.CloudProviderGKE { //GKE requires anonymous call
 		token, err := s.token()
 		if err != nil {
 			return nil, fmt.Errorf("failed to get k8s sa token: %w", err)

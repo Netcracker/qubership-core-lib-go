@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
-	"github.com/netcracker/qubership-core-lib-go/v3/cloudprovidersource"
+	"github.com/netcracker/qubership-core-lib-go/v3/cloudprovidergetter"
 	qubetoken "github.com/netcracker/qubership-core-lib-go/v3/security/token"
 	"github.com/netcracker/qubership-core-lib-go/v3/security/tokensource"
 	"golang.org/x/time/rate"
@@ -40,7 +40,7 @@ func newKubernetesVerifier(ctx context.Context, audience string, kubernetesApiTo
 	if err != nil {
 		return nil, err
 	}
-	httpClient := CreateHttpClient(newSecureTransport(kubernetesApiToken, cloudprovidersource.GetCloudProvider(ctx)))
+	httpClient := CreateHttpClient(newSecureTransport(kubernetesApiToken, cloudprovidergetter.GetCloudProvider(ctx)))
 	refreshInterval := defaultRefreshInterval
 	if override.RefreshInterval > 0 {
 		refreshInterval = override.RefreshInterval
