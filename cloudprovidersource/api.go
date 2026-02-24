@@ -16,7 +16,6 @@ const (
 	// CloudProviderAKS Azure Kubernetes Service
 	CloudProviderAKS    = "AKS"
 	CloudProviderOnPrem = "OnPrem"
-	CloudProviderUnknown = "Unknown"
 )
 
 func init() {

@@ -9,8 +9,12 @@ import (
 )
 
 const (
-	defaultCompositeStructurePath = "/etc/composite-structure"
-	compositeStructureFileName    = "data"
+	compositeStructureFileName = "data"
+)
+
+var (
+	// DefaultCompositeStructureDir is the default directory where composite structure config map is mounted
+	DefaultCompositeStructureDir = "/etc/composite-structure"
 )
 
 var cloudProviderByString = map[string]CloudProvider{
@@ -28,7 +32,7 @@ type Structure struct {
 }
 
 func (r DefaultCloudProviderFileReader) GetCloudProvider(_ context.Context) CloudProvider {
-	fileName := filepath.Join(defaultCompositeStructurePath, compositeStructureFileName)
+	fileName := filepath.Join(DefaultCompositeStructureDir, compositeStructureFileName)
 	bytes, err := os.ReadFile(fileName)
 	structure := &Structure{}
 	if err == nil {
@@ -37,12 +41,12 @@ func (r DefaultCloudProviderFileReader) GetCloudProvider(_ context.Context) Clou
 			return stringToCloudProvider(structure.CloudProvider)
 		}
 	}
-	return CloudProviderUnknown
+	return CloudProviderOnPrem
 }
 
 func stringToCloudProvider(str string) CloudProvider {
 	if cloudProvider, ok := cloudProviderByString[strings.ToLower(str)]; ok {
 		return cloudProvider
 	}
-	return CloudProviderUnknown
+	return CloudProviderOnPrem
 }

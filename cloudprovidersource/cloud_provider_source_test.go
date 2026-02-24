@@ -33,21 +33,21 @@ func TestStringToCloudProvider_Unknown(t *testing.T) {
 	testCases := []string{"", "unknown", "something", "eks ", " gke"}
 	for _, str := range testCases {
 		actual := stringToCloudProvider(str)
-		assert.Equal(t, CloudProviderUnknown, string(actual))
+		assert.Equal(t, CloudProviderOnPrem, string(actual))
 	}
 }
 
 func TestDefaultCloudProviderFileReader_GetCloudProvider_FileMissing(t *testing.T) {
 	withCompositeStructureFileState(t, nil, func() {
 		cloudProvider := GetCloudProvider(t.Context())
-		assert.Equal(t, CloudProviderUnknown, string(cloudProvider))
+		assert.Equal(t, CloudProviderOnPrem, string(cloudProvider))
 	})
 }
 
 func TestDefaultCloudProviderFileReader_GetCloudProvider_InvalidJSON(t *testing.T) {
 	withCompositeStructureFileState(t, []byte(`{"cloudProvider":`), func() {
 		cloudProvider := GetCloudProvider(t.Context())
-		assert.Equal(t, CloudProviderUnknown, string(cloudProvider))
+		assert.Equal(t, CloudProviderOnPrem, string(cloudProvider))
 	})
 }
 
@@ -61,15 +61,16 @@ func TestDefaultCloudProviderFileReader_GetCloudProvider_ValidJSONKnownProvider(
 func TestDefaultCloudProviderFileReader_GetCloudProvider_ValidJSONUnknownProvider(t *testing.T) {
 	withCompositeStructureFileState(t, []byte(`{"cloudProvider":"some-new-cloud"}`), func() {
 		cloudProvider := GetCloudProvider(t.Context())
-		assert.Equal(t, CloudProviderUnknown, string(cloudProvider))
+		assert.Equal(t, CloudProviderOnPrem, string(cloudProvider))
 	})
 }
 
 func withCompositeStructureFileState(t *testing.T, content []byte, test func()) {
 	t.Helper()
 
-	dir := defaultCompositeStructurePath
-	file := filepath.Join(defaultCompositeStructurePath, compositeStructureFileName)
+	dir := t.TempDir()
+	DefaultCompositeStructureDir = dir
+	file := filepath.Join(dir, compositeStructureFileName)
 
 	err := os.MkdirAll(dir, 0775)
 	assert.NoError(t, err)
