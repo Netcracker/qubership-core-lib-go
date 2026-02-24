@@ -229,3 +229,9 @@ func sortByInitLevel(providers []ContextProvider) []ContextProvider {
 	})
 	return providers
 }
+
+func newFunc() {
+	logger.Debug("1")
+	logger.Debug("2")
+	logger.Debug("3")
+}
