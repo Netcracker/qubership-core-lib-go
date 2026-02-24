@@ -15,6 +15,7 @@ import (
 
 	. "github.com/MicahParks/jwkset"
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/netcracker/qubership-core-lib-go/v3/cloudprovidersource"
 	"github.com/netcracker/qubership-core-lib-go/v3/security/oidc"
 	qubetest "github.com/netcracker/qubership-core-lib-go/v3/security/test"
 	qubetoken "github.com/netcracker/qubership-core-lib-go/v3/security/token"
@@ -30,9 +31,10 @@ const (
 )
 
 var (
-	sub                 = qubetoken.GetKubernetesSubject(qubetest.Namespace, qubetest.ServiceAccount)
-	mockTokenSource     = qubetest.MockTokenSource{}
-	serviceAccountToken string
+	sub                     = qubetoken.GetKubernetesSubject(qubetest.Namespace, qubetest.ServiceAccount)
+	mockTokenSource         = qubetest.MockTokenSource{}
+	mockCloudProviderSource = qubetest.MockCloudProviderSource{CloudProvider: cloudprovidersource.CloudProviderEKS}
+	serviceAccountToken     string
 )
 
 var scenarios = []struct {
@@ -185,6 +187,7 @@ func beforeAll() {
 	mockServer.StartMockServer()
 	qubetest.MustInitDefaultTestKeys()
 	serviceloader.Register(1, &mockTokenSource)
+	serviceloader.Register(1, &mockCloudProviderSource)
 	serviceAccountToken = createServiceAccountToken(mockServer.GetMockServerUrl())
 	mockTokenSource.ServiceAccountToken = serviceAccountToken
 
