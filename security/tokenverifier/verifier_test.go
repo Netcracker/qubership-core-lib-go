@@ -15,6 +15,7 @@ import (
 
 	. "github.com/MicahParks/jwkset"
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/netcracker/qubership-core-lib-go/v3/cloudprovidergetter"
 	"github.com/netcracker/qubership-core-lib-go/v3/security/oidc"
 	qubetest "github.com/netcracker/qubership-core-lib-go/v3/security/test"
 	qubetoken "github.com/netcracker/qubership-core-lib-go/v3/security/token"
@@ -30,9 +31,10 @@ const (
 )
 
 var (
-	sub                 = qubetoken.GetKubernetesSubject(qubetest.Namespace, qubetest.ServiceAccount)
-	mockTokenSource     = qubetest.MockTokenSource{}
-	serviceAccountToken string
+	sub                     = qubetoken.GetKubernetesSubject(qubetest.Namespace, qubetest.ServiceAccount)
+	mockTokenSource         = qubetest.MockTokenSource{}
+	mockCloudProviderGetter = qubetest.MockCloudProviderGetter{CloudProvider: cloudprovidergetter.CloudProviderEKS}
+	serviceAccountToken     string
 )
 
 var scenarios = []struct {
@@ -185,6 +187,7 @@ func beforeAll() {
 	mockServer.StartMockServer()
 	qubetest.MustInitDefaultTestKeys()
 	serviceloader.Register(1, &mockTokenSource)
+	serviceloader.Register(1, &mockCloudProviderGetter)
 	serviceAccountToken = createServiceAccountToken(mockServer.GetMockServerUrl())
 	mockTokenSource.ServiceAccountToken = serviceAccountToken
 
@@ -371,7 +374,7 @@ func TestOidcResponseInvalidPlainText(t *testing.T) {
 	qubetest.AddKubernetesProviderHandler(serviceAccountToken, http.StatusOK, []byte("some body"))
 
 	_, err := NewKubernetesVerifier(ctx, tokensource.AudienceMaaS)
-	assert.ErrorContains(t, err, "oidc: failed to decode provider discovery object: expected content-type = application/json, got \"text/plain; charset=utf-8\": invalid character 's' looking for beginning of value")
+	assert.ErrorContains(t, err, "unexpected issue during oidc call to '"+mockServer.GetMockServerUrl()+"/.well-known/openid-configuration', cloud provider 'EKS': failed to decode provider discovery object, possible reasons are:\n1. outdated base image without kubernetes service account ca.crt -> please check your base image version\n2. lack of access to the Kubernetes API for the EKS cloud provider -> please check firewall setting (pod -> kubernetes api access is required!): expected content-type = application/json, got \"text/plain; charset=utf-8\": invalid character 's' looking for beginning of value")
 }
 func TestOidcResponseInvalidJson(t *testing.T) {
 	ctx, cancelCtx := context.WithCancel(t.Context())
@@ -389,7 +392,7 @@ func TestOidcResponseInvalidNil(t *testing.T) {
 	qubetest.AddKubernetesProviderHandler(serviceAccountToken, http.StatusOK, nil)
 
 	_, err := NewKubernetesVerifier(ctx, tokensource.AudienceMaaS)
-	assert.ErrorContains(t, err, "oidc: failed to decode provider discovery object: expected content-type = application/json, got \"\": unexpected end of JSON input")
+	assert.ErrorContains(t, err, "unexpected issue during oidc call to '"+mockServer.GetMockServerUrl()+"/.well-known/openid-configuration', cloud provider 'EKS': failed to decode provider discovery object, possible reasons are:\n1. outdated base image without kubernetes service account ca.crt -> please check your base image version\n2. lack of access to the Kubernetes API for the EKS cloud provider -> please check firewall setting (pod -> kubernetes api access is required!): expected content-type = application/json, got \"\": unexpected end of JSON input")
 
 }
 func TestOidcResponseInternalServerErrorFiveAttempts(t *testing.T) {
@@ -405,7 +408,7 @@ func TestOidcResponseInternalServerErrorFiveAttempts(t *testing.T) {
 		})
 
 	_, err := NewKubernetesVerifier(ctx, tokensource.AudienceMaaS)
-	assert.ErrorContains(t, err, "failed to send oidc request (the possible cause is outdated base image without kubernetes service account ca.crt, please check your base image version.):")
+	assert.ErrorContains(t, err, "unexpected issue during oidc call to '"+mockServer.GetMockServerUrl()+"/.well-known/openid-configuration', cloud provider 'EKS': possible reasons are:\n1. outdated base image without kubernetes service account ca.crt -> please check your base image version\n2. lack of access to the Kubernetes API for the EKS cloud provider -> please check firewall setting (pod -> kubernetes api access is required!):")
 }
 func TestOidcResponseInternalServerErrorFourAttempts(t *testing.T) {
 	ctx, cancelCtx := context.WithCancel(t.Context())

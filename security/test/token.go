@@ -12,6 +12,7 @@ import (
 
 	"github.com/MicahParks/jwkset"
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/netcracker/qubership-core-lib-go/v3/cloudprovidergetter"
 	"github.com/netcracker/qubership-core-lib-go/v3/logging"
 	"github.com/netcracker/qubership-core-lib-go/v3/security/oidc"
 	"github.com/netcracker/qubership-core-lib-go/v3/security/tokensource"
@@ -143,4 +144,16 @@ func (t MockTokenSource) GetServiceAccountToken(_ context.Context) (string, erro
 		return "", t.ServiceAccountTokenError
 	}
 	return t.ServiceAccountToken, nil
+}
+
+type MockCloudProviderGetter struct {
+	CloudProvider cloudprovidergetter.CloudProvider
+	Error         error
+}
+
+func (s MockCloudProviderGetter) GetCloudProvider(ctx context.Context) cloudprovidergetter.CloudProvider {
+	if s.Error != nil {
+		return ""
+	}
+	return s.CloudProvider
 }
