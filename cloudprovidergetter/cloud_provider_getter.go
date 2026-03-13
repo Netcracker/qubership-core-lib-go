@@ -9,12 +9,12 @@ import (
 )
 
 const (
-	compositeStructureFileName = "data"
+	topologyFileName = "data"
 )
 
 var (
-	// DefaultCompositeStructureDir is the default directory where composite structure config map is mounted
-	DefaultCompositeStructureDir = "/etc/composite-structure"
+	// DefaultTopologyDir is the default directory where topology config map is mounted
+	DefaultTopologyDir = "/etc/topology"
 )
 
 var cloudProviderByString = map[string]CloudProvider{
@@ -32,7 +32,7 @@ type Structure struct {
 }
 
 func (r DefaultCloudProviderFileReader) GetCloudProvider(_ context.Context) CloudProvider {
-	fileName := filepath.Join(DefaultCompositeStructureDir, compositeStructureFileName)
+	fileName := filepath.Join(DefaultTopologyDir, topologyFileName)
 	bytes, err := os.ReadFile(fileName)
 	structure := &Structure{}
 	if err == nil {

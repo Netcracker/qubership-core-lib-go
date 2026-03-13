@@ -69,8 +69,8 @@ func withCompositeStructureFileState(t *testing.T, content []byte, test func()) 
 	t.Helper()
 
 	dir := t.TempDir()
-	DefaultCompositeStructureDir = dir
-	file := filepath.Join(dir, compositeStructureFileName)
+	DefaultTopologyDir = dir
+	file := filepath.Join(dir, topologyFileName)
 
 	err := os.MkdirAll(dir, 0775)
 	assert.NoError(t, err)
