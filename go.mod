@@ -1,11 +1,11 @@
 module github.com/netcracker/qubership-core-lib-go/v3
 
-go 1.25.7
+go 1.26.1
 
 require (
 	github.com/KimMachineGun/automemlimit v0.7.5
 	github.com/MicahParks/jwkset v0.11.0
-	github.com/MicahParks/keyfunc/v3 v3.7.0
+	github.com/MicahParks/keyfunc/v3 v3.8.0
 	github.com/failsafe-go/failsafe-go v0.9.6
 	github.com/fsnotify/fsnotify v1.9.0
 	github.com/golang-jwt/jwt/v5 v5.3.1
@@ -19,7 +19,7 @@ require (
 	github.com/pkg/errors v0.9.1
 	github.com/stretchr/testify v1.11.1
 	github.com/viney-shih/go-lock v1.1.2
-	golang.org/x/time v0.14.0
+	golang.org/x/time v0.15.0
 )
 
 require (
