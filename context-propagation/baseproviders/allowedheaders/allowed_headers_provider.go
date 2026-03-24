@@ -64,7 +64,7 @@ func (allowedHeaderProvider allowedHeaderProvider) Provide(ctx context.Context, 
 	for headerName, value := range incomingData {
 		if allowedHeaderProvider.allowedHeaders.isAllowedHeader(headerName) {
 			allowedRequestHeaders[headerName] = value.(string)
-			logger.Debug("context object=" + headerName + " provided to context.Context")
+			logger.Debug("context object=%s provided to context.Context", headerName)
 		}
 	}
 
@@ -80,7 +80,7 @@ func (allowedHeaderProvider allowedHeaderProvider) Set(ctx context.Context, allo
 	for headerName, value := range allowedHeaders.header {
 		if allowedHeaderProvider.allowedHeaders.isAllowedHeader(headerName) {
 			allowedRequestHeaders[headerName] = value
-			logger.Debug("context object=" + headerName + " set to context.Context")
+			logger.Debug("context object=%s set to context.Context", headerName)
 		}
 	}
 	return context.WithValue(ctx, ALLOWED_HEADER_CONTEX_NAME, NewAllowedHeaderContextObject(allowedRequestHeaders)), nil

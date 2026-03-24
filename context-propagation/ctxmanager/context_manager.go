@@ -60,7 +60,7 @@ func Register(providers []ContextProvider) {
 			break
 		}
 		contextProviders[provider.ContextName()] = provider
-		logger.Debug("context=" + provider.ContextName() + " registered")
+		logger.Debug("context=%s registered", provider.ContextName())
 	}
 	var allProviders []ContextProvider
 	for _, provider := range contextProviders {
@@ -73,7 +73,7 @@ func Register(providers []ContextProvider) {
 
 func RegisterSingle(provider ContextProvider) {
 	contextProviders[provider.ContextName()] = provider
-	logger.Debug("context=" + provider.ContextName() + " registered")
+	logger.Debug("context=%s registered", provider.ContextName())
 	var allProviders []ContextProvider
 	for _, prov := range contextProviders {
 		allProviders = append(allProviders, prov)
