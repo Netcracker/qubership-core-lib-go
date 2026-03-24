@@ -35,7 +35,7 @@ func AddResponsePropagatableContextData(ctx context.Context, f func(string, stri
 
 func addContextData(contextData map[string]string, f func(string, string)) {
 	for headerName, headerVals := range contextData {
-		logger.Debug("add context=" + headerName + " with value=" + headerVals)
+		logger.Debug("add context=%s with value=%s", headerName, headerVals)
 		f(headerName, headerVals)
 	}
 }
