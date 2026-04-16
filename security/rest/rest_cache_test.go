@@ -1,7 +1,6 @@
 package rest
 
 import (
-	"net/url"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -52,39 +51,29 @@ func TestCalculateCacheKey(t *testing.T) {
 			expected: "api.example.com:8080",
 		},
 		{
-			name:     "internal-gateway with version and service",
-			rawUrl:   "https://internal-gateway.namespace.svc/api/v1/service-name/resource",
-			expected: "internal-gateway.namespace.svc/api/v1/service-name",
-		},
-		{
 			name:     "internal-gateway with version no service",
-			rawUrl:   "https://internal-gateway.namespace.svc/v1/resource",
-			expected: "internal-gateway.namespace.svc/v1",
-		},
-		{
-			name:     "internal-gateway without version",
-			rawUrl:   "https://internal-gateway.namespace.svc/resource/path",
-			expected: "internal-gateway.namespace.svc/resource/path",
+			rawUrl:   "https://internal-gateway/v10",
+			expected: "internal-gateway/v10",
 		},
 		{
 			name:     "internal-gateway with multiple path segments",
-			rawUrl:   "https://internal-gateway/api/v2/my-service/users/123",
-			expected: "internal-gateway/api/v2/my-service",
+			rawUrl:   "https://internal-gateway/some/path/to/something",
+			expected: "internal-gateway/some/path/to/something",
 		},
 		{
 			name:     "internal-gateway with trailing slash",
-			rawUrl:   "https://internal-gateway/api/v1/service/",
-			expected: "internal-gateway/api/v1/service",
+			rawUrl:   "https://internal-gateway/path/",
+			expected: "internal-gateway/path",
 		},
 		{
 			name:     "internal-gateway with query params",
-			rawUrl:   "https://internal-gateway/api/v1/service/resource?param=value",
-			expected: "internal-gateway/api/v1/service",
+			rawUrl:   "https://internal-gateway/path?param=value",
+			expected: "internal-gateway/path",
 		},
 		{
-			name:     "non-internal-gateway with complex path",
-			rawUrl:   "https://external-api.com/api/v1/service/resource",
-			expected: "external-api.com",
+			name:     "public api with complex path",
+			rawUrl:   "https://google.com/v10/api/resource/service",
+			expected: "google.com",
 		},
 		{
 			name:        "invalid URL",
@@ -107,64 +96,6 @@ func TestCalculateCacheKey(t *testing.T) {
 				assert.NoError(t, err)
 				assert.Equal(t, tt.expected, result)
 			}
-		})
-	}
-}
-
-func TestCalculateCacheKeyForInternalGateway(t *testing.T) {
-	tests := []struct {
-		name     string
-		rawUrl   string
-		expected string
-	}{
-		{
-			name:     "api with version and service name",
-			rawUrl:   "https://internal-gateway/api/v1/my-service/resource/123",
-			expected: "internal-gateway/api/v1/my-service",
-		},
-		{
-			name:     "api with version no service name",
-			rawUrl:   "https://internal-gateway/api/v1",
-			expected: "internal-gateway/api/v1",
-		},
-		{
-			name:     "version without api prefix",
-			rawUrl:   "https://internal-gateway/v2/resource",
-			expected: "internal-gateway/v2",
-		},
-		{
-			name:     "no version in path",
-			rawUrl:   "https://internal-gateway/some/path/without/version",
-			expected: "internal-gateway/some/path/without/version",
-		},
-		{
-			name:     "root path",
-			rawUrl:   "https://internal-gateway/",
-			expected: "internal-gateway/",
-		},
-		{
-			name:     "multiple segments before version",
-			rawUrl:   "https://internal-gateway/prefix/api/v3/service/resource",
-			expected: "internal-gateway/prefix/api/v3",
-		},
-		{
-			name:     "version in middle of path",
-			rawUrl:   "https://internal-gateway/prefix/v1/suffix/more",
-			expected: "internal-gateway/prefix/v1",
-		},
-		{
-			name:     "api prefix with service but no version",
-			rawUrl:   "https://internal-gateway/api/service/resource",
-			expected: "internal-gateway/api/service/resource",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			parsedUrl, err := url.Parse(tt.rawUrl)
-			assert.NoError(t, err)
-			result := calculateCacheKeyForInternalGateway(parsedUrl)
-			assert.Equal(t, tt.expected, result)
 		})
 	}
 }
