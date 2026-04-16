@@ -23,32 +23,36 @@ func init() {
 	logger = logging.GetLogger("rest-client")
 }
 
+// RestClient represents a generic rest client to make requests to services. Use DefaultM2MRestClient, DefaultDbaasRestClient, DefaultMaasRestClient functions to get a RestClient for your task. All of them support Kubernetes tokens and falling back to old approach if they are not available either in client or server
 type RestClient interface {
 	DoRequest(ctx context.Context, httpMethod, url string, headers map[string][]string, body io.Reader) (*http.Response, error)
 }
 
+// DefaultM2MRestClient returns a RestClient for making requests to internal services using kubernetes token with netcracker audience. If token is not available or a service doesn't support kubernetes tokens then it falls back to old m2m tokens
 func DefaultM2MRestClient() RestClient {
 	return newM2MRestClient(getKubernetesAuthHeaderSupplier(tokensource.AudienceNetcracker), getKeycloakAuthHeaderSupplier())
 }
 
+// DefaultDbaasRestClient returns a RestClient for making requests to dbaas using kubernetes token with dbaas audience. If token is not available or the current dbaas version doesn't support kubernetes tokens then it falls back to old approach with basic creds `username` and `password`.
 func DefaultDbaasRestClient(username, password string) RestClient {
 	return newM2MRestClient(getKubernetesAuthHeaderSupplier(tokensource.AudienceDBaaS), getBasicAuthHeaderSupplier(username, password))
 }
 
+// DefaultMaasRestClient returns a RestClient for making requests to maas using kubernetes token with maas audience. If token is not available or the current maas version doesn't support kubernetes tokens then it falls back to old approach with basic creds `username` and `password`.
 func DefaultMaasRestClient(username, password string) RestClient {
 	return newM2MRestClient(getKubernetesAuthHeaderSupplier(tokensource.AudienceMaaS), getBasicAuthHeaderSupplier(username, password))
 }
 
-type AuthHeaderSupplier func(ctx context.Context) (string, error)
+type authHeaderSupplier func(ctx context.Context) (string, error)
 
 type m2MRestClient struct {
 	client                     *http.Client
 	urlCache                   cache.Cache[string, empty]
-	newAuthHeaderSupplier      AuthHeaderSupplier
-	fallbackAuthHeaderSupplier AuthHeaderSupplier
+	newAuthHeaderSupplier      authHeaderSupplier
+	fallbackAuthHeaderSupplier authHeaderSupplier
 }
 
-func newM2MRestClient(newAuthHeaderSupplier, fallbackAuthHeaderSupplier AuthHeaderSupplier) RestClient {
+func newM2MRestClient(newAuthHeaderSupplier, fallbackAuthHeaderSupplier authHeaderSupplier) RestClient {
 	return &m2MRestClient{
 		client:                     utils.GetClient(),
 		urlCache:                   getUrlCache(),
@@ -120,7 +124,7 @@ func (m *m2MRestClient) doRequest(ctx context.Context, requestProducer *httpRequ
 	return httpResponse, nil
 }
 
-func getKubernetesAuthHeaderSupplier(audience tokensource.TokenAudience) AuthHeaderSupplier {
+func getKubernetesAuthHeaderSupplier(audience tokensource.TokenAudience) authHeaderSupplier {
 	return func(ctx context.Context) (string, error) {
 		token, err := tokensource.GetAudienceToken(ctx, audience)
 		if err != nil {
@@ -130,7 +134,7 @@ func getKubernetesAuthHeaderSupplier(audience tokensource.TokenAudience) AuthHea
 	}
 }
 
-func getKeycloakAuthHeaderSupplier() AuthHeaderSupplier {
+func getKeycloakAuthHeaderSupplier() authHeaderSupplier {
 	tokenProvider := serviceloader.MustLoad[security.TokenProvider]()
 	return func(ctx context.Context) (string, error) {
 		token, err := tokenProvider.GetToken(ctx)
@@ -141,7 +145,7 @@ func getKeycloakAuthHeaderSupplier() AuthHeaderSupplier {
 	}
 }
 
-func getBasicAuthHeaderSupplier(username, password string) AuthHeaderSupplier {
+func getBasicAuthHeaderSupplier(username, password string) authHeaderSupplier {
 	credentials := username + ":" + password
 	encoded := base64.StdEncoding.EncodeToString([]byte(credentials))
 	authHeader := "Basic " + encoded

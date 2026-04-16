@@ -16,7 +16,7 @@ import (
 )
 
 // mockAuthHeaderSupplier creates a mock auth header supplier for testing
-func mockAuthHeaderSupplier(token string, err error) AuthHeaderSupplier {
+func mockAuthHeaderSupplier(token string, err error) authHeaderSupplier {
 	return func(ctx context.Context) (string, error) {
 		return token, err
 	}
