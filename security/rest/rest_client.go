@@ -100,7 +100,7 @@ func (m *m2MRestClient) doRequestFallback(ctx context.Context, cacheKey string, 
 
 	if err == nil && response.StatusCode < 400 {
 		m.urlCache.Add(cacheKey, empty{})
-		logger.WarnC(ctx, reason.Message())
+		logger.WarnC(ctx, "%s", reason.Message())
 	}
 
 	return response, err
