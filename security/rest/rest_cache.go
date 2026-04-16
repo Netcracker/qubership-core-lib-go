@@ -26,6 +26,7 @@ func getUrlCache() cache.Cache[string, empty] {
 		WithLRU().
 		WithTTL(urlCacheTTL)
 }
+
 func calculateCacheKey(rawUrl string) (string, error) {
 	parsedUrl, err := url.Parse(rawUrl)
 	if err != nil {
@@ -36,6 +37,7 @@ func calculateCacheKey(rawUrl string) (string, error) {
 	}
 	return parsedUrl.Host, nil
 }
+
 func calculateCacheKeyForInternalGateway(parsedUrl *url.URL) string {
 	segments := strings.Split(strings.Trim(parsedUrl.Path, "/"), "/")
 	var filteredSegments []string
@@ -62,6 +64,7 @@ func calculateCacheKeyForInternalGateway(parsedUrl *url.URL) string {
 	}
 	return key
 }
+
 func isVersion(segment string) bool {
 	if len(segment) < 2 {
 		return false

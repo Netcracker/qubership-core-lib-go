@@ -150,9 +150,9 @@ func TestM2MRestClient_DoRequest_TokenAcquisitionError_Fallback(t *testing.T) {
 	defer server.Close()
 
 	client := &m2MRestClient{
-		client:   server.Client(),
-		urlCache: getUrlCache(),
-		newAuthHeaderSupplier: mockAuthHeaderSupplier("", errors.New("token acquisition failed")),
+		client:                     server.Client(),
+		urlCache:                   getUrlCache(),
+		newAuthHeaderSupplier:      mockAuthHeaderSupplier("", errors.New("token acquisition failed")),
 		fallbackAuthHeaderSupplier: mockAuthHeaderSupplier("Bearer fallback-token", nil),
 	}
 
@@ -294,9 +294,9 @@ func TestM2MRestClient_DoRequest_BothAuthMethodsFail(t *testing.T) {
 	defer server.Close()
 
 	client := &m2MRestClient{
-		client:   server.Client(),
-		urlCache: getUrlCache(),
-		newAuthHeaderSupplier: mockAuthHeaderSupplier("", errors.New("new auth failed")),
+		client:                     server.Client(),
+		urlCache:                   getUrlCache(),
+		newAuthHeaderSupplier:      mockAuthHeaderSupplier("", errors.New("new auth failed")),
 		fallbackAuthHeaderSupplier: mockAuthHeaderSupplier("", errors.New("fallback auth failed")),
 	}
 
