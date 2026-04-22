@@ -172,7 +172,7 @@ func TestHttpRequestProducer_Produce(t *testing.T) {
 		url                 string
 		headers             map[string][]string
 		bodyBytes           []byte
-		authHeaderSupplier  func(ctx context.Context) (string, error)
+		authHeader          func(ctx context.Context) (string, error)
 		expectError         bool
 		expectedAuthHeader  string
 		expectTokenAcqError bool
@@ -183,7 +183,7 @@ func TestHttpRequestProducer_Produce(t *testing.T) {
 			url:        "https://example.com/api",
 			headers:    map[string][]string{"Content-Type": {"application/json"}},
 			bodyBytes:  nil,
-			authHeaderSupplier: func(ctx context.Context) (string, error) {
+			authHeader: func(ctx context.Context) (string, error) {
 				return "Bearer test-token", nil
 			},
 			expectedAuthHeader: "Bearer test-token",
@@ -194,7 +194,7 @@ func TestHttpRequestProducer_Produce(t *testing.T) {
 			url:        "https://example.com/api",
 			headers:    map[string][]string{"Content-Type": {"application/json"}},
 			bodyBytes:  []byte(`{"data":"value"}`),
-			authHeaderSupplier: func(ctx context.Context) (string, error) {
+			authHeader: func(ctx context.Context) (string, error) {
 				return "Basic dXNlcjpwYXNz", nil
 			},
 			expectedAuthHeader: "Basic dXNlcjpwYXNz",
@@ -205,7 +205,7 @@ func TestHttpRequestProducer_Produce(t *testing.T) {
 			url:        "https://example.com/api",
 			headers:    nil,
 			bodyBytes:  nil,
-			authHeaderSupplier: func(ctx context.Context) (string, error) {
+			authHeader: func(ctx context.Context) (string, error) {
 				return "", errors.New("token acquisition failed")
 			},
 			expectError:         true,
@@ -217,7 +217,7 @@ func TestHttpRequestProducer_Produce(t *testing.T) {
 			url:        "https://example.com/api",
 			headers:    nil,
 			bodyBytes:  nil,
-			authHeaderSupplier: func(ctx context.Context) (string, error) {
+			authHeader: func(ctx context.Context) (string, error) {
 				return "Bearer token", nil
 			},
 			expectError: true,
@@ -231,7 +231,7 @@ func TestHttpRequestProducer_Produce(t *testing.T) {
 				"Accept":          {"application/json"},
 			},
 			bodyBytes: []byte(`{"update":"data"}`),
-			authHeaderSupplier: func(ctx context.Context) (string, error) {
+			authHeader: func(ctx context.Context) (string, error) {
 				return "Bearer multi-header-token", nil
 			},
 			expectedAuthHeader: "Bearer multi-header-token",
@@ -239,46 +239,44 @@ func TestHttpRequestProducer_Produce(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			producer := &httpRequestProducer{
-				httpMethod:         tt.httpMethod,
-				url:                tt.url,
-				headers:            tt.headers,
-				bodyBytes:          tt.bodyBytes,
-				authHeaderSupplier: tt.authHeaderSupplier,
+		producer := &httpRequestProducer{
+			httpMethod: tt.httpMethod,
+			url:        tt.url,
+			headers:    tt.headers,
+			bodyBytes:  tt.bodyBytes,
+			authHeader: tt.authHeader,
+		}
+
+		ctx := context.Background()
+		req, err := producer.produce(ctx)
+
+		if tt.expectError {
+			assert.Error(t, err)
+			if tt.expectTokenAcqError {
+				var tae *TokenAcquisitionError
+				assert.ErrorAs(t, err, &tae)
+			}
+		} else {
+			require.NoError(t, err)
+			assert.NotNil(t, req)
+			assert.Equal(t, tt.httpMethod, req.Method)
+			assert.Equal(t, tt.url, req.URL.String())
+			assert.Equal(t, tt.expectedAuthHeader, req.Header.Get("Authorization"))
+
+			// Verify custom headers were added
+			for key, values := range tt.headers {
+				for _, value := range values {
+					assert.Contains(t, req.Header.Values(key), value)
+				}
 			}
 
-			ctx := context.Background()
-			req, err := producer.produce(ctx)
-
-			if tt.expectError {
-				assert.Error(t, err)
-				if tt.expectTokenAcqError {
-					var tae *TokenAcquisitionError
-					assert.ErrorAs(t, err, &tae)
-				}
-			} else {
-				require.NoError(t, err)
-				assert.NotNil(t, req)
-				assert.Equal(t, tt.httpMethod, req.Method)
-				assert.Equal(t, tt.url, req.URL.String())
-				assert.Equal(t, tt.expectedAuthHeader, req.Header.Get("Authorization"))
-
-				// Verify custom headers were added
-				for key, values := range tt.headers {
-					for _, value := range values {
-						assert.Contains(t, req.Header.Values(key), value)
-					}
-				}
-
-				// Verify body if present
-				if len(tt.bodyBytes) > 0 {
-					bodyBytes, err := io.ReadAll(req.Body)
-					assert.NoError(t, err)
-					assert.Equal(t, tt.bodyBytes, bodyBytes)
-				}
+			// Verify body if present
+			if len(tt.bodyBytes) > 0 {
+				bodyBytes, err := io.ReadAll(req.Body)
+				assert.NoError(t, err)
+				assert.Equal(t, tt.bodyBytes, bodyBytes)
 			}
-		})
+		}
 	}
 }
 
@@ -290,7 +288,7 @@ func TestHttpRequestProducer_ProduceReusability(t *testing.T) {
 		url:        "https://example.com/api",
 		headers:    nil,
 		bodyBytes:  bodyContent,
-		authHeaderSupplier: func(ctx context.Context) (string, error) {
+		authHeader: func(ctx context.Context) (string, error) {
 			return "Bearer token", nil
 		},
 	}

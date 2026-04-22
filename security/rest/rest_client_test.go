@@ -15,21 +15,21 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// mockAuthHeaderSupplier creates a mock auth header supplier for testing
-func mockAuthHeaderSupplier(token string, err error) authHeaderSupplier {
+// mockAuthHeaderFunc creates a mock auth header func for testing
+func mockAuthHeaderFunc(token string, err error) authHeaderFunc {
 	return func(ctx context.Context) (string, error) {
 		return token, err
 	}
 }
 
-func TestGetKubernetesAuthHeaderSupplier(t *testing.T) {
+func TestKubernetesAuthHeaderFunc(t *testing.T) {
 	// This test verifies the structure of the supplier function
 	// Actual token acquisition would require tokensource setup
-	supplier := getKubernetesAuthHeaderSupplier("test-audience")
+	supplier := k8sAuthHeaderFunc("test-audience")
 	assert.NotNil(t, supplier)
 }
 
-func TestGetBasicAuthHeaderSupplier(t *testing.T) {
+func TestBasicAuthHeaderFunc(t *testing.T) {
 	tests := []struct {
 		name     string
 		username string
@@ -64,7 +64,7 @@ func TestGetBasicAuthHeaderSupplier(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			supplier := getBasicAuthHeaderSupplier(tt.username, tt.password)
+			supplier := basicAuthHeaderFunc(tt.username, tt.password)
 			result, err := supplier(context.Background())
 			assert.NoError(t, err)
 			assert.Equal(t, tt.expected, result)
@@ -82,10 +82,10 @@ func TestM2MRestClient_DoRequest_FirstCallSuccess(t *testing.T) {
 	defer server.Close()
 
 	client := &m2MRestClient{
-		client:                     server.Client(),
-		urlCache:                   getUrlCache(),
-		newAuthHeaderSupplier:      mockAuthHeaderSupplier("Bearer new-token", nil),
-		fallbackAuthHeaderSupplier: mockAuthHeaderSupplier("Bearer fallback-token", nil),
+		client:             server.Client(),
+		urlCache:           getUrlCache(),
+		k8sAuthHeader:      mockAuthHeaderFunc("Bearer new-token", nil),
+		fallbackAuthHeader: mockAuthHeaderFunc("Bearer fallback-token", nil),
 	}
 
 	ctx := context.Background()
@@ -119,10 +119,10 @@ func TestM2MRestClient_DoRequest_FirstCallUnauthorized_FallbackSuccess(t *testin
 	defer server.Close()
 
 	client := &m2MRestClient{
-		client:                     server.Client(),
-		urlCache:                   getUrlCache(),
-		newAuthHeaderSupplier:      mockAuthHeaderSupplier("Bearer new-token", nil),
-		fallbackAuthHeaderSupplier: mockAuthHeaderSupplier("Bearer fallback-token", nil),
+		client:             server.Client(),
+		urlCache:           getUrlCache(),
+		k8sAuthHeader:      mockAuthHeaderFunc("Bearer new-token", nil),
+		fallbackAuthHeader: mockAuthHeaderFunc("Bearer fallback-token", nil),
 	}
 
 	ctx := context.Background()
@@ -150,10 +150,10 @@ func TestM2MRestClient_DoRequest_TokenAcquisitionError_Fallback(t *testing.T) {
 	defer server.Close()
 
 	client := &m2MRestClient{
-		client:                     server.Client(),
-		urlCache:                   getUrlCache(),
-		newAuthHeaderSupplier:      mockAuthHeaderSupplier("", errors.New("token acquisition failed")),
-		fallbackAuthHeaderSupplier: mockAuthHeaderSupplier("Bearer fallback-token", nil),
+		client:             server.Client(),
+		urlCache:           getUrlCache(),
+		k8sAuthHeader:      mockAuthHeaderFunc("", errors.New("token acquisition failed")),
+		fallbackAuthHeader: mockAuthHeaderFunc("Bearer fallback-token", nil),
 	}
 
 	ctx := context.Background()
@@ -182,10 +182,10 @@ func TestM2MRestClient_DoRequest_CachedUrl_UsesFallback(t *testing.T) {
 	defer server.Close()
 
 	client := &m2MRestClient{
-		client:                     server.Client(),
-		urlCache:                   getUrlCache(),
-		newAuthHeaderSupplier:      mockAuthHeaderSupplier("Bearer new-token", nil),
-		fallbackAuthHeaderSupplier: mockAuthHeaderSupplier("Bearer fallback-token", nil),
+		client:             server.Client(),
+		urlCache:           getUrlCache(),
+		k8sAuthHeader:      mockAuthHeaderFunc("Bearer new-token", nil),
+		fallbackAuthHeader: mockAuthHeaderFunc("Bearer fallback-token", nil),
 	}
 
 	ctx := context.Background()
@@ -220,10 +220,10 @@ func TestM2MRestClient_DoRequest_WithBody(t *testing.T) {
 	defer server.Close()
 
 	client := &m2MRestClient{
-		client:                     server.Client(),
-		urlCache:                   getUrlCache(),
-		newAuthHeaderSupplier:      mockAuthHeaderSupplier("Bearer token", nil),
-		fallbackAuthHeaderSupplier: mockAuthHeaderSupplier("Bearer fallback", nil),
+		client:             server.Client(),
+		urlCache:           getUrlCache(),
+		k8sAuthHeader:      mockAuthHeaderFunc("Bearer token", nil),
+		fallbackAuthHeader: mockAuthHeaderFunc("Bearer fallback", nil),
 	}
 
 	ctx := context.Background()
@@ -248,10 +248,10 @@ func TestM2MRestClient_DoRequest_WithHeaders(t *testing.T) {
 	defer server.Close()
 
 	client := &m2MRestClient{
-		client:                     server.Client(),
-		urlCache:                   getUrlCache(),
-		newAuthHeaderSupplier:      mockAuthHeaderSupplier("Bearer token", nil),
-		fallbackAuthHeaderSupplier: mockAuthHeaderSupplier("Bearer fallback", nil),
+		client:             server.Client(),
+		urlCache:           getUrlCache(),
+		k8sAuthHeader:      mockAuthHeaderFunc("Bearer token", nil),
+		fallbackAuthHeader: mockAuthHeaderFunc("Bearer fallback", nil),
 	}
 
 	ctx := context.Background()
@@ -274,10 +274,10 @@ func TestM2MRestClient_DoRequest_WithHeaders(t *testing.T) {
 
 func TestM2MRestClient_DoRequest_InvalidUrl(t *testing.T) {
 	client := &m2MRestClient{
-		client:                     http.DefaultClient,
-		urlCache:                   getUrlCache(),
-		newAuthHeaderSupplier:      mockAuthHeaderSupplier("Bearer token", nil),
-		fallbackAuthHeaderSupplier: mockAuthHeaderSupplier("Bearer fallback", nil),
+		client:             http.DefaultClient,
+		urlCache:           getUrlCache(),
+		k8sAuthHeader:      mockAuthHeaderFunc("Bearer token", nil),
+		fallbackAuthHeader: mockAuthHeaderFunc("Bearer fallback", nil),
 	}
 
 	ctx := context.Background()
@@ -294,10 +294,10 @@ func TestM2MRestClient_DoRequest_BothAuthMethodsFail(t *testing.T) {
 	defer server.Close()
 
 	client := &m2MRestClient{
-		client:                     server.Client(),
-		urlCache:                   getUrlCache(),
-		newAuthHeaderSupplier:      mockAuthHeaderSupplier("", errors.New("new auth failed")),
-		fallbackAuthHeaderSupplier: mockAuthHeaderSupplier("", errors.New("fallback auth failed")),
+		client:             server.Client(),
+		urlCache:           getUrlCache(),
+		k8sAuthHeader:      mockAuthHeaderFunc("", errors.New("new auth failed")),
+		fallbackAuthHeader: mockAuthHeaderFunc("", errors.New("fallback auth failed")),
 	}
 
 	ctx := context.Background()
@@ -316,10 +316,10 @@ func TestM2MRestClient_DoRequest_ServerError(t *testing.T) {
 	defer server.Close()
 
 	client := &m2MRestClient{
-		client:                     server.Client(),
-		urlCache:                   getUrlCache(),
-		newAuthHeaderSupplier:      mockAuthHeaderSupplier("Bearer token", nil),
-		fallbackAuthHeaderSupplier: mockAuthHeaderSupplier("Bearer fallback", nil),
+		client:             server.Client(),
+		urlCache:           getUrlCache(),
+		k8sAuthHeader:      mockAuthHeaderFunc("Bearer token", nil),
+		fallbackAuthHeader: mockAuthHeaderFunc("Bearer fallback", nil),
 	}
 
 	ctx := context.Background()
@@ -345,10 +345,10 @@ func TestM2MRestClient_DoRequest_ConcurrentRequests(t *testing.T) {
 	defer server.Close()
 
 	client := &m2MRestClient{
-		client:                     server.Client(),
-		urlCache:                   getUrlCache(),
-		newAuthHeaderSupplier:      mockAuthHeaderSupplier("Bearer token", nil),
-		fallbackAuthHeaderSupplier: mockAuthHeaderSupplier("Bearer fallback", nil),
+		client:             server.Client(),
+		urlCache:           getUrlCache(),
+		k8sAuthHeader:      mockAuthHeaderFunc("Bearer token", nil),
+		fallbackAuthHeader: mockAuthHeaderFunc("Bearer fallback", nil),
 	}
 
 	ctx := context.Background()
@@ -384,10 +384,10 @@ func TestM2MRestClient_DoRequest_DifferentHttpMethods(t *testing.T) {
 			defer server.Close()
 
 			client := &m2MRestClient{
-				client:                     server.Client(),
-				urlCache:                   getUrlCache(),
-				newAuthHeaderSupplier:      mockAuthHeaderSupplier("Bearer token", nil),
-				fallbackAuthHeaderSupplier: mockAuthHeaderSupplier("Bearer fallback", nil),
+				client:             server.Client(),
+				urlCache:           getUrlCache(),
+				k8sAuthHeader:      mockAuthHeaderFunc("Bearer token", nil),
+				fallbackAuthHeader: mockAuthHeaderFunc("Bearer fallback", nil),
 			}
 
 			ctx := context.Background()
@@ -415,10 +415,10 @@ func TestM2MRestClient_DoRequest_FallbackCachesUrl(t *testing.T) {
 	defer server.Close()
 
 	client := &m2MRestClient{
-		client:                     server.Client(),
-		urlCache:                   getUrlCache(),
-		newAuthHeaderSupplier:      mockAuthHeaderSupplier("Bearer new-token", nil),
-		fallbackAuthHeaderSupplier: mockAuthHeaderSupplier("Bearer fallback-token", nil),
+		client:             server.Client(),
+		urlCache:           getUrlCache(),
+		k8sAuthHeader:      mockAuthHeaderFunc("Bearer new-token", nil),
+		fallbackAuthHeader: mockAuthHeaderFunc("Bearer fallback-token", nil),
 	}
 
 	ctx := context.Background()
@@ -442,10 +442,10 @@ func TestM2MRestClient_DoRequest_FallbackCachesUrl(t *testing.T) {
 
 func TestM2MRestClient_DoRequest_BodyReaderError(t *testing.T) {
 	client := &m2MRestClient{
-		client:                     http.DefaultClient,
-		urlCache:                   getUrlCache(),
-		newAuthHeaderSupplier:      mockAuthHeaderSupplier("Bearer token", nil),
-		fallbackAuthHeaderSupplier: mockAuthHeaderSupplier("Bearer fallback", nil),
+		client:             http.DefaultClient,
+		urlCache:           getUrlCache(),
+		k8sAuthHeader:      mockAuthHeaderFunc("Bearer token", nil),
+		fallbackAuthHeader: mockAuthHeaderFunc("Bearer fallback", nil),
 	}
 
 	// Create an error reader
@@ -468,8 +468,8 @@ func (e *errorReader) Read(p []byte) (n int, err error) {
 }
 
 func TestNewM2MRestClient(t *testing.T) {
-	newAuth := mockAuthHeaderSupplier("Bearer new", nil)
-	fallbackAuth := mockAuthHeaderSupplier("Bearer fallback", nil)
+	newAuth := mockAuthHeaderFunc("Bearer new", nil)
+	fallbackAuth := mockAuthHeaderFunc("Bearer fallback", nil)
 
 	client := newM2MRestClient(newAuth, fallbackAuth)
 
@@ -478,8 +478,8 @@ func TestNewM2MRestClient(t *testing.T) {
 	require.True(t, ok)
 	assert.NotNil(t, m2mClient.client)
 	assert.NotNil(t, m2mClient.urlCache)
-	assert.NotNil(t, m2mClient.newAuthHeaderSupplier)
-	assert.NotNil(t, m2mClient.fallbackAuthHeaderSupplier)
+	assert.NotNil(t, m2mClient.k8sAuthHeader)
+	assert.NotNil(t, m2mClient.fallbackAuthHeader)
 }
 
 func TestM2MRestClient_DoRequest_InternalGatewayUrlCaching(t *testing.T) {
@@ -497,10 +497,10 @@ func TestM2MRestClient_DoRequest_InternalGatewayUrlCaching(t *testing.T) {
 	defer server.Close()
 
 	client := &m2MRestClient{
-		client:                     server.Client(),
-		urlCache:                   getUrlCache(),
-		newAuthHeaderSupplier:      mockAuthHeaderSupplier("Bearer new-token", nil),
-		fallbackAuthHeaderSupplier: mockAuthHeaderSupplier("Bearer fallback-token", nil),
+		client:             server.Client(),
+		urlCache:           getUrlCache(),
+		k8sAuthHeader:      mockAuthHeaderFunc("Bearer new-token", nil),
+		fallbackAuthHeader: mockAuthHeaderFunc("Bearer fallback-token", nil),
 	}
 
 	ctx := context.Background()
@@ -533,10 +533,10 @@ func TestM2MRestClient_DoRequestFallback(t *testing.T) {
 	defer server.Close()
 
 	client := &m2MRestClient{
-		client:                     server.Client(),
-		urlCache:                   getUrlCache(),
-		newAuthHeaderSupplier:      mockAuthHeaderSupplier("Bearer new", nil),
-		fallbackAuthHeaderSupplier: mockAuthHeaderSupplier("Bearer fallback", nil),
+		client:             server.Client(),
+		urlCache:           getUrlCache(),
+		k8sAuthHeader:      mockAuthHeaderFunc("Bearer new", nil),
+		fallbackAuthHeader: mockAuthHeaderFunc("Bearer fallback", nil),
 	}
 
 	ctx := context.Background()
@@ -573,10 +573,10 @@ func TestM2MRestClient_DoRequest_MultipleBodyReads(t *testing.T) {
 	defer server.Close()
 
 	client := &m2MRestClient{
-		client:                     server.Client(),
-		urlCache:                   getUrlCache(),
-		newAuthHeaderSupplier:      mockAuthHeaderSupplier("Bearer new", nil),
-		fallbackAuthHeaderSupplier: mockAuthHeaderSupplier("Bearer fallback", nil),
+		client:             server.Client(),
+		urlCache:           getUrlCache(),
+		k8sAuthHeader:      mockAuthHeaderFunc("Bearer new", nil),
+		fallbackAuthHeader: mockAuthHeaderFunc("Bearer fallback", nil),
 	}
 
 	ctx := context.Background()

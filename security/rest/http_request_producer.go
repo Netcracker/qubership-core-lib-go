@@ -11,11 +11,11 @@ import (
 )
 
 type httpRequestProducer struct {
-	httpMethod         string
-	url                string
-	headers            map[string][]string
-	bodyBytes          []byte
-	authHeaderSupplier func(ctx context.Context) (string, error)
+	httpMethod string
+	url        string
+	headers    map[string][]string
+	bodyBytes  []byte
+	authHeader authHeaderFunc
 }
 
 func newHttpRequestProducer(httpMethod, url string, headers map[string][]string, bodyReader io.Reader) (*httpRequestProducer, error) {
@@ -47,7 +47,7 @@ func (producer *httpRequestProducer) getBody() io.Reader {
 }
 
 func (producer *httpRequestProducer) produce(ctx context.Context) (*http.Request, error) {
-	httpRequest, err := http.NewRequest(producer.httpMethod, producer.url, producer.getBody())
+	httpRequest, err := http.NewRequestWithContext(ctx, producer.httpMethod, producer.url, producer.getBody())
 	if err != nil {
 		return nil, fmt.Errorf("cannot create request: %w", err)
 	}
@@ -56,11 +56,11 @@ func (producer *httpRequestProducer) produce(ctx context.Context) (*http.Request
 	if err != nil {
 		return nil, fmt.Errorf("cannot add serializable data: %w", err)
 	}
-	authHeaderValue, err := producer.authHeaderSupplier(ctx)
+	authHeader, err := producer.authHeader(ctx)
 	if err != nil {
 		return nil, &TokenAcquisitionError{Err: err}
 	}
-	httpRequest.Header.Add("Authorization", authHeaderValue)
+	httpRequest.Header.Add("Authorization", authHeader)
 	for header, values := range producer.headers {
 		for _, value := range values {
 			httpRequest.Header.Add(header, value)
