@@ -471,7 +471,7 @@ func TestNewM2MRestClient(t *testing.T) {
 	newAuth := mockAuthHeaderFunc("Bearer new", nil)
 	fallbackAuth := mockAuthHeaderFunc("Bearer fallback", nil)
 
-	client := newM2MRestClient(newAuth, fallbackAuth)
+	client := newM2MRestClient(newAuth, fallbackAuth, "")
 
 	assert.NotNil(t, client)
 	m2mClient, ok := client.(*m2MRestClient)
