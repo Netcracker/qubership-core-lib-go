@@ -23,24 +23,24 @@ func init() {
 	logger = logging.GetLogger("rest-client")
 }
 
-// RestClient represents a generic rest client to make requests to services. Use DefaultM2MRestClient, DefaultDbaasRestClient, DefaultMaasRestClient functions to get a RestClient for your task. All of them support Kubernetes tokens and falling back to old approach if they are not available either in client or server
-type RestClient interface {
+// Client represents a generic rest client to make requests to services. Use NewM2MRestClient, NewDbaasRestClient, NewMaasRestClient functions to get a Client for your task. All of them support Kubernetes tokens and falling back to old approach if they are not available either in client or server
+type Client interface {
 	DoRequest(ctx context.Context, httpMethod, url string, headers map[string][]string, body io.Reader) (*http.Response, error)
 }
 
-// DefaultM2MRestClient returns a RestClient for making requests to internal services using kubernetes token with netcracker audience. If token is not available or a service doesn't support kubernetes tokens then it falls back to old m2m tokens
-func DefaultM2MRestClient() RestClient {
-	return newM2MRestClient(k8sAuthHeaderFunc(tokensource.AudienceNetcracker), keycloakAuthHeaderFunc())
+// NewM2MRestClient returns a Client for making requests to internal services using kubernetes token with netcracker audience. If token is not available or a service doesn't support kubernetes tokens then it falls back to old m2m tokens
+func NewM2MRestClient() Client {
+	return newM2MRestClient(k8sAuthHeaderFunc(tokensource.AudienceNetcracker), keycloakAuthHeaderFunc(), "")
 }
 
-// DefaultDbaasRestClient returns a RestClient for making requests to dbaas using kubernetes token with dbaas audience. If token is not available or the current dbaas version doesn't support kubernetes tokens then it falls back to old approach with basic creds `username` and `password`.
-func DefaultDbaasRestClient(username, password string) RestClient {
-	return newM2MRestClient(k8sAuthHeaderFunc(tokensource.AudienceDBaaS), basicAuthHeaderFunc(username, password))
+// NewDbaasRestClient returns a Client for making requests to dbaas using kubernetes token with dbaas audience. If token is not available or the current dbaas version doesn't support kubernetes tokens then it falls back to old approach making request through dbaas-agent
+func NewDbaasRestClient() Client {
+	return newM2MRestClient(k8sAuthHeaderFunc(tokensource.AudienceDBaaS), keycloakAuthHeaderFunc(), "http://dbaas-agent:8080")
 }
 
-// DefaultMaasRestClient returns a RestClient for making requests to maas using kubernetes token with maas audience. If token is not available or the current maas version doesn't support kubernetes tokens then it falls back to old approach with basic creds `username` and `password`.
-func DefaultMaasRestClient(username, password string) RestClient {
-	return newM2MRestClient(k8sAuthHeaderFunc(tokensource.AudienceMaaS), basicAuthHeaderFunc(username, password))
+// NewMaasRestClient returns a Client for making requests to maas using kubernetes token with maas audience. If token is not available or the current maas version doesn't support kubernetes tokens then it falls back to old approach making request through maas-agent
+func NewMaasRestClient() Client {
+	return newM2MRestClient(k8sAuthHeaderFunc(tokensource.AudienceMaaS), keycloakAuthHeaderFunc(), "http://maas-agent:8080")
 }
 
 type authHeaderFunc func(ctx context.Context) (string, error)
@@ -50,14 +50,16 @@ type m2MRestClient struct {
 	urlCache           cache.Cache[string, empty]
 	k8sAuthHeader      authHeaderFunc
 	fallbackAuthHeader authHeaderFunc
+	fallBackUrl        string
 }
 
-func newM2MRestClient(k8sAuthHeader, fallbackAuthHeader authHeaderFunc) RestClient {
+func newM2MRestClient(k8sAuthHeader, fallbackAuthHeader authHeaderFunc, fallBackUrl string) Client {
 	return &m2MRestClient{
 		client:             utils.GetClient(),
 		urlCache:           getUrlCache(),
 		k8sAuthHeader:      k8sAuthHeader,
 		fallbackAuthHeader: fallbackAuthHeader,
+		fallBackUrl:        fallBackUrl,
 	}
 }
 
