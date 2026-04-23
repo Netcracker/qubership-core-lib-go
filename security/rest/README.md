@@ -16,14 +16,14 @@ The library offers three factory functions to create REST clients for different 
 
 ### Factory Functions
 
-* `DefaultM2MRestClient()` – returns a RestClient for internal service-to-service communication using Kubernetes tokens with Netcracker audience, with automatic fallback to Keycloak M2M tokens
-* `DefaultDbaasRestClient(username, password string)` – returns a RestClient for DBaaS communication using Kubernetes tokens with DBaaS audience, with automatic fallback to Basic authentication
-* `DefaultMaasRestClient(username, password string)` – returns a RestClient for MaaS communication using Kubernetes tokens with MaaS audience, with automatic fallback to Basic authentication
+* `NewM2MRestClient()` – returns a Client for internal service-to-service communication using Kubernetes tokens with Netcracker audience, with automatic fallback to Keycloak M2M tokens
+* `NewDbaasRestClient(username, password string)` – returns a Client for DBaaS communication using Kubernetes tokens with DBaaS audience, with automatic fallback to dbaas-agent
+* `NewMaasRestClient(username, password string)` – returns a Client for MaaS communication using Kubernetes tokens with MaaS audience, with automatic fallback to maas-agent
 
-### RestClient Interface
+### Client Interface
 
 ```go
-type RestClient interface {
+type Client interface {
     DoRequest(ctx context.Context, httpMethod, url string, headers map[string][]string, body io.Reader) (*http.Response, error)
 }
 ```
@@ -49,7 +49,7 @@ func main() {
     ctx := context.Background()
     
     // Create client for internal service communication
-    client := rest.DefaultM2MRestClient()
+    client := rest.NewM2MRestClient()
     
     // Prepare headers
     headers := map[string][]string{
@@ -99,7 +99,7 @@ import (
 )
 
 func fetchData(ctx context.Context, resourceID string) error {
-    client := rest.DefaultM2MRestClient()
+    client := rest.NewM2MRestClient()
     
     url := fmt.Sprintf("http://data-service:8080/api/v1/resources/%s", resourceID)
     
@@ -138,7 +138,7 @@ import (
 
 func createDatabase(ctx context.Context, dbName string) error {
     // Create client with DBaaS credentials
-    client := rest.DefaultDbaasRestClient("dbaas-user", "dbaas-password")
+    client := rest.NewDbaasRestClient("dbaas-user", "dbaas-password")
     
     headers := map[string][]string{
         "Content-Type": {"application/json"},
@@ -181,7 +181,7 @@ import (
 
 func sendMessage(ctx context.Context, topic, message string) error {
     // Create client with MaaS credentials
-    client := rest.DefaultMaasRestClient("maas-user", "maas-password")
+    client := rest.NewMaasRestClient("maas-user", "maas-password")
     
     headers := map[string][]string{
         "Content-Type": {"application/json"},
@@ -218,7 +218,7 @@ import (
 )
 
 func fetchWithCustomHeaders(ctx context.Context) error {
-    client := rest.DefaultM2MRestClient()
+    client := rest.NewM2MRestClient()
     
     // Add multiple custom headers
     headers := map[string][]string{
