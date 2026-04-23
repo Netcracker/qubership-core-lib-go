@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 
 	cache "github.com/go-pkgz/expirable-cache/v3"
 	"github.com/netcracker/qubership-core-lib-go/v3/security"
@@ -50,16 +51,16 @@ type m2MRestClient struct {
 	urlCache           cache.Cache[string, empty]
 	k8sAuthHeader      authHeaderFunc
 	fallbackAuthHeader authHeaderFunc
-	fallBackUrl        string
+	fallBackBaseUrl    string
 }
 
-func newM2MRestClient(k8sAuthHeader, fallbackAuthHeader authHeaderFunc, fallBackUrl string) Client {
+func newM2MRestClient(k8sAuthHeader, fallbackAuthHeader authHeaderFunc, fallBackBaseUrl string) Client {
 	return &m2MRestClient{
 		client:             utils.GetClient(),
 		urlCache:           getUrlCache(),
 		k8sAuthHeader:      k8sAuthHeader,
 		fallbackAuthHeader: fallbackAuthHeader,
-		fallBackUrl:        fallBackUrl,
+		fallBackBaseUrl:    fallBackBaseUrl,
 	}
 }
 
@@ -94,17 +95,23 @@ func (m *m2MRestClient) DoRequest(ctx context.Context, httpMethod, url string, h
 	}
 
 	//new authentication method is not applicable (we already know it from cache), need to use fallback approach
-	requestProducer.authHeader = m.fallbackAuthHeader
-	logger.Debugf("trying to send %s request to %s using fallback authentication method", httpMethod, url)
-	return m.doRequest(ctx, requestProducer)
+	return m.doRequestFallback(ctx, cacheKey, requestProducer, nil)
 }
 
 func (m *m2MRestClient) doRequestFallback(ctx context.Context, cacheKey string, requestProducer *httpRequestProducer, reason *fallbackReason) (*http.Response, error) {
 	logger.Debugf("fallback: trying to send %s request to %s using fallback authentication method", requestProducer.httpMethod, requestProducer.url)
+
+	if m.fallBackBaseUrl != "" {
+		rebasedUrl, err := rebaseUrl(requestProducer.url, m.fallBackBaseUrl)
+		if err != nil {
+			return nil, fmt.Errorf("failed to rebase url %q to fallback base url %q: %w", requestProducer.url, m.fallBackBaseUrl, err)
+		}
+		requestProducer.url = rebasedUrl
+	}
 	requestProducer.authHeader = m.fallbackAuthHeader
 	response, err := m.doRequest(ctx, requestProducer)
 
-	if err == nil && response.StatusCode < 400 {
+	if err == nil && response.StatusCode < 400 && reason != nil {
 		m.urlCache.Add(cacheKey, empty{})
 		logger.WarnC(ctx, "%s", reason.Message())
 	}
@@ -154,4 +161,18 @@ func basicAuthHeaderFunc(username, password string) authHeaderFunc {
 	return func(ctx context.Context) (string, error) {
 		return authHeader, nil
 	}
+}
+
+func rebaseUrl(originalUrl, fallbackBase string) (string, error) {
+	original, err := url.Parse(originalUrl)
+	if err != nil {
+		return "", fmt.Errorf("cannot parse url: %w", err)
+	}
+	base, err := url.Parse(fallbackBase)
+	if err != nil {
+		return "", fmt.Errorf("cannot parse fallback base url: %w", err)
+	}
+	original.Scheme = base.Scheme
+	original.Host = base.Host
+	return original.String(), nil
 }

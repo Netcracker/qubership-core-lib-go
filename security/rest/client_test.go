@@ -587,3 +587,44 @@ func TestM2MRestClient_DoRequest_MultipleBodyReads(t *testing.T) {
 	assert.NotNil(t, resp)
 	resp.Body.Close()
 }
+
+func TestM2MRestClient_DoRequest_FallbackRebasesUrl(t *testing.T) {
+	agentServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer agentServer.Close()
+
+	originalServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusUnauthorized)
+	}))
+	defer originalServer.Close()
+
+	client := &m2MRestClient{
+		client:             agentServer.Client(),
+		urlCache:           getUrlCache(),
+		k8sAuthHeader:      mockAuthHeaderFunc("Bearer new-token", nil),
+		fallbackAuthHeader: mockAuthHeaderFunc("Bearer fallback-token", nil),
+		fallBackBaseUrl:    agentServer.URL,
+	}
+
+	ctx := context.Background()
+
+	t.Run("first call 401 rebases to fallback agent", func(t *testing.T) {
+		resp, err := client.DoRequest(ctx, "GET", originalServer.URL+"/api/v1/resource", nil, nil)
+		require.NoError(t, err)
+		assert.Equal(t, http.StatusOK, resp.StatusCode)
+		resp.Body.Close()
+	})
+
+	t.Run("cached url also rebases to fallback agent", func(t *testing.T) {
+		originalUrl := "http://original-service:9090/api/v1/resource"
+		cacheKey, err := calculateCacheKey(originalUrl)
+		require.NoError(t, err)
+		client.urlCache.Add(cacheKey, empty{})
+
+		resp, err := client.DoRequest(ctx, "GET", originalUrl, nil, nil)
+		require.NoError(t, err)
+		assert.Equal(t, http.StatusOK, resp.StatusCode)
+		resp.Body.Close()
+	})
+}
