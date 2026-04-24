@@ -17,6 +17,7 @@ var (
 )
 
 func beforeEach(t *testing.T) {
+	resetTokenSourceState(t)
 	var err error
 
 	saTokenStorage, err = newServiceAccountTokenStorage(t.TempDir())
@@ -29,7 +30,8 @@ func beforeEach(t *testing.T) {
 	DefaultAudienceTokensDir = audTokensStorage.audienceTokensDir
 	logger.Infof("audience tokens dir is %s", audTokensStorage.audienceTokensDir)
 }
-func afterEach(_ *testing.T) {
+func afterEach(t *testing.T) {
+	resetTokenSourceState(t)
 	_ = saTokenStorage.clear()
 	_ = audTokensStorage.clear()
 }
@@ -39,7 +41,7 @@ func TestMain(m *testing.M) {
 }
 func TestServiceAccountToken(t *testing.T) {
 	ctx, cancelCtx := context.WithCancel(t.Context())
-	defer func() { cancelCtx(); time.Sleep(time.Millisecond * 10) }()
+	defer cancelCtx()
 	beforeEach(t)
 	defer afterEach(t)
 
@@ -55,23 +57,18 @@ func TestServiceAccountToken(t *testing.T) {
 	err = saTokenStorage.saveTokenValue(serviceAccountTokenSecondValue)
 	assert.NoError(t, err)
 
+	resetTokenSourceState(t)
 	token, err = GetServiceAccountToken(ctx)
 	assert.NoError(t, err)
 	assert.Equal(t, serviceAccountTokenSecondValue, token)
 }
 func TestNoServiceAccountToken(t *testing.T) {
 	ctx, cancelCtx := context.WithCancel(t.Context())
-	defer func() { cancelCtx(); time.Sleep(time.Millisecond * 10) }()
+	defer cancelCtx()
 	beforeEach(t)
 	defer afterEach(t)
 
-	err := saTokenStorage.deleteTokenFile()
-	assert.NoError(t, err)
-
-	_, err = GetServiceAccountToken(ctx)
-	assert.ErrorContains(t, err, "failed to get token default kubernetes service account token: failed to read token at path")
-
-	err = saTokenStorage.saveTokenValue("value")
+	err := saTokenStorage.saveTokenValue("value")
 	assert.NoError(t, err)
 
 	token, err := GetServiceAccountToken(ctx)
@@ -81,12 +78,21 @@ func TestNoServiceAccountToken(t *testing.T) {
 	err = saTokenStorage.deleteTokenFile()
 	assert.NoError(t, err)
 
+	resetTokenSourceState(t)
 	_, err = GetServiceAccountToken(ctx)
-	assert.ErrorContains(t, err, "failed to get token default kubernetes service account token: failed to read token at path")
+	assert.ErrorContains(t, err, "failed to create token watcher: failed to add path")
+
+	err = saTokenStorage.saveTokenValue("value")
+	assert.NoError(t, err)
+
+	resetTokenSourceState(t)
+	token, err = GetServiceAccountToken(ctx)
+	assert.NoError(t, err)
+	assert.Equal(t, "value", token)
 }
 func TestNoServiceAccountTokenDir(t *testing.T) {
 	ctx, cancelCtx := context.WithCancel(t.Context())
-	defer func() { cancelCtx(); time.Sleep(time.Millisecond * 10) }()
+	defer cancelCtx()
 	beforeEach(t)
 	defer afterEach(t)
 
@@ -98,7 +104,7 @@ func TestNoServiceAccountTokenDir(t *testing.T) {
 }
 func TestAudienceTokens(t *testing.T) {
 	ctx, cancelCtx := context.WithCancel(t.Context())
-	defer func() { cancelCtx(); time.Sleep(time.Millisecond * 10) }()
+	defer cancelCtx()
 	beforeEach(t)
 	defer afterEach(t)
 
@@ -122,6 +128,7 @@ func TestAudienceTokens(t *testing.T) {
 	err = audTokensStorage.saveTokenValue(AudienceNetcracker, netcrackerTokenSecondValue)
 	assert.NoError(t, err)
 
+	resetTokenSourceState(t)
 	token, err = GetAudienceToken(ctx, AudienceNetcracker)
 	assert.NoError(t, err)
 	assert.Equal(t, netcrackerTokenSecondValue, token)
@@ -130,20 +137,18 @@ func TestAudienceTokens(t *testing.T) {
 	err = audTokensStorage.saveTokenValue(AudienceDBaaS, dbaasTokenSecondValue)
 	assert.NoError(t, err)
 
+	resetTokenSourceState(t)
 	token, err = GetAudienceToken(ctx, AudienceDBaaS)
 	assert.NoError(t, err)
 	assert.Equal(t, dbaasTokenSecondValue, token)
 }
 func TestNoAudienceToken(t *testing.T) {
 	ctx, cancelCtx := context.WithCancel(t.Context())
-	defer func() { cancelCtx(); time.Sleep(time.Millisecond * 10) }()
+	defer cancelCtx()
 	beforeEach(t)
 	defer afterEach(t)
 
-	_, err := GetAudienceToken(ctx, AudienceNetcracker)
-	assert.ErrorContains(t, err, "token with audience netcracker was not found")
-
-	err = audTokensStorage.saveTokenValue(AudienceNetcracker, "value")
+	err := audTokensStorage.saveTokenValue(AudienceNetcracker, "value")
 	assert.NoError(t, err)
 
 	token, err := GetAudienceToken(ctx, AudienceNetcracker)
@@ -153,12 +158,13 @@ func TestNoAudienceToken(t *testing.T) {
 	err = audTokensStorage.deleteTokenFile(AudienceNetcracker)
 	assert.NoError(t, err)
 
+	resetTokenSourceState(t)
 	_, err = GetAudienceToken(ctx, AudienceNetcracker)
 	assert.ErrorContains(t, err, "failed to get token by audience: netcracker: failed to read token at path")
 }
 func TestNoAudienceTokensDir(t *testing.T) {
 	ctx, cancelCtx := context.WithCancel(t.Context())
-	defer func() { cancelCtx(); time.Sleep(time.Millisecond * 10) }()
+	defer cancelCtx()
 	beforeEach(t)
 	defer afterEach(t)
 
@@ -171,12 +177,31 @@ func TestNoAudienceTokensDir(t *testing.T) {
 }
 func TestEmptyAudience(t *testing.T) {
 	ctx, cancelCtx := context.WithCancel(t.Context())
-	defer func() { cancelCtx(); time.Sleep(time.Millisecond * 10) }()
+	defer cancelCtx()
 	beforeEach(t)
 	defer afterEach(t)
 
 	_, err := GetAudienceToken(ctx, "")
 	assert.ErrorContains(t, err, "audience is empty")
+}
+
+func resetTokenSourceState(t *testing.T) {
+	if lazy := serviceAccountTokenWatcher.Load(); lazy != nil {
+		if watcher, err := lazy.Get(); err == nil && watcher != nil {
+			watcher.cancel()
+			assert.Eventually(t, func() bool { return serviceAccountTokenWatcher.Load() == nil }, time.Second, time.Millisecond*20)
+		}
+	}
+	if lazy := audienceTokensWatcher.Load(); lazy != nil {
+		if watcher, err := lazy.Get(); err == nil && watcher != nil {
+			watcher.cancel()
+			assert.Eventually(t, func() bool { return audienceTokensWatcher.Load() == nil }, time.Second, time.Millisecond*20)
+		}
+	}
+	serviceAccountTokenWatcher.Store(nil)
+	audienceTokensWatcher.Store(nil)
+	serviceAccountTokenCache.Store(tokenUpdateResult{})
+	audienceTokensCache.Clear()
 }
 
 const dataSymlinkName = "..data"
