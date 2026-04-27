@@ -256,26 +256,26 @@ func TestHttpRequestProducer_Produce(t *testing.T) {
 				var tae *TokenAcquisitionError
 				assert.ErrorAs(t, err, &tae)
 			}
-		} else {
-			require.NoError(t, err)
-			assert.NotNil(t, req)
-			assert.Equal(t, tt.httpMethod, req.Method)
-			assert.Equal(t, tt.url, req.URL.String())
-			assert.Equal(t, tt.expectedAuthHeader, req.Header.Get("Authorization"))
+			continue
+		}
+		require.NoError(t, err)
+		assert.NotNil(t, req)
+		assert.Equal(t, tt.httpMethod, req.Method)
+		assert.Equal(t, tt.url, req.URL.String())
+		assert.Equal(t, tt.expectedAuthHeader, req.Header.Get("Authorization"))
 
-			// Verify custom headers were added
-			for key, values := range tt.headers {
-				for _, value := range values {
-					assert.Contains(t, req.Header.Values(key), value)
-				}
+		// Verify custom headers were added
+		for key, values := range tt.headers {
+			for _, value := range values {
+				assert.Contains(t, req.Header.Values(key), value)
 			}
+		}
 
-			// Verify body if present
-			if len(tt.bodyBytes) > 0 {
-				bodyBytes, err := io.ReadAll(req.Body)
-				assert.NoError(t, err)
-				assert.Equal(t, tt.bodyBytes, bodyBytes)
-			}
+		// Verify body if present
+		if len(tt.bodyBytes) > 0 {
+			bodyBytes, err := io.ReadAll(req.Body)
+			assert.NoError(t, err)
+			assert.Equal(t, tt.bodyBytes, bodyBytes)
 		}
 	}
 }
