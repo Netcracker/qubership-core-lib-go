@@ -253,3 +253,6 @@ The REST client automatically handles authentication method selection:
 3. **Caching**: Once a fallback is triggered for a service, subsequent requests to that service will directly use the fallback method to avoid unnecessary retries
 
 This ensures backward compatibility with services that haven't been upgraded to support Kubernetes token authentication while providing seamless migration path for services that do support it.
+
+## Testing
+Override rest.DefaultDbaasAgentUrl and rest.DefaultMaasAgentUrl for testing.

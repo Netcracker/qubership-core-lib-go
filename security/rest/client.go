@@ -18,7 +18,12 @@ import (
 	"github.com/netcracker/qubership-core-lib-go/v3/logging"
 )
 
-var logger logging.Logger
+var (
+    logger logging.Logger
+
+	DefaultDbaasAgentUrl string = "http://dbaas-agent:8080"
+	DefaultMaasAgentUrl  string = "http://maas-agent:8080"
+)
 
 func init() {
 	logger = logging.GetLogger("rest-client")
@@ -36,12 +41,12 @@ func NewM2MRestClient() Client {
 
 // NewDbaasRestClient returns a Client for making requests to dbaas using kubernetes token with dbaas audience. If token is not available or the current dbaas version doesn't support kubernetes tokens then it falls back to old approach making request through dbaas-agent
 func NewDbaasRestClient() Client {
-	return newM2MRestClient(k8sAuthHeaderFunc(tokensource.AudienceDBaaS), keycloakAuthHeaderFunc(), "http://dbaas-agent:8080")
+	return newM2MRestClient(k8sAuthHeaderFunc(tokensource.AudienceDBaaS), keycloakAuthHeaderFunc(), DefaultDbaasAgentUrl)
 }
 
 // NewMaasRestClient returns a Client for making requests to maas using kubernetes token with maas audience. If token is not available or the current maas version doesn't support kubernetes tokens then it falls back to old approach making request through maas-agent
 func NewMaasRestClient() Client {
-	return newM2MRestClient(k8sAuthHeaderFunc(tokensource.AudienceMaaS), keycloakAuthHeaderFunc(), "http://maas-agent:8080")
+	return newM2MRestClient(k8sAuthHeaderFunc(tokensource.AudienceMaaS), keycloakAuthHeaderFunc(), DefaultMaasAgentUrl)
 }
 
 type authHeaderFunc func(ctx context.Context) (string, error)
