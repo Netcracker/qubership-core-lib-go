@@ -124,6 +124,10 @@ func GetSerializableContextData(ctx context.Context) (map[string]string, error) 
 	resultMap := map[string]string{}
 	logger.Debug("get serializable contextData")
 	for _, provider := range sortedContextProviders {
+		if IsContextBlackListed(provider.ContextName()) {
+			logger.Debug("context=%s is blacklisted", provider.ContextName())
+			continue
+		}
 		if contextObject := provider.Get(ctx); contextObject != nil {
 			if serializablePropagator, isSerializable := (contextObject).(SerializableContext); isSerializable {
 				serializableData, err := serializablePropagator.Serialize()
