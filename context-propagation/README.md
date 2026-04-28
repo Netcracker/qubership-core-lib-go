@@ -58,6 +58,7 @@ AllowedHeader
 BusinessProcess
 OriginatingBiId
 ClientIp
+XChannelRequestId
 ```
 
 **Secondly,** on each request you should init context by calling the method `ctxmanager.InitContext(ctx, map[string][]string)` and passing `context.Context` and request data.
