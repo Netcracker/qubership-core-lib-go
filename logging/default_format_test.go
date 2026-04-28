@@ -4,10 +4,11 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"github.com/stretchr/testify/assert"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/assert"
 )
 
 const (
@@ -40,12 +41,13 @@ func TestDefaultFormat(t *testing.T) {
 		Message:     message,
 		Ctx:         nil,
 	})
-	expectedValue := "[0001-01-01T00:00:00.000] [FATAL] [request_id=-] [tenant_id=-] [thread=-] [class=test] test message"
+	expectedValue := "[0001-01-01T00:00:00.000] [FATAL] [request_id=-] [x_channel_request_id=-] [tenant_id=-] [thread=-] [class=test] test message"
 	assert.True(t, strings.Contains(string(formatBuffer), expectedValue))
 
 	ctx := context.Background()
 	ctx = context.WithValue(ctx, RequestIdContextName, &testObjectWithLogValueMethod{"req-id"})
 	ctx = context.WithValue(ctx, TenantContextName, &testObjectWithLogValueMethod{"ten-id"})
+	ctx = context.WithValue(ctx, ChannelRequestIdContextName, &testObjectWithLogValueMethod{"chan-req-id"})
 	formatBuffer = DefaultFormat.format(&Record{
 		PackageName: packageName,
 		Time:        timeValue,
@@ -53,7 +55,7 @@ func TestDefaultFormat(t *testing.T) {
 		Message:     message,
 		Ctx:         ctx,
 	})
-	assert.True(t, strings.Contains(string(formatBuffer), "[request_id=req-id] [tenant_id=ten-id]"))
+	assert.True(t, strings.Contains(string(formatBuffer), "[request_id=req-id] [x_channel_request_id=chan-req-id] [tenant_id=ten-id]"))
 
 	ctx = context.Background()
 	ctx = context.WithValue(ctx, RequestIdContextName, &testObjectWithoutLogValueMethod{"req-id"})
@@ -65,7 +67,7 @@ func TestDefaultFormat(t *testing.T) {
 		Message:     message,
 		Ctx:         ctx,
 	})
-	assert.True(t, strings.Contains(string(formatBuffer), "[request_id=-] [tenant_id=-]"))
+	assert.True(t, strings.Contains(string(formatBuffer), "[request_id=-] [x_channel_request_id=-] [tenant_id=-]"))
 }
 
 func TestContextObject(t *testing.T) {
