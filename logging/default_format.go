@@ -57,13 +57,13 @@ func (format *defaultFormat) logFormat(r *Record, b *bytes.Buffer, color int, lv
 	if format.messageFormat != nil {
 		return format.messageFormat(r, b, color, lvl)
 	}
-	return fmt.Fprintf(b, "[%s] [%s] [request_id=%s] [x_channel_request_id=%s] [tenant_id=%s] [thread=-] [class=%s] %s",
+	return fmt.Fprintf(b, "[%s] [%s] [request_id=%s] [tenant_id=%s] [thread=-] [class=%s] [x_channel_request_id=%s] %s",
 		r.Time.Format(TimeFormat),
 		lvl,
 		GetValueOrPlaceholder(r.Ctx, RequestIdContextName),
-		GetValueOrPlaceholder(r.Ctx, ChannelRequestIdContextName),
 		GetValueOrPlaceholder(r.Ctx, TenantContextName),
 		ConstructCallerValueByRecord(r),
+		GetValueOrPlaceholder(r.Ctx, ChannelRequestIdContextName),
 		JoinStringsWithSpace(AssembleDefaultCustomLogFields(r.Ctx), r.Message),
 	)
 }
