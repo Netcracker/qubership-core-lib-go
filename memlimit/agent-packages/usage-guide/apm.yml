@@ -1,0 +1,9 @@
+name: usage-guide
+version: 1.0.0
+description: APM project for usage-guide
+author: Roman Kichasov
+dependencies:
+  apm: []
+  mcp: []
+includes: auto
+scripts: {}
