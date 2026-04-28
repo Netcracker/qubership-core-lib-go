@@ -30,14 +30,14 @@ func init() {
 }
 
 func IsContextBlackListed(name string) bool {
-	return globalBlackLister.IsBlackListed(name)
+	return globalBlackLister.isBlackListed(name)
 }
 
 type contextBlackLister struct {
 	blackListedContexts []string
 }
 
-func (cbl *contextBlackLister) IsBlackListed(contextName string) bool {
+func (cbl *contextBlackLister) isBlackListed(contextName string) bool {
 	for _, blackListedContext := range cbl.blackListedContexts {
 		if strings.EqualFold(blackListedContext, contextName) {
 			return true
