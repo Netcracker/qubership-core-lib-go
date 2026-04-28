@@ -28,9 +28,31 @@ there is no exported function to call:
 import _ "github.com/netcracker/qubership-core-lib-go/v3/memlimit"
 ```
 
-Place the import in `main.go`. Safe to use outside containers —
-becomes a no-op when no cgroup limit is detected. Does not override
-GOMEMLIMIT if already set via environment.
+Place the import in `main.go`. Does not override GOMEMLIMIT if already
+set via environment.
+
+## Dependency on configloader and application.yaml
+
+memlimit's `init()` internally calls `logging.GetLogger`, which
+triggers configloader. Because the blank import causes memlimit's
+`init()` to run **before** `main`'s `init()`, configloader has not
+yet been explicitly initialized at that point — it auto-initializes
+with default sources, which means it looks for `application.yaml`
+in the working directory.
+
+**`application.yaml` must exist** (may be empty) before the binary
+starts, otherwise the service will fail to start with a missing-file
+error.
+
+Minimum required file:
+
+```yaml
+# application.yaml
+```
+
+Outside containers (local dev, macOS) cgroup files are absent so
+no memory limit is set; the library logs "failed to set MEMORY LIMIT"
+and continues normally.
 
 ## Anti-patterns
 

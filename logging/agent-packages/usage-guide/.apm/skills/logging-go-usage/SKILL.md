@@ -77,7 +77,7 @@ import (
 var logger logging.Logger
 
 func init() {
-    configloader.Init(configloader.BasePropertySources())
+    configloader.InitWithSourcesArray(configloader.BasePropertySources())
     logger = logging.GetLogger("main")
 }
 
@@ -92,7 +92,7 @@ func main() {
 
 Key points:
 1. `var logger` — declared at package level
-2. `configloader.Init(...)` — called in `init()`, first
+2. `configloader.InitWithSourcesArray(...)` — called in `init()`, first
 3. `logging.GetLogger(...)` — called in `init()`, after configloader
 4. Logger name matches the package name
 
@@ -132,7 +132,7 @@ import (
 var logger logging.Logger
 
 func init() {
-    configloader.Init(configloader.BasePropertySources())
+    configloader.InitWithSourcesArray(configloader.BasePropertySources())
     logger = logging.GetLogger("main")
 }
 ```
