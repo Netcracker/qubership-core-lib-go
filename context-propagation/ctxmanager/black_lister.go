@@ -1,9 +1,10 @@
 package ctxmanager
 
 import (
-	"os"
 	"strings"
 	"sync"
+
+	"github.com/netcracker/qubership-core-lib-go/v3/configloader"
 )
 
 const defaultInBlackList = "X-Channel-Request-Id"
@@ -13,24 +14,26 @@ var (
 	once              sync.Once
 )
 
-func init() {
+func IsContextBlackListed(name string) bool {
+	return getBlackLister().isBlackListed(name)
+}
+
+func getBlackLister() *contextBlackLister {
 	once.Do(func() {
-		raw, present := os.LookupEnv("CONTEXT_BLACK_LIST")
-		if !present {
-			raw = defaultInBlackList
-		}
+		raw := configloader.GetOrDefault("context.black.list", defaultInBlackList) // we don't use GetOrDefaultString because we should handle empty string value
 		var entries []string
-		for _, entry := range strings.Split(raw, ",") {
+		for _, entry := range strings.Split(raw.(string), ",") {
 			if trimmed := strings.TrimSpace(entry); trimmed != "" {
 				entries = append(entries, trimmed)
 			}
 		}
-		globalBlackLister = &contextBlackLister{blackListedContexts: entries}
-	})
-}
 
-func IsContextBlackListed(name string) bool {
-	return globalBlackLister.isBlackListed(name)
+		globalBlackLister = &contextBlackLister{
+			blackListedContexts: entries,
+		}
+	})
+
+	return globalBlackLister
 }
 
 type contextBlackLister struct {

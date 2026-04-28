@@ -1,23 +1,17 @@
 package ctxmanager
 
 import (
-	"os"
 	"strings"
 	"sync"
 	"testing"
 )
 
 func resetSingleton(present bool, envVal string) {
-	if present {
-		os.Setenv("CONTEXT_BLACK_LIST", envVal)
-	} else {
-		os.Unsetenv("CONTEXT_BLACK_LIST")
-	}
 	once = sync.Once{}
 	globalBlackLister = nil
 	once.Do(func() {
-		raw, ok := os.LookupEnv("CONTEXT_BLACK_LIST")
-		if !ok {
+		raw := envVal
+		if !present {
 			raw = defaultInBlackList
 		}
 		var entries []string
