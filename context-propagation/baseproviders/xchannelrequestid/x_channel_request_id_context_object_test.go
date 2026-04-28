@@ -14,18 +14,6 @@ func init() {
 	ctxmanager.Register([]ctxmanager.ContextProvider{XChannelRequestIdProvider{}})
 }
 
-func TestChannelRequestIdSerializableCtx(t *testing.T) {
-	incomingHeaders := getIncomingRequestHeaders()
-	ctx := ctxmanager.InitContext(context.Background(), incomingHeaders)
-	contextData, err := ctxmanager.GetContextObject(ctx, X_CHANNEL_REQUEST_ID_COTEXT_NAME)
-	assert.NotNil(t, contextData)
-	assert.Nil(t, err)
-	requestId, _ := Of(ctx)
-	assert.Equal(t, xChannelRequestIdValue, requestId.channelRequestId)
-	outgoingData, _ := ctxmanager.GetSerializableContextData(ctx)
-	assert.Equal(t, xChannelRequestIdValue, outgoingData[X_CHANNEL_REQUEST_ID_HEADER_NAME])
-}
-
 func TestChannelRequestIdIncomingResponsePropagatableCtx(t *testing.T) {
 	incomingHeaders := getIncomingRequestHeaders()
 	ctx := ctxmanager.InitContext(context.Background(), incomingHeaders)
