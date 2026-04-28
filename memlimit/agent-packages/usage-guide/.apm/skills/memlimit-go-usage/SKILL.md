@@ -21,17 +21,14 @@ fraction, so the GC runs more aggressively near the boundary.
 
 ## Import
 
-```go
-import "github.com/netcracker/qubership-core-lib-go/v3/memlimit"
-```
-
-## API
+Use a blank import — the library activates via its own `init()`,
+there is no exported function to call:
 
 ```go
-memlimit.SetMemoryLimit()
+import _ "github.com/netcracker/qubership-core-lib-go/v3/memlimit"
 ```
 
-Call once in main package init(). Safe to call outside containers —
+Place the import in `main.go`. Safe to use outside containers —
 becomes a no-op when no cgroup limit is detected. Does not override
 GOMEMLIMIT if already set via environment.
 

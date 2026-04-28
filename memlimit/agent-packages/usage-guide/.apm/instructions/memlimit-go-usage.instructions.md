@@ -1,16 +1,16 @@
 ---
-description: >
-  Require memlimit.SetMemoryLimit() in every Qubership Go microservice.
-applyTo: "**/main.go"
+paths:
+  - "**/main.go"
 ---
 
 # memlimit requirement
 
-Every Qubership microservice must call memlimit.SetMemoryLimit()
-in main package init(), after configloader and logger init.
+Every Qubership microservice must include memlimit via blank import
+in main.go. The library activates through its own init() — there is
+no function to call.
 
 ```go
-import "github.com/netcracker/qubership-core-lib-go/v3/memlimit"
+import _ "github.com/netcracker/qubership-core-lib-go/v3/memlimit"
 ```
 
 Do not set GOMEMLIMIT manually. Do not use automemlimit
