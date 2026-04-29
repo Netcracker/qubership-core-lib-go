@@ -45,7 +45,7 @@ func TestSetChannelRequestIdProvider(t *testing.T) {
 	assert.Equal(t, "24", secondXRequestId.channelRequestId)
 }
 
-func TestErrorSetAcceptLanguageProvider(t *testing.T) {
+func TestErrorSetXChannelRequestIdProvider(t *testing.T) {
 	provider, _ := ctxmanager.GetProvider(X_CHANNEL_REQUEST_ID_CONTEXT_NAME)
 	_, err := provider.Set(context.Background(), "wrong type")
 	assert.NotNil(t, err)

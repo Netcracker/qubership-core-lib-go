@@ -20,16 +20,35 @@ func IsContextBlackListed(name string) bool {
 
 func getBlackLister() *contextBlackLister {
 	once.Do(func() {
-		raw := configloader.GetOrDefault("headers.blocked", defaultInBlackList) // we don't use GetOrDefaultString because we should handle empty string value
-		var entries []string
-		for _, entry := range strings.Split(raw.(string), ",") {
-			if trimmed := strings.TrimSpace(entry); trimmed != "" {
-				entries = append(entries, trimmed)
+		globalBlackLister = &contextBlackLister{}
+
+		loadEntries := func() []string {
+			raw := configloader.GetOrDefault("headers.blocked", defaultInBlackList)
+			str, ok := raw.(string)
+			if !ok {
+				logger.Error("unexpected type for headers.blocked: %T", raw)
+				return nil
 			}
+			var entries []string
+			for _, entry := range strings.Split(str, ",") {
+				if trimmed := strings.TrimSpace(entry); trimmed != "" {
+					entries = append(entries, trimmed)
+				}
+			}
+			return entries
 		}
 
-		globalBlackLister = &contextBlackLister{
-			blackListedContexts: entries,
+		globalBlackLister.blackListedContexts = loadEntries() // initial load before Subscribe
+
+		_, err := configloader.Subscribe(func(event configloader.Event) error {
+			entries := loadEntries()
+			globalBlackLister.mu.Lock()
+			globalBlackLister.blackListedContexts = entries
+			globalBlackLister.mu.Unlock()
+			return nil
+		})
+		if err != nil {
+			logger.Error("error subscribing to black lister: %v", err)
 		}
 	})
 
@@ -38,9 +57,12 @@ func getBlackLister() *contextBlackLister {
 
 type contextBlackLister struct {
 	blackListedContexts []string
+	mu                  sync.RWMutex
 }
 
 func (cbl *contextBlackLister) isBlackListed(contextName string) bool {
+	cbl.mu.RLock()
+	defer cbl.mu.RUnlock()
 	for _, blackListedContext := range cbl.blackListedContexts {
 		if strings.EqualFold(blackListedContext, contextName) {
 			return true

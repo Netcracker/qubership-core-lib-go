@@ -92,7 +92,7 @@ func TestIsBlackListed_NotInList(t *testing.T) {
 	resetSingleton(true, "X-Black-Listed-First,X-Black-Listed-Second")
 
 	if IsContextBlackListed("X-Black-Listed-Third") {
-		t.Error("expected 'user' not to be blacklisted")
+		t.Error("expected 'X-Black-Listed-Third' not to be blacklisted")
 	}
 	if IsContextBlackListed("") {
 		t.Error("expected empty string not to be blacklisted")
