@@ -1,6 +1,6 @@
 ---
-paths:
-  - "**/main.go"
+description: Automatic GOMEMLIMIT configuration for Qubership Go microservices in Kubernetes.
+applyTo: "**/main.go"
 ---
 
 # memlimit requirement

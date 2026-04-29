@@ -1,4 +1,5 @@
 ---
+description: Go coding standards for Qubership Logging
 applyTo: "**/*.go"
 ---
 
