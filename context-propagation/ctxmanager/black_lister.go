@@ -20,7 +20,7 @@ func IsContextBlackListed(name string) bool {
 
 func getBlackLister() *contextBlackLister {
 	once.Do(func() {
-		raw := configloader.GetOrDefault("context.black.list", defaultInBlackList) // we don't use GetOrDefaultString because we should handle empty string value
+		raw := configloader.GetOrDefault("headers.blocked", defaultInBlackList) // we don't use GetOrDefaultString because we should handle empty string value
 		var entries []string
 		for _, entry := range strings.Split(raw.(string), ",") {
 			if trimmed := strings.TrimSpace(entry); trimmed != "" {
