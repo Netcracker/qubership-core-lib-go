@@ -20,34 +20,39 @@ func TestChannelRequestIdIncomingResponsePropagatableCtx(t *testing.T) {
 	contextData, err := ctxmanager.GetContextObject(ctx, X_CHANNEL_REQUEST_ID_CONTEXT_NAME)
 	assert.NotNil(t, contextData)
 	assert.Nil(t, err)
-	requestId, _ := Of(ctx)
+	requestId, err := Of(ctx)
+	assert.NoError(t, err)
 	assert.Equal(t, xChannelRequestIdValue, requestId.channelRequestId)
-	responseContextData, _ := ctxmanager.GetResponsePropagatableContextData(ctx)
+	responseContextData, err := ctxmanager.GetResponsePropagatableContextData(ctx)
+	assert.NoError(t, err)
 	assert.Equal(t, xChannelRequestIdValue, responseContextData[X_CHANNEL_REQUEST_ID_HEADER_NAME])
 }
 
 func TestOfChannelRequestIdContext(t *testing.T) {
 	ctx := ctxmanager.InitContext(context.Background(), getIncomingRequestHeaders())
-	requestId, _ := Of(ctx)
+	requestId, err := Of(ctx)
+	assert.NoError(t, err)
 	assert.Equal(t, xChannelRequestIdValue, requestId.channelRequestId)
 }
 
 func TestSetChannelRequestIdProvider(t *testing.T) {
 	ctx := ctxmanager.InitContext(context.Background(), getIncomingRequestHeaders())
 
-	xRequestId, _ := Of(ctx)
+	xRequestId, err := Of(ctx)
+	assert.NoError(t, err)
 	assert.Equal(t, xChannelRequestIdValue, xRequestId.channelRequestId)
 
-	var err error
 	ctx, err = ctxmanager.SetContextObject(ctx, X_CHANNEL_REQUEST_ID_CONTEXT_NAME, NewXChannelRequestIdContextObject("24"))
 	assert.Nil(t, err)
-	secondXRequestId, _ := Of(ctx)
+	secondXRequestId, err := Of(ctx)
+	assert.NoError(t, err)
 	assert.Equal(t, "24", secondXRequestId.channelRequestId)
 }
 
 func TestErrorSetXChannelRequestIdProvider(t *testing.T) {
-	provider, _ := ctxmanager.GetProvider(X_CHANNEL_REQUEST_ID_CONTEXT_NAME)
-	_, err := provider.Set(context.Background(), "wrong type")
+	provider, err := ctxmanager.GetProvider(X_CHANNEL_REQUEST_ID_CONTEXT_NAME)
+	assert.NoError(t, err)
+	_, err = provider.Set(context.Background(), "wrong type")
 	assert.NotNil(t, err)
 }
 
@@ -62,7 +67,8 @@ func getIncomingRequestHeaders() map[string]interface{} {
 func TestGetLogValue(t *testing.T) {
 	ctx := ctxmanager.InitContext(context.Background(), getIncomingRequestHeaders())
 
-	xRequestId, _ := Of(ctx)
+	xRequestId, err := Of(ctx)
+	assert.NoError(t, err)
 	assert.Equal(t, xChannelRequestIdValue, xRequestId.channelRequestId)
 	assert.Equal(t, xChannelRequestIdValue, xRequestId.GetLogValue())
 }
