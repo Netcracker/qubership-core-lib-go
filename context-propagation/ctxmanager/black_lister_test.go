@@ -6,105 +6,133 @@ import (
 	"testing"
 )
 
-func resetSingleton(present bool, envVal string) {
-	once = sync.Once{}
-	globalBlackLister = nil
-	once.Do(func() {
-		raw := envVal
-		if !present {
-			raw = defaultInBlackList
-		}
-		var entries []string
-		for _, entry := range strings.Split(raw, ",") {
-			if trimmed := strings.TrimSpace(entry); trimmed != "" {
-				entries = append(entries, trimmed)
-			}
-		}
-		globalBlackLister = &contextBlackLister{blackListedContexts: entries}
-	})
+func newBlackLister(entries ...string) *contextBlackLister {
+	return &contextBlackLister{blackListedContexts: entries}
 }
 
-func TestIsBlackListed_Default_BuiltInUsed(t *testing.T) {
-	resetSingleton(false, "")
-
-	if !IsContextBlackListed("X-Channel-Request-Id") {
-		t.Error("expected built-in default 'X-Channel-Request-Id' to be blacklisted when env is not set")
+func TestContextBlackLister_EmptyList(t *testing.T) {
+	cbl := newBlackLister()
+	if cbl.isBlackListed("anything") {
+		t.Error("expected empty blacklist to return false for any input")
 	}
 }
 
-func TestIsBlackListed_Default_CaseInsensitive(t *testing.T) {
-	resetSingleton(false, "")
+func TestContextBlackLister_SingleEntry(t *testing.T) {
+	cbl := newBlackLister("X-Only-Header")
+	if !cbl.isBlackListed("X-Only-Header") {
+		t.Error("expected single entry to be blacklisted")
+	}
+	if cbl.isBlackListed("X-Other-Header") {
+		t.Error("expected non-matching header not to be blacklisted")
+	}
+}
 
-	for _, c := range []string{"x-channel-request-id", "X-CHANNEL-REQUEST-ID", "x-Channel-Request-Id"} {
-		if !IsContextBlackListed(c) {
-			t.Errorf("expected default built-in to be blacklisted case-insensitively, got false for %q", c)
+func TestContextBlackLister_CaseInsensitive(t *testing.T) {
+	cbl := newBlackLister("X-My-Header")
+	for _, variant := range []string{"x-my-header", "X-MY-HEADER", "X-My-Header", "X-mY-hEaDeR"} {
+		if !cbl.isBlackListed(variant) {
+			t.Errorf("expected case-insensitive match for %q", variant)
 		}
 	}
 }
 
-func TestIsBlackListed_EnvOverridesDefault(t *testing.T) {
-	resetSingleton(true, "X-Black-Listed-First,X-Black-Listed-Second")
-
-	if IsContextBlackListed("X-Channel-Request-Id") {
-		t.Error("expected built-in default to be absent when env is set")
-	}
-	if !IsContextBlackListed("X-Black-Listed-First") {
-		t.Error("expected 'X-Black-Listed-First' to be blacklisted")
-	}
-	if !IsContextBlackListed("X-Black-Listed-Second") {
-		t.Error("expected 'X-Black-Listed-Second' to be blacklisted")
-	}
-}
-
-func TestIsBlackListed_EnvEmpty_NoEntries(t *testing.T) {
-	resetSingleton(true, "")
-
-	if IsContextBlackListed("X-Channel-Request-Id") {
-		t.Error("expected built-in default to be absent when env is set to empty")
-	}
-	if IsContextBlackListed("X-Black-Listed-First") {
-		t.Error("expected no entries when env is set to empty string")
-	}
-}
-
-func TestIsBlackListed_ExactMatch(t *testing.T) {
-	resetSingleton(true, "X-Black-Listed-First,X-Black-Listed-Second")
-
-	for _, name := range []string{"X-Black-Listed-First", "X-Black-Listed-Second"} {
-		if !IsContextBlackListed(name) {
-			t.Errorf("expected %q to be blacklisted", name)
-		}
-	}
-}
-
-func TestIsBlackListed_CaseInsensitive(t *testing.T) {
-	resetSingleton(true, "X-Black-Listed-First,X-Black-Listed-Second")
-
-	for _, c := range []string{"x-black-listed-first", "X-BLACK-LISTED-FIRST", "X-Black-Listed-First",
-		"x-black-listed-second", "X-BLACK-LISTED-SECOND", "X-Black-Listed-Second"} {
-		if !IsContextBlackListed(c) {
-			t.Errorf("expected %q to be blacklisted (case-insensitive)", c)
-		}
-	}
-}
-
-func TestIsBlackListed_NotInList(t *testing.T) {
-	resetSingleton(true, "X-Black-Listed-First,X-Black-Listed-Second")
-
-	if IsContextBlackListed("X-Black-Listed-Third") {
-		t.Error("expected 'X-Black-Listed-Third' not to be blacklisted")
-	}
-	if IsContextBlackListed("") {
+func TestContextBlackLister_EmptyStringNotBlacklisted(t *testing.T) {
+	cbl := newBlackLister("X-My-Header")
+	if cbl.isBlackListed("") {
 		t.Error("expected empty string not to be blacklisted")
 	}
 }
 
-func TestIsBlackListed_WhitespaceTrimming(t *testing.T) {
-	resetSingleton(true, "  X-Black-Listed-First , X-Black-Listed-Second  ")
+// --- Dynamic update tests ---
 
-	for _, name := range []string{"X-Black-Listed-First", "X-Black-Listed-Second"} {
-		if !IsContextBlackListed(name) {
-			t.Errorf("expected %q to be blacklisted after whitespace trimming", name)
+func TestDynamicUpdate_BlacklistChanges(t *testing.T) {
+	cbl := newBlackLister("X-Original-Header")
+
+	if !cbl.isBlackListed("X-Original-Header") {
+		t.Error("expected original header to be blacklisted before update")
+	}
+
+	// Simulate config reload
+	cbl.mu.Lock()
+	cbl.blackListedContexts = []string{"X-New-Header"}
+	cbl.mu.Unlock()
+
+	if cbl.isBlackListed("X-Original-Header") {
+		t.Error("expected original header NOT to be blacklisted after update")
+	}
+	if !cbl.isBlackListed("X-New-Header") {
+		t.Error("expected new header to be blacklisted after update")
+	}
+}
+
+func TestDynamicUpdate_ClearList(t *testing.T) {
+	cbl := newBlackLister("X-Some-Header")
+
+	cbl.mu.Lock()
+	cbl.blackListedContexts = nil
+	cbl.mu.Unlock()
+
+	if cbl.isBlackListed("X-Some-Header") {
+		t.Error("expected no entries after clearing list")
+	}
+}
+
+func TestConcurrentReadsAreSafe(t *testing.T) {
+	cbl := newBlackLister("X-Concurrent-Header")
+	var wg sync.WaitGroup
+	for i := 0; i < 100; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			cbl.isBlackListed("X-Concurrent-Header")
+		}()
+	}
+	wg.Wait()
+}
+
+func TestConcurrentReadWriteAreSafe(t *testing.T) {
+	cbl := newBlackLister("X-Init-Header")
+	var wg sync.WaitGroup
+
+	// 50 concurrent readers
+	for i := 0; i < 50; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			cbl.isBlackListed("X-Init-Header")
+		}()
+	}
+
+	// 10 concurrent writers (simulating config reloads)
+	for i := 0; i < 10; i++ {
+		wg.Add(1)
+		go func(n int) {
+			defer wg.Done()
+			newEntries := []string{"X-Updated-Header"}
+			cbl.mu.Lock()
+			cbl.blackListedContexts = newEntries
+			cbl.mu.Unlock()
+		}(i)
+	}
+
+	wg.Wait()
+}
+
+func TestIsBlackListed_LargeList(t *testing.T) {
+	entries := make([]string, 50)
+	for i := range entries {
+		entries[i] = strings.Repeat("X", i+1) + "-Header"
+	}
+	cbl := &contextBlackLister{blackListedContexts: entries}
+
+	// First, middle, last should all match
+	for _, name := range []string{entries[0], entries[24], entries[49]} {
+		if !cbl.isBlackListed(name) {
+			t.Errorf("expected %q to be blacklisted in large list", name)
 		}
+	}
+
+	if cbl.isBlackListed("Not-In-List") {
+		t.Error("expected 'Not-In-List' not to be blacklisted")
 	}
 }
