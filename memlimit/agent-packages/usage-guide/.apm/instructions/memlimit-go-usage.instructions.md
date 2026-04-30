@@ -15,3 +15,7 @@ import _ "github.com/netcracker/qubership-core-lib-go/v3/memlimit"
 
 Do not set GOMEMLIMIT manually. Do not use automemlimit
 or runtime/debug.SetMemoryLimit() directly.
+
+## Skill trigger: `memlimit-go-usage`
+
+Invoke the `memlimit-go-usage` skill when writing, creating or modifying main.go file 

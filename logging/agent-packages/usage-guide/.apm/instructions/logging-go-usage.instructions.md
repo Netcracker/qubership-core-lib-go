@@ -3,10 +3,6 @@ description: Go coding standards for Qubership Logging
 applyTo: "**/*.go"
 ---
 
-# Qubership Logging
+## Skill trigger: `logging-go-usage`
 
-Only allowed logger: github.com/netcracker/qubership-core-lib-go/v3/logging
-
-Prohibited: log, fmt.Println, logrus, zap, zerolog, slog.
-Declare logger at package level. Initialize configloader before GetLogger.
-Never log PII (passwords, tokens, emails).
+When writing any logging code, creating or modifying a Go microservice, or reviewing code that uses log.Println, fmt.Printf, logrus, zap, zerolog, or slog, apply the `logging-go-usage` skill.
