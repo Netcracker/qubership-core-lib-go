@@ -28,8 +28,10 @@ func (xChannelRequestIdProvider XChannelRequestIdProvider) ContextName() string 
 
 func (xChannelRequestIdProvider XChannelRequestIdProvider) Provide(ctx context.Context, incomingData map[string]interface{}) context.Context {
 	headerValue := ""
-	if incomingData[X_CHANNEL_REQUEST_ID_CONTEXT_NAME] != nil {
-		headerValue = incomingData[X_CHANNEL_REQUEST_ID_CONTEXT_NAME].(string)
+	if val, ok := incomingData[X_CHANNEL_REQUEST_ID_CONTEXT_NAME].(string); ok {
+		headerValue = val
+	} else {
+		logger.Warn("%s=%s is not string; ignore it", X_CHANNEL_REQUEST_ID_CONTEXT_NAME, incomingData[X_CHANNEL_REQUEST_ID_CONTEXT_NAME])
 	}
 	logger.Debug("context object=%s provided to context.Context", X_CHANNEL_REQUEST_ID_CONTEXT_NAME)
 	return context.WithValue(ctx, X_CHANNEL_REQUEST_ID_CONTEXT_NAME, NewXChannelRequestIdContextObject(headerValue))

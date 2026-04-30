@@ -14,7 +14,7 @@ const (
 	CallerPropertyName          = "caller"
 	valuePlaceholder            = "-"
 	RequestIdContextName        = "X-Request-Id"         // see implementation in github.com/netcracker/qubership-core-lib-go/v3/context-propagation/xrequestid
-	ChannelRequestIdContextName = "X-Channel-Request-Id" // see implementation in github.com/netcracker/qubership-core-lib-go/v3/context-propagation/xrequestid
+	ChannelRequestIdContextName = "X-Channel-Request-Id" // see implementation in github.com/netcracker/qubership-core-lib-go/v3/context-propagation/xchannelrequestid
 	TenantContextName           = "Tenant-Context"
 )
 

@@ -3,6 +3,7 @@ package xchannelrequestid
 import (
 	"context"
 	"errors"
+	"fmt"
 
 	"github.com/netcracker/qubership-core-lib-go/v3/context-propagation/ctxmanager"
 )
@@ -41,6 +42,9 @@ func Of(ctx context.Context) (*XChannelRequestIdContextObject, error) {
 	if abstractContextObject == nil {
 		return nil, errors.New("xChannelRequestId context object is null")
 	}
-	contextObject := (abstractContextObject).(*XChannelRequestIdContextObject)
+	contextObject, ok := abstractContextObject.(*XChannelRequestIdContextObject)
+	if !ok {
+		return nil, fmt.Errorf("unexpected type %T for xChannelRequestId context object", abstractContextObject)
+	}
 	return contextObject, nil
 }
