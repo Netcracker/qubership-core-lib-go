@@ -8,6 +8,7 @@ import (
 	"github.com/netcracker/qubership-core-lib-go/v3/context-propagation/baseproviders/clientip"
 	"github.com/netcracker/qubership-core-lib-go/v3/context-propagation/baseproviders/originatingbiid"
 	"github.com/netcracker/qubership-core-lib-go/v3/context-propagation/baseproviders/tenant"
+	"github.com/netcracker/qubership-core-lib-go/v3/context-propagation/baseproviders/xchannelrequestid"
 	"github.com/netcracker/qubership-core-lib-go/v3/context-propagation/baseproviders/xrequestid"
 	"github.com/netcracker/qubership-core-lib-go/v3/context-propagation/baseproviders/xversion"
 	"github.com/netcracker/qubership-core-lib-go/v3/context-propagation/baseproviders/xversionname"
@@ -26,5 +27,6 @@ func Get() []ctxmanager.ContextProvider {
 		originatingbiid.OriginatingBiIdProvider{},
 		clientip.ClientIpProvider{},
 		tenant.TenantProvider{},
+		xchannelrequestid.XChannelRequestIdProvider{},
 	}
 }

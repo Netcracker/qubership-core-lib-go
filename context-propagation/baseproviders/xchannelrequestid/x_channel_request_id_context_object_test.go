@@ -1,0 +1,74 @@
+package xchannelrequestid
+
+import (
+	"context"
+	"testing"
+
+	"github.com/netcracker/qubership-core-lib-go/v3/context-propagation/ctxmanager"
+	"github.com/stretchr/testify/assert"
+)
+
+const xChannelRequestIdValue = "42"
+
+func init() {
+	ctxmanager.Register([]ctxmanager.ContextProvider{XChannelRequestIdProvider{}})
+}
+
+func TestChannelRequestIdIncomingResponsePropagatableCtx(t *testing.T) {
+	incomingHeaders := getIncomingRequestHeaders()
+	ctx := ctxmanager.InitContext(context.Background(), incomingHeaders)
+	contextData, err := ctxmanager.GetContextObject(ctx, X_CHANNEL_REQUEST_ID_CONTEXT_NAME)
+	assert.NotNil(t, contextData)
+	assert.Nil(t, err)
+	requestId, err := Of(ctx)
+	assert.NoError(t, err)
+	assert.Equal(t, xChannelRequestIdValue, requestId.channelRequestId)
+	responseContextData, err := ctxmanager.GetResponsePropagatableContextData(ctx)
+	assert.NoError(t, err)
+	assert.Equal(t, xChannelRequestIdValue, responseContextData[X_CHANNEL_REQUEST_ID_HEADER_NAME])
+}
+
+func TestOfChannelRequestIdContext(t *testing.T) {
+	ctx := ctxmanager.InitContext(context.Background(), getIncomingRequestHeaders())
+	requestId, err := Of(ctx)
+	assert.NoError(t, err)
+	assert.Equal(t, xChannelRequestIdValue, requestId.channelRequestId)
+}
+
+func TestSetChannelRequestIdProvider(t *testing.T) {
+	ctx := ctxmanager.InitContext(context.Background(), getIncomingRequestHeaders())
+
+	xRequestId, err := Of(ctx)
+	assert.NoError(t, err)
+	assert.Equal(t, xChannelRequestIdValue, xRequestId.channelRequestId)
+
+	ctx, err = ctxmanager.SetContextObject(ctx, X_CHANNEL_REQUEST_ID_CONTEXT_NAME, NewXChannelRequestIdContextObject("24"))
+	assert.Nil(t, err)
+	secondXRequestId, err := Of(ctx)
+	assert.NoError(t, err)
+	assert.Equal(t, "24", secondXRequestId.channelRequestId)
+}
+
+func TestErrorSetXChannelRequestIdProvider(t *testing.T) {
+	provider, err := ctxmanager.GetProvider(X_CHANNEL_REQUEST_ID_CONTEXT_NAME)
+	assert.NoError(t, err)
+	_, err = provider.Set(context.Background(), "wrong type")
+	assert.NotNil(t, err)
+}
+
+func TestContextName(t *testing.T) {
+	assert.Equal(t, XChannelRequestIdProvider{}.ContextName(), X_CHANNEL_REQUEST_ID_CONTEXT_NAME)
+}
+
+func getIncomingRequestHeaders() map[string]interface{} {
+	return map[string]interface{}{X_CHANNEL_REQUEST_ID_CONTEXT_NAME: xChannelRequestIdValue}
+}
+
+func TestGetLogValue(t *testing.T) {
+	ctx := ctxmanager.InitContext(context.Background(), getIncomingRequestHeaders())
+
+	xRequestId, err := Of(ctx)
+	assert.NoError(t, err)
+	assert.Equal(t, xChannelRequestIdValue, xRequestId.channelRequestId)
+	assert.Equal(t, xChannelRequestIdValue, xRequestId.GetLogValue())
+}

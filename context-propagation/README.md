@@ -58,6 +58,7 @@ AllowedHeader
 BusinessProcess
 OriginatingBiId
 ClientIp
+XChannelRequestId
 ```
 
 **Secondly,** on each request you should init context by calling the method `ctxmanager.InitContext(ctx, map[string][]string)` and passing `context.Context` and request data.
@@ -338,6 +339,30 @@ headers.allowed=myheader1,myheader2,...
 ```
 
 Otherwise, you need to take care that this parameter is in system#environment.
+
+##### Blocked headers
+
+Allows blocking specific headers from being propagated. To set a list of blocked headers you should put either
+`HEADERS_BLOCKED` environment variable or set the `headers.blocked` property.
+For getting the `headers.blocked` value, the framework uses [configloader](../configloader), so you must ensure that your main function contains `configloader#Init(propertySources []*PropertySource)`.
+
+The default blocked header is `X-Channel-Request-Id`.
+
+If you use `application.yaml`, specify the property in the following format:
+
+```text
+headers.blocked=myheader1,myheader2,...
+```
+
+To set an empty blocklist (i.e. block nothing), set the property to an empty string:
+
+```text
+headers.blocked=
+```
+
+> **Note**  
+> Blocked headers take effect across all propagatable contexts. A header present in both `headers.allowed` and `headers.blocked` will be blocked.
+
 
 ##### API version
 

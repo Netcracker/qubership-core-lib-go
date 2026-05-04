@@ -3,6 +3,7 @@ package xrequestid
 import (
 	"context"
 	"errors"
+
 	"github.com/netcracker/qubership-core-lib-go/v3/logging"
 )
 
@@ -30,7 +31,7 @@ func (xRequestIdProvider XRequestIdProvider) Provide(ctx context.Context, incomi
 	if incomingData[X_REQUEST_ID_HEADER_NAME] != nil {
 		headerValue = incomingData[X_REQUEST_ID_HEADER_NAME].(string)
 	}
-	logger.Debug("context object=" + X_REQUEST_ID_COTEXT_NAME + " provided to context.Context")
+	logger.Debug("context object=%s provided to context.Context", X_REQUEST_ID_COTEXT_NAME)
 	return context.WithValue(ctx, X_REQUEST_ID_COTEXT_NAME, NewXRequestIdContextObject(headerValue))
 }
 
@@ -39,7 +40,7 @@ func (xRequestIdProvider XRequestIdProvider) Set(ctx context.Context, xRequestId
 	if !success {
 		return ctx, errors.New("incorrect type to set xRequestId")
 	}
-	logger.Debug("context object=" + X_REQUEST_ID_HEADER_NAME + " set to context.Context")
+	logger.Debug("context object=%s set to context.Context", X_REQUEST_ID_HEADER_NAME)
 	return context.WithValue(ctx, X_REQUEST_ID_HEADER_NAME, xRequestId), nil
 }
 

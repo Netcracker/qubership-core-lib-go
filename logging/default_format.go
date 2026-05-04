@@ -10,11 +10,12 @@ import (
 )
 
 const (
-	TimeFormat           = "2006-01-02T15:04:05.000"
-	CallerPropertyName   = "caller"
-	valuePlaceholder     = "-"
-	RequestIdContextName = "X-Request-Id"   // see implementation in github.com/netcracker/qubership-core-lib-go/v3/context-propagation/xrequestid
-	TenantContextName    = "Tenant-Context"
+	TimeFormat                  = "2006-01-02T15:04:05.000"
+	CallerPropertyName          = "caller"
+	valuePlaceholder            = "-"
+	RequestIdContextName        = "X-Request-Id"         // see implementation in github.com/netcracker/qubership-core-lib-go/v3/context-propagation/xrequestid
+	ChannelRequestIdContextName = "X-Channel-Request-Id" // see implementation in github.com/netcracker/qubership-core-lib-go/v3/context-propagation/xchannelrequestid
+	TenantContextName           = "Tenant-Context"
 )
 
 var (
@@ -56,12 +57,13 @@ func (format *defaultFormat) logFormat(r *Record, b *bytes.Buffer, color int, lv
 	if format.messageFormat != nil {
 		return format.messageFormat(r, b, color, lvl)
 	}
-	return fmt.Fprintf(b, "[%s] [%s] [request_id=%s] [tenant_id=%s] [thread=-] [class=%s] %s",
+	return fmt.Fprintf(b, "[%s] [%s] [request_id=%s] [tenant_id=%s] [thread=-] [class=%s] [x_channel_request_id=%s] %s",
 		r.Time.Format(TimeFormat),
 		lvl,
 		GetValueOrPlaceholder(r.Ctx, RequestIdContextName),
 		GetValueOrPlaceholder(r.Ctx, TenantContextName),
 		ConstructCallerValueByRecord(r),
+		GetValueOrPlaceholder(r.Ctx, ChannelRequestIdContextName),
 		JoinStringsWithSpace(AssembleDefaultCustomLogFields(r.Ctx), r.Message),
 	)
 }

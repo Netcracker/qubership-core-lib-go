@@ -12,5 +12,5 @@ func init() {
 }
 
 func TestProviders(t *testing.T) {
-	assert.Equal(t, 10, len(Get()))
+	assert.Equal(t, 11, len(Get()))
 }
