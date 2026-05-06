@@ -1,17 +1,11 @@
 ---
 name: context-propagation-go-usage
-description: Use this skill when the user works with the github.com/netcracker/qubership-core-lib-go/v3/context-propagation library in Go — registering context providers, initializing request context in HTTP/Fiber middleware, propagating headers (X-Request-Id, X-Version, Accept-Language, Business-Process-Id, etc.) to outgoing requests, writing custom context providers, or working with context snapshots.
+description: Use this skill to propagate request context when handling incoming and outgoing requests in Go code.
 ---
 
 # qubership-core-lib-go context-propagation
 
 Helper skill for the `context-propagation` package from `github.com/netcracker/qubership-core-lib-go/v3`. The library propagates request-scoped data (headers, IDs) between microservices via Go's `context.Context`.
-
-## Install
-
-```sh
-go get github.com/netcracker/qubership-core-lib-go/v3@<latest>
-```
 
 ## Core packages
 
@@ -127,73 +121,31 @@ _ = ctxhelper.AddResponsePropagatableContextData(ctx, w.Header().Add)
 - `ctxmanager.GetResponsePropagatableContextData(ctx) map[string]string`
 - `ctxmanager.GetSerializableHeaders(ctx) []string` — header names that will propagate
 
-## Writing a custom provider
+## Custom provider
 
-A provider needs a context object plus a `ContextProvider` implementation.
-
-1. **Context object** — implement `Serialize() map[string]string` if it must propagate to outgoing requests (`SerializableContext`). Implement `ResponsePropagatableContext` if it must be written to responses.
-
-   ```go
-   const MyCtxName = "My-Context"
-
-   type MyCtxObject struct{ value string }
-
-   func NewMyCtxObject(v string) MyCtxObject { return MyCtxObject{v} }
-
-   func (o MyCtxObject) Serialize() map[string]string {
-       return map[string]string{MyCtxName: o.value}
-   }
-
-   func Of(ctx context.Context) (*MyCtxObject, error) {
-       p, err := ctxmanager.GetProvider(MyCtxName)
-       if err != nil { return nil, err }
-       v := p.Get(ctx)
-       if v == nil { return nil, errors.New(MyCtxName + " not in context") }
-       o := v.(MyCtxObject)
-       return &o, nil
-   }
-   ```
-
-2. **Provider** — implement `InitLevel`, `ContextName`, `Provide`, `Set`, `Get`.
-
-   ```go
-   type MyProvider struct{}
-
-   func (MyProvider) InitLevel() int       { return 0 }
-   func (MyProvider) ContextName() string  { return MyCtxName }
-
-   func (MyProvider) Provide(ctx context.Context, in map[string]interface{}) context.Context {
-       if in[MyCtxName] == nil { return ctx }
-       return context.WithValue(ctx, MyCtxName, NewMyCtxObject(in[MyCtxName].(string)))
-   }
-
-   func (MyProvider) Set(ctx context.Context, o interface{}) (context.Context, error) {
-       obj, ok := o.(MyCtxObject)
-       if !ok { return ctx, errors.New("wrong type") }
-       return context.WithValue(ctx, MyCtxName, obj), nil
-   }
-
-   func (MyProvider) Get(ctx context.Context) interface{} { return ctx.Value(MyCtxName) }
-   ```
-
-3. **Register** with `ctxmanager.RegisterSingle(MyProvider{})`. To override an existing provider, register a new one with the same `ContextName()`.
+Create one only when you need to propagate a header not covered by `baseproviders`.
+See `baseproviders/xrequestid/x_request_id_provider.go` as a reference: implement
+`ContextProvider` (`InitLevel`, `ContextName`, `Provide`, `Set`, `Get`) plus a
+context object with `Serialize()`, then register via `ctxmanager.RegisterSingle()`.
 
 ## Snapshots
 
-Capture the current context to revive it later (useful for goroutines / async work):
+Use only when you start a goroutine that outlives the request and need the request
+context inside it (passing `ctx` directly would tie the goroutine to request
+cancellation). Capture in the handler, activate inside the goroutine:
 
 ```go
-snap := ctxmanager.CreateFullContextSnapshot(ctx)        // map[string]interface{}
-// or selective:
-snap = ctxmanager.CreateContextSnapshot(ctx, []string{acceptlanguage.ACCEPT_LANGUAGE_CONTEXT_NAME})
-
-newCtx := ctxmanager.ActivateContextSnapshot(snap)       // context.Context
+snap := ctxmanager.CreateFullContextSnapshot(ctx)
+go func() {
+    newCtx, _ := ctxmanager.ActivateContextSnapshot(snap)
+    // use newCtx
+}()
 ```
 
 ## Common pitfalls
 
 - Calling `ctxmanager.Register` after the server starts handling requests — register at startup only.
-- Forgetting the middleware → `Of(ctx)` returns `"context doesn't contain ..."` errors.
+- `Of(ctx)` returns `"context doesn't contain ..."` — wire the `InitContext` middleware before any handler that reads context.
 - Headers map passed to `InitContext` must be `map[string]interface{}` (not `map[string]string`).
-- `AllowedHeader` silently does nothing without `configloader.Init` and `headers.allowed` / `HEADERS_ALLOWED`.
+- `AllowedHeader` requires `configloader.Init` plus `headers.allowed` / `HEADERS_ALLOWED` to be set; without them it silently does nothing.
 - Outgoing requests don't propagate automatically — call `ctxhelper.AddSerializableContextData`.

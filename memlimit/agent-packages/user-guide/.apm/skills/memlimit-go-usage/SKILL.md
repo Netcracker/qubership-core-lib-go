@@ -28,41 +28,20 @@ there is no exported function to call:
 import _ "github.com/netcracker/qubership-core-lib-go/v3/memlimit"
 ```
 
-Place the import in `main.go`. Does not override GOMEMLIMIT if already
-set via environment.
+Place the import in `main.go`.
 
-## Dependency on configloader and application.yaml
+## Requirements
 
-memlimit's `init()` internally calls `logging.GetLogger`, which
-triggers configloader. Because the blank import causes memlimit's
-`init()` to run **before** `main`'s `init()`, configloader has not
-yet been explicitly initialized at that point — it auto-initializes
-with default sources, which means it looks for `application.yaml`
-in the working directory.
+- `application.yaml` must exist in the working directory before the
+  binary starts (empty file is fine) — without it the service fails
+  to start.
+- Outside containers (local dev, macOS) cgroup files are absent, so
+  the library logs a warning and skips setting the limit; the service
+  continues normally.
 
-**`application.yaml` must exist** (may be empty) before the binary
-starts, otherwise the service will fail to start with a missing-file
-error.
+## Guidelines
 
-Minimum required file:
-
-```yaml
-# application.yaml
-```
-
-Outside containers (local dev, macOS) cgroup files are absent so
-no memory limit is set; the library logs "failed to set MEMORY LIMIT"
-and continues normally.
-
-## Anti-patterns
-
-```go
-// WRONG: manual GOMEMLIMIT in Dockerfile
-ENV GOMEMLIMIT=400MiB
-
-// WRONG: direct runtime call
-debug.SetMemoryLimit(400 * 1024 * 1024)
-
-// WRONG: third-party library
-import _ "github.com/KimMachineGun/automemlimit"
-```
+- Use `qubership-core-lib-go/v3/memlimit` (it wraps `automemlimit` with
+  Qubership defaults); don't import `automemlimit` directly.
+- Don't set `GOMEMLIMIT` manually in Dockerfile or call
+  `debug.SetMemoryLimit` — the library handles it from the cgroup.
