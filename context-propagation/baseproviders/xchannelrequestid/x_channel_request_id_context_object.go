@@ -48,3 +48,7 @@ func Of(ctx context.Context) (*XChannelRequestIdContextObject, error) {
 	}
 	return contextObject, nil
 }
+
+func (xChannelRequestIdContextObject XChannelRequestIdContextObject) GetChannelRequestId() string {
+	return xChannelRequestIdContextObject.channelRequestId
+}
