@@ -1,6 +1,6 @@
 ---
 name: security-go-usage
-description: Use this skill when the user works with the github.com/netcracker/qubership-core-lib-go/v3/security package — obtaining Kubernetes service account tokens for outbound calls (tokensource), verifying incoming JWT tokens via OIDC (tokenverifier), extracting standard or Kubernetes-specific claims, building HTTP/gRPC auth middleware, or handling service-to-service authentication in a Qubership Go microservice.
+description: Use when handling service-to-service authentication in a Qubership Go microservice on Kubernetes — attaching K8s service-account tokens to outbound calls or verifying inbound JWTs via OIDC.
 ---
 
 # qubership-core-lib-go security
@@ -11,12 +11,6 @@ Helper skill for the `security` package from `github.com/netcracker/qubership-co
 - **Inbound** — verifying tokens that other services attach to requests they send to you (`security/tokenverifier`), plus claim helpers in `security/token`.
 
 Both flows are designed for Kubernetes projected service-account tokens and OIDC-based verification through the Kubernetes API server.
-
-## Install
-
-```sh
-go get github.com/netcracker/qubership-core-lib-go/v3@<latest>
-```
 
 ## Sub-packages at a glance
 

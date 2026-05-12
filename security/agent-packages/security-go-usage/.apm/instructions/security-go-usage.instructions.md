@@ -1,8 +1,8 @@
 ---
-description: Go coding standards for Qubership security (service-account tokens, OIDC verification, JWT claims)
+description: Service-to-service authentication in Qubership Go microservices
 applyTo: "**/*.go"
 ---
 
 ## Skill trigger: `security-go-usage`
 
-When writing, modifying, or reviewing Go code that handles authentication or authorization — obtaining Kubernetes service account tokens for outbound calls, verifying incoming JWTs, building HTTP/gRPC auth middleware, extracting JWT or Kubernetes claims, or wiring service-to-service authentication — apply the `security-go-usage` skill.
+When editing `*.go` and handling authentication of inbound or outbound service-to-service traffic in a Qubership Go microservice, apply the `security-go-usage` skill.
