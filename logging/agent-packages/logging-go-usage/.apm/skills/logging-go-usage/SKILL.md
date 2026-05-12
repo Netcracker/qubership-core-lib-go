@@ -1,10 +1,6 @@
 ---
 name: logging-go-usage
-description: >
-  Structured logging for Qubership Go microservices using
-  qubership-core-lib-go/v3/logging. Use when writing any logging code,
-  creating or modifying a Go microservice, or reviewing code that uses
-  log.Println, fmt.Printf, logrus, zap, zerolog, or slog.
+description: Use when writing or replacing logging in a Qubership Go microservice — `qubership-core-lib-go/v3/logging` instead of `log`/`fmt`/logrus/zap/zerolog/slog.
 ---
 
 # qubership-logging
@@ -27,29 +23,6 @@ properties (`logging.level.root`, `logging.level.<pkg>`). Levels are
 picked up dynamically when configloader is initialized or refreshed —
 order of `GetLogger` and `configloader.Init` does not matter. Never
 hardcode the level — always set it via config / ENV.
-
-## API
-
-### Creating a logger
-
-```go
-logging.GetLogger(name string) logging.Logger
-```
-
-- `name` — component identifier. Use the package name or a meaningful
-  module name: `"main"`, `"repository"`, `"handler"`,
-  `"kafka-consumer"`.
-
-### Logger interface
-
-Supports standard levels: `Debug`, `Info`, `Warn`, `Error`.
-
-```go
-logger.Debug(msg string)
-logger.Info(msg string)
-logger.Warn(msg string)
-logger.Error(msg string)
-```
 
 ## Canonical usage pattern
 
@@ -77,8 +50,9 @@ func main() {
 }
 ```
 
-Each package declares its own logger; `configloader` is initialized only
-once in `main/init()`.
+Each package declares its own logger named after the package or module
+(`main`, `repository`, `handler`, `kafka-consumer`); `configloader` is
+initialized only once in `main/init()`.
 
 ## Integration with fiber-server-utils
 
@@ -87,11 +61,8 @@ automatically — `x_request_id` and `tenantId` from the request context
 are included. Just initialize configloader and create the logger the
 standard way.
 
-## Prohibited alternatives
+## Rules
 
-- `log.Println`, `log.Printf`, `log.Fatal` — Go standard library `log`
-- `fmt.Println`, `fmt.Printf` — for diagnostic output
-- `logrus`, `zap`, `zerolog`, `slog` — third-party loggers
-- Hardcoded log levels in code
-- Logging PII: emails, passwords, tokens, API keys, personal data
+- Use only `qubership-core-lib-go/v3/logging` — replaces `log`, `fmt.Print*`, `logrus`, `zap`, `zerolog`, `slog`.
+- Never log PII (emails, passwords, tokens, API keys, personal data).
 
