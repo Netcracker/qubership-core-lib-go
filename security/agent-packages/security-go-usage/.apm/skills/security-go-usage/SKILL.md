@@ -178,50 +178,18 @@ m, _   := qtoken.GetMapValue(jwt, "kubernetes.io")
 ns, _  := qtoken.StringValue(m, "namespace")
 ```
 
-## HTTP middleware pattern
+## Wiring `Verify` into request handling
 
-Standard Bearer-token auth wired into `net/http`:
+Read the bearer token from `Authorization` header (`net/http`, Fiber) or `authorization` metadata key (gRPC), strip the `Bearer ` prefix, then:
 
 ```go
-func AuthMiddleware(v tokenverifier.Verifier) func(http.Handler) http.Handler {
-    return func(next http.Handler) http.Handler {
-        return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-            raw := strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")
-            if raw == "" {
-                http.Error(w, "missing token", http.StatusUnauthorized)
-                return
-            }
-            jwt, err := v.Verify(r.Context(), raw)
-            if err != nil {
-                http.Error(w, "invalid token", http.StatusUnauthorized)
-                return
-            }
-            next.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), claimsKey{}, jwt)))
-        })
-    }
+jwt, err := verifier.Verify(r.Context(), raw)
+if err != nil {
+    // expired, bad signature, wrong audience, malformed — treat as 401 / Unauthenticated
 }
 ```
 
-For Fiber, use `c.Get("Authorization")` and `c.Locals(claimsKey{}, jwt)` instead — same shape.
-
-## gRPC interceptor pattern
-
-```go
-func UnaryAuthInterceptor(v tokenverifier.Verifier) grpc.UnaryServerInterceptor {
-    return func(ctx context.Context, req any, info *grpc.UnaryServerInfo, h grpc.UnaryHandler) (any, error) {
-        md, ok := metadata.FromIncomingContext(ctx)
-        if !ok || len(md.Get("authorization")) == 0 {
-            return nil, status.Error(codes.Unauthenticated, "missing token")
-        }
-        raw := strings.TrimPrefix(md.Get("authorization")[0], "Bearer ")
-        jwt, err := v.Verify(ctx, raw)
-        if err != nil {
-            return nil, status.Errorf(codes.Unauthenticated, "invalid token: %v", err)
-        }
-        return h(context.WithValue(ctx, claimsKey{}, jwt), req)
-    }
-}
-```
+Stash the parsed `*jwt.Token` on the request context (`context.WithValue(r.Context(), claimsKey{}, jwt)` for `net/http`, `c.Locals(claimsKey{}, jwt)` for Fiber) so handlers can read claims via `security/token` helpers.
 
 ## Service-to-service: combining both packages
 
