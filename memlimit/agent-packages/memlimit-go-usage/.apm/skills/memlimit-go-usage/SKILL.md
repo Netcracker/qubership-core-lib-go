@@ -1,9 +1,6 @@
 ---
 name: memlimit-go-usage
-description: >
-  Automatic GOMEMLIMIT configuration for Qubership Go microservices
-  in Kubernetes. Use when creating a new service, debugging OOM kills,
-  or configuring memory. Do NOT use for Helm chart resource limits.
+description: Use when wiring container-aware GOMEMLIMIT into a Qubership Go microservice — initial setup or after OOM kills (exit 137) in Kubernetes.
 ---
 
 # qubership-memlimit
@@ -35,9 +32,6 @@ Place the import in `main.go`.
 - `application.yaml` must exist in the working directory before the
   binary starts (empty file is fine) — without it the service fails
   to start.
-- Outside containers (local dev, macOS) cgroup files are absent, so
-  the library logs a warning and skips setting the limit; the service
-  continues normally.
 
 ## Guidelines
 
