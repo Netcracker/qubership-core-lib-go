@@ -5,4 +5,4 @@ applyTo: "**/*.go"
 
 ## Skill trigger: `logging-go-usage`
 
-When editing go logging code apply the `logging-go-usage` skill.
+When editing `*.go` and adding or replacing logger calls in a Qubership Go microservice, apply the `logging-go-usage` skill.

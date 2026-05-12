@@ -9,12 +9,6 @@ Structured logging library for Qubership platform Go microservices.
 Wraps a configurable logging backend with configloader integration
 for dynamic log level management.
 
-## Import
-
-```go
-import "github.com/netcracker/qubership-core-lib-go/v3/logging"
-```
-
 ## Log level configuration
 
 Levels can be set via env vars (`LOG_LEVEL`, `LOGGING_LEVEL_ROOT`,
