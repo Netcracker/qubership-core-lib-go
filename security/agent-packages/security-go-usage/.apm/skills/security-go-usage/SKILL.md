@@ -109,16 +109,6 @@ if err != nil {
 
 For tighter control over JWKS refresh cadence and unknown-KID rate limiting use `NewKubernetesVerifierOverride` with a custom `Override{RefreshInterval, RefreshUnknownKID}`. The defaults (24h refresh, 1 unknown-KID lookup per 5 min) are fine for almost everyone — only change them with a concrete reason.
 
-### Verifying
-
-```go
-parsed, err := verifier.Verify(ctx, rawToken)
-if err != nil {
-    // expired, bad signature, wrong audience, malformed — treat as 401
-    return http.StatusUnauthorized
-}
-```
-
 ### Custom validations
 
 `NewKubernetesVerifier` accepts variadic `Validation func(*jwt.Token) error` callbacks that run after signature/audience/expiry checks. Use them to enforce domain-specific rules (subject allow-list, namespace allow-list, etc.):
@@ -146,37 +136,17 @@ verifier, err := tokenverifier.NewKubernetesVerifier(ctx, "my-service",
 
 ## Reading claims (`security/token`)
 
-After `Verify` succeeds you have a `*jwt.Token`. Use the helpers instead of poking at `Claims` manually — they handle missing / wrongly-typed claims uniformly.
-
-**Standard JWT claims:**
+After `Verify` succeeds you have a `*jwt.Token`. Use the `security/token` helpers — they handle missing / wrongly-typed claims uniformly instead of panicking on direct `Claims` access.
 
 ```go
 import qtoken "github.com/netcracker/qubership-core-lib-go/v3/security/token"
 
-iss, _ := qtoken.GetIssuer(jwt)
-sub, _ := qtoken.GetSubject(jwt)
-aud, _ := qtoken.GetAudience(jwt)        // jwt.ClaimStrings
-exp, _ := qtoken.GetExpirationTime(jwt)  // *jwt.NumericDate
-iat, _ := qtoken.GetIssuedAt(jwt)
-nbf, _ := qtoken.GetNotBefore(jwt)
-jti, _ := qtoken.GetId(jwt)
+iss, _ := qtoken.GetIssuer(jwt)             // standard JWT claims
+ns,  _ := qtoken.GetNamespace(jwt)          // Kubernetes claim under `kubernetes.io`
+val, _ := qtoken.GetStringValue(jwt, "x")   // arbitrary string claim
 ```
 
-**Kubernetes claims** (from the `kubernetes.io` claim group):
-
-```go
-ns, _   := qtoken.GetNamespace(jwt)
-sa, _   := qtoken.GetServiceAccountName(jwt)
-saUID   := qtoken.GetServiceAccountId(jwt)
-```
-
-**Generic accessors** for arbitrary claims:
-
-```go
-val, _ := qtoken.GetStringValue(jwt, "custom-claim")
-m, _   := qtoken.GetMapValue(jwt, "kubernetes.io")
-ns, _  := qtoken.StringValue(m, "namespace")
-```
+Full set: standard JWT (`GetSubject`, `GetAudience`, `GetExpirationTime`, `GetIssuedAt`, `GetNotBefore`, `GetId`), Kubernetes (`GetServiceAccountName`, `GetServiceAccountId`), generic (`GetMapValue`, `StringValue`) — see godoc for the rest.
 
 ## Wiring `Verify` into request handling
 
