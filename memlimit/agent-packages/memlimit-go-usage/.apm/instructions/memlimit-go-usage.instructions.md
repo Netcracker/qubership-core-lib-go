@@ -5,4 +5,4 @@ applyTo: "**/main.go"
 
 ## Skill trigger: `memlimit-go-usage`
 
-Invoke the `memlimit-go-usage` skill when editing main.go
+When editing `main.go` in a Qubership Go microservice, apply the `memlimit-go-usage` skill.

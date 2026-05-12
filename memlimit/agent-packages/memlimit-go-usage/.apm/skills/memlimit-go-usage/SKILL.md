@@ -9,13 +9,6 @@ Automatically sets Go runtime GOMEMLIMIT based on the container's
 cgroup memory limit. Prevents OOM kills in Kubernetes by making
 the Go GC aware of the container's memory boundary.
 
-## Why it matters
-
-Without GOMEMLIMIT the Go GC grows the heap freely until the
-kernel OOM-killer terminates the process (exit code 137). This
-library reads the cgroup limit and sets GOMEMLIMIT to a safe
-fraction, so the GC runs more aggressively near the boundary.
-
 ## Import
 
 Use a blank import — the library activates via its own `init()`,
