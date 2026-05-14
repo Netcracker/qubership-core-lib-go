@@ -10,6 +10,7 @@ import (
 	"net/url"
 
 	cache "github.com/go-pkgz/expirable-cache/v3"
+	"github.com/netcracker/qubership-core-lib-go/v3/configloader"
 	"github.com/netcracker/qubership-core-lib-go/v3/security"
 	"github.com/netcracker/qubership-core-lib-go/v3/security/tokensource"
 	"github.com/netcracker/qubership-core-lib-go/v3/serviceloader"
@@ -67,6 +68,7 @@ func newM2MRestClient(k8sAuthHeader, fallbackAuthHeader authHeaderFunc, fallBack
 		k8sAuthHeader:      k8sAuthHeader,
 		fallbackAuthHeader: fallbackAuthHeader,
 		fallBackBaseUrl:    fallBackBaseUrl,
+		k8sEnabled:         configloader.GetKoanf().Bool("security.m2m.kubernetes.enabled"),
 	}
 }
 
@@ -121,7 +123,7 @@ func (m *m2MRestClient) doRequestFallback(ctx context.Context, cacheKey string, 
 		m.urlCache.Add(cacheKey, empty{})
 	}
 	if reason != nil {
-		if(reason.desc == kubernetesTokenAcquisitionError && m.k8sEnabled) {
+		if reason.desc == kubernetesTokenAcquisitionError && m.k8sEnabled {
 			logger.WarnC(ctx, "%s", reason.Message())
 		} else {
 			logger.DebugC(ctx, "%s", reason.Message())
