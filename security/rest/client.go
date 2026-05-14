@@ -1,0 +1,192 @@
+package rest
+
+import (
+	"context"
+	"encoding/base64"
+	"errors"
+	"fmt"
+	"io"
+	"net/http"
+	"net/url"
+
+	cache "github.com/go-pkgz/expirable-cache/v3"
+	"github.com/netcracker/qubership-core-lib-go/v3/configloader"
+	"github.com/netcracker/qubership-core-lib-go/v3/security"
+	"github.com/netcracker/qubership-core-lib-go/v3/security/tokensource"
+	"github.com/netcracker/qubership-core-lib-go/v3/serviceloader"
+	"github.com/netcracker/qubership-core-lib-go/v3/utils"
+
+	"github.com/netcracker/qubership-core-lib-go/v3/logging"
+)
+
+var (
+	logger logging.Logger
+
+	DefaultDbaasAgentUrl string = "http://dbaas-agent:8080"
+	DefaultMaasAgentUrl  string = "http://maas-agent:8080"
+)
+
+func init() {
+	logger = logging.GetLogger("rest-client")
+}
+
+// Client represents a generic rest client to make requests to services. Use NewM2MRestClient, NewDbaasRestClient, NewMaasRestClient functions to get a Client for your task. All of them support Kubernetes tokens and falling back to old approach if they are not available either in client or server
+type Client interface {
+	DoRequest(ctx context.Context, httpMethod, url string, headers map[string][]string, body io.Reader) (*http.Response, error)
+}
+
+// NewM2MRestClient returns a Client for making requests to internal services using kubernetes token with netcracker audience. If token is not available or a service doesn't support kubernetes tokens then it falls back to old m2m tokens
+func NewM2MRestClient() Client {
+	return newM2MRestClient(k8sAuthHeaderFunc(tokensource.AudienceNetcracker), keycloakAuthHeaderFunc(), "")
+}
+
+// NewDbaasRestClient returns a Client for making requests to dbaas using kubernetes token with dbaas audience. If token is not available or the current dbaas version doesn't support kubernetes tokens then it falls back to old approach making request through dbaas-agent
+func NewDbaasRestClient() Client {
+	return newM2MRestClient(k8sAuthHeaderFunc(tokensource.AudienceDBaaS), keycloakAuthHeaderFunc(), DefaultDbaasAgentUrl)
+}
+
+// NewMaasRestClient returns a Client for making requests to maas using kubernetes token with maas audience. If token is not available or the current maas version doesn't support kubernetes tokens then it falls back to old approach making request through maas-agent
+func NewMaasRestClient() Client {
+	return newM2MRestClient(k8sAuthHeaderFunc(tokensource.AudienceMaaS), keycloakAuthHeaderFunc(), DefaultMaasAgentUrl)
+}
+
+type authHeaderFunc func(ctx context.Context) (string, error)
+
+type m2MRestClient struct {
+	client             *http.Client
+	urlCache           cache.Cache[string, empty]
+	k8sAuthHeader      authHeaderFunc
+	fallbackAuthHeader authHeaderFunc
+	fallBackBaseUrl    string
+	k8sEnabled         bool
+}
+
+func newM2MRestClient(k8sAuthHeader, fallbackAuthHeader authHeaderFunc, fallBackBaseUrl string) Client {
+	return &m2MRestClient{
+		client:             utils.GetClient(),
+		urlCache:           getUrlCache(),
+		k8sAuthHeader:      k8sAuthHeader,
+		fallbackAuthHeader: fallbackAuthHeader,
+		fallBackBaseUrl:    fallBackBaseUrl,
+		k8sEnabled:         configloader.GetKoanf().Bool("security.m2m.kubernetes.enabled"),
+	}
+}
+
+func (m *m2MRestClient) DoRequest(ctx context.Context, httpMethod, url string, headers map[string][]string, bodyReader io.Reader) (*http.Response, error) {
+	cacheKey, err := calculateCacheKey(url)
+	if err != nil {
+		return nil, fmt.Errorf("url can not be parsed: %w", err)
+	}
+	requestProducer, err := newHttpRequestProducer(httpMethod, url, headers, bodyReader)
+	if err != nil {
+		return nil, err
+	}
+	_, ok := m.urlCache.Get(cacheKey)
+	if m.k8sEnabled && !ok {
+		logger.Debugf("trying to send %s request to %s using new authentication method", httpMethod, url)
+		//first call (no information) / new authentication method is applicable
+		requestProducer.authHeader = m.k8sAuthHeader
+		response, requestError := m.doRequest(ctx, requestProducer)
+		if requestError != nil {
+			tae := &TokenAcquisitionError{}
+			if errors.As(requestError, &tae) {
+				return m.doRequestFallback(ctx, cacheKey, requestProducer, &fallbackReason{desc: kubernetesTokenAcquisitionError, url: url, err: tae})
+			}
+			return nil, requestError
+		}
+
+		if response.StatusCode == http.StatusUnauthorized {
+			//authentication failed, need to use fallback approach
+			return m.doRequestFallback(ctx, cacheKey, requestProducer, &fallbackReason{desc: kubernetesTokenUnauthorizedError, url: url})
+		}
+		return response, requestError
+	}
+
+	//new authentication method is not applicable (we already know it from cache), need to use fallback approach
+	return m.doRequestFallback(ctx, cacheKey, requestProducer, nil)
+}
+
+func (m *m2MRestClient) doRequestFallback(ctx context.Context, cacheKey string, requestProducer *httpRequestProducer, reason *fallbackReason) (*http.Response, error) {
+	logger.Debugf("fallback: trying to send %s request to %s using fallback authentication method", requestProducer.httpMethod, requestProducer.url)
+
+	if m.k8sEnabled && m.fallBackBaseUrl != "" {
+		rebasedUrl, err := rebaseUrl(requestProducer.url, m.fallBackBaseUrl)
+		if err != nil {
+			return nil, fmt.Errorf("failed to rebase url %q to fallback base url %q: %w", requestProducer.url, m.fallBackBaseUrl, err)
+		}
+		requestProducer.url = rebasedUrl
+	}
+	requestProducer.authHeader = m.fallbackAuthHeader
+	response, err := m.doRequest(ctx, requestProducer)
+
+	if err == nil && response.StatusCode < 400 {
+		m.urlCache.Add(cacheKey, empty{})
+	}
+	if reason != nil {
+		if reason.desc == kubernetesTokenAcquisitionError && m.k8sEnabled {
+			logger.WarnC(ctx, "%s", reason.Message())
+		} else {
+			logger.DebugC(ctx, "%s", reason.Message())
+		}
+	}
+
+	return response, err
+}
+
+func (m *m2MRestClient) doRequest(ctx context.Context, requestProducer *httpRequestProducer) (*http.Response, error) {
+	httpRequest, err := requestProducer.produce(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	httpResponse, err := m.client.Do(httpRequest)
+	if err != nil {
+		return nil, fmt.Errorf("cannot perform request: %w", err)
+	}
+
+	return httpResponse, nil
+}
+
+func k8sAuthHeaderFunc(audience tokensource.TokenAudience) authHeaderFunc {
+	return func(ctx context.Context) (string, error) {
+		token, err := tokensource.GetAudienceToken(ctx, audience)
+		if err != nil {
+			return "", err
+		}
+		return fmt.Sprintf("Bearer %s", token), nil
+	}
+}
+
+func keycloakAuthHeaderFunc() authHeaderFunc {
+	tokenProvider := serviceloader.MustLoad[security.TokenProvider]()
+	return func(ctx context.Context) (string, error) {
+		token, err := tokenProvider.GetToken(ctx)
+		if err != nil {
+			return "", err
+		}
+		return fmt.Sprintf("Bearer %s", token), nil
+	}
+}
+
+func basicAuthHeaderFunc(username, password string) authHeaderFunc {
+	credentials := username + ":" + password
+	encoded := base64.StdEncoding.EncodeToString([]byte(credentials))
+	authHeader := "Basic " + encoded
+	return func(ctx context.Context) (string, error) {
+		return authHeader, nil
+	}
+}
+
+func rebaseUrl(originalUrl, fallbackBase string) (string, error) {
+	original, err := url.Parse(originalUrl)
+	if err != nil {
+		return "", fmt.Errorf("cannot parse url: %w", err)
+	}
+	base, err := url.Parse(fallbackBase)
+	if err != nil {
+		return "", fmt.Errorf("cannot parse fallback base url: %w", err)
+	}
+	original.Scheme = base.Scheme
+	original.Host = base.Host
+	return original.String(), nil
+}
