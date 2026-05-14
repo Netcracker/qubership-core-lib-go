@@ -19,7 +19,7 @@ import (
 )
 
 var (
-    logger logging.Logger
+	logger logging.Logger
 
 	DefaultDbaasAgentUrl string = "http://dbaas-agent:8080"
 	DefaultMaasAgentUrl  string = "http://maas-agent:8080"
@@ -57,6 +57,7 @@ type m2MRestClient struct {
 	k8sAuthHeader      authHeaderFunc
 	fallbackAuthHeader authHeaderFunc
 	fallBackBaseUrl    string
+	k8sEnabled         bool
 }
 
 func newM2MRestClient(k8sAuthHeader, fallbackAuthHeader authHeaderFunc, fallBackBaseUrl string) Client {
@@ -79,7 +80,7 @@ func (m *m2MRestClient) DoRequest(ctx context.Context, httpMethod, url string, h
 		return nil, err
 	}
 	_, ok := m.urlCache.Get(cacheKey)
-	if !ok {
+	if m.k8sEnabled && !ok {
 		logger.Debugf("trying to send %s request to %s using new authentication method", httpMethod, url)
 		//first call (no information) / new authentication method is applicable
 		requestProducer.authHeader = m.k8sAuthHeader
@@ -106,7 +107,7 @@ func (m *m2MRestClient) DoRequest(ctx context.Context, httpMethod, url string, h
 func (m *m2MRestClient) doRequestFallback(ctx context.Context, cacheKey string, requestProducer *httpRequestProducer, reason *fallbackReason) (*http.Response, error) {
 	logger.Debugf("fallback: trying to send %s request to %s using fallback authentication method", requestProducer.httpMethod, requestProducer.url)
 
-	if m.fallBackBaseUrl != "" {
+	if m.k8sEnabled && m.fallBackBaseUrl != "" {
 		rebasedUrl, err := rebaseUrl(requestProducer.url, m.fallBackBaseUrl)
 		if err != nil {
 			return nil, fmt.Errorf("failed to rebase url %q to fallback base url %q: %w", requestProducer.url, m.fallBackBaseUrl, err)
@@ -116,9 +117,15 @@ func (m *m2MRestClient) doRequestFallback(ctx context.Context, cacheKey string, 
 	requestProducer.authHeader = m.fallbackAuthHeader
 	response, err := m.doRequest(ctx, requestProducer)
 
-	if err == nil && response.StatusCode < 400 && reason != nil {
+	if err == nil && response.StatusCode < 400 {
 		m.urlCache.Add(cacheKey, empty{})
-		logger.WarnC(ctx, "%s", reason.Message())
+	}
+	if reason != nil {
+		if(reason.desc == kubernetesTokenAcquisitionError && m.k8sEnabled) {
+			logger.WarnC(ctx, "%s", reason.Message())
+		} else {
+			logger.DebugC(ctx, "%s", reason.Message())
+		}
 	}
 
 	return response, err
