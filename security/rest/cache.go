@@ -6,16 +6,13 @@ import (
 	"time"
 	"unicode"
 
-	"github.com/go-pkgz/expirable-cache/v3"
-)
-
-const (
-	internalGatewayHostName = "internal-gateway"
+	cache "github.com/go-pkgz/expirable-cache/v3"
+	"github.com/netcracker/qubership-core-lib-go/v3/configloader"
 )
 
 var (
 	urlCacheSize = 400
-	urlCacheTTL  = 5 * time.Hour
+	urlCacheTTL  = configloader.GetOrDefault("security.m2m.kubernetes.url-cache.timeout", 5*time.Hour)
 )
 
 type empty struct{}
@@ -32,6 +29,7 @@ func calculateCacheKey(rawUrl string) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	internalGatewayHostName := configloader.GetOrDefaultString("security.m2m.kubernetes.url-cache.internal-gateway-hostname", "internal-gateway")
 	if strings.Contains(parsedUrl.Host, internalGatewayHostName) {
 		return calculateCacheKeyForInternalGateway(parsedUrl), nil
 	}
