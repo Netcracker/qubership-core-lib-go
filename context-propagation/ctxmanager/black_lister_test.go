@@ -35,7 +35,7 @@ func TestOptionalHeaders_UnblocksDefaultBlocked(t *testing.T) {
 	resetSingleton([]string{"X-Channel-Request-Id"})
 
 	if IsContextBlackListed("X-Channel-Request-Id") {
-		t.Error("expected 'X-Channel-Request-Id' to be unblocked when listed in context.propagation.headers.enable.optional")
+		t.Errorf("expected 'X-Channel-Request-Id' to be unblocked when listed in %s", optionalHeadersEnabledConfigKey)
 	}
 }
 
@@ -43,7 +43,7 @@ func TestOptionalHeaders_EmptySlice_DefaultBlockedRemains(t *testing.T) {
 	resetSingleton([]string{})
 
 	if !IsContextBlackListed("X-Channel-Request-Id") {
-		t.Error("expected 'X-Channel-Request-Id' to remain blocked when context.propagation.headers.enable.optional is empty")
+		t.Errorf("expected 'X-Channel-Request-Id' to remain blocked when %s is empty", optionalHeadersEnabledConfigKey)
 	}
 }
 

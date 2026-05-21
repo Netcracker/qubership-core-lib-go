@@ -8,6 +8,8 @@ import (
 	"github.com/netcracker/qubership-core-lib-go/v3/configloader"
 )
 
+const optionalHeadersEnabledConfigKey = "context.propagation.headers.enable.optional"
+
 var defaultBlockedHeaders = []string{"X-Channel-Request-Id"}
 
 var (
@@ -21,7 +23,7 @@ func IsContextBlackListed(name string) bool {
 
 func getBlackLister() *contextBlackLister {
 	once.Do(func() {
-		raw := configloader.GetOrDefaultString("context.propagation.headers.enable.optional", "")
+		raw := configloader.GetOrDefaultString(optionalHeadersEnabledConfigKey, "")
 		var enabled []string
 		for _, entry := range strings.Split(raw, ",") {
 			if trimmed := strings.TrimSpace(entry); trimmed != "" {
