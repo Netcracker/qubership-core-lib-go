@@ -91,9 +91,6 @@ func (m *m2MRestClient) DoRequest(ctx context.Context, httpMethod, url string, h
 		if requestError != nil {
 			tae := &TokenAcquisitionError{}
 			if errors.As(requestError, &tae) {
-				if response.Body != nil {
-					response.Body.Close()
-				}
 				return m.doRequestFallback(ctx, cacheKey, requestProducer, &fallbackReason{desc: kubernetesTokenAcquisitionError, url: url, err: tae})
 			}
 			return nil, requestError
