@@ -52,27 +52,29 @@ func NewMaasRestClient() Client {
 type authHeaderFunc func(ctx context.Context) (string, error)
 
 type m2MRestClient struct {
-	client             *http.Client
-	urlCache           cache.Cache[string, empty]
-	k8sAuthHeader      authHeaderFunc
-	fallbackAuthHeader authHeaderFunc
-	fallBackBaseUrl    string
-	k8sEnabled         bool
+	client                  *http.Client
+	urlCache                cache.Cache[string, empty]
+	k8sAuthHeader           authHeaderFunc
+	fallbackAuthHeader      authHeaderFunc
+	fallBackBaseUrl         string
+	internalGatewayHostname string
+	k8sEnabled              bool
 }
 
 func newM2MRestClient(k8sAuthHeader, fallbackAuthHeader authHeaderFunc, fallBackBaseUrl string) Client {
 	return &m2MRestClient{
-		client:             utils.GetClient(),
-		urlCache:           newUrlCache(),
-		k8sAuthHeader:      k8sAuthHeader,
-		fallbackAuthHeader: fallbackAuthHeader,
-		fallBackBaseUrl:    fallBackBaseUrl,
-		k8sEnabled:         configloader.GetKoanf().Bool("security.m2m.kubernetes.enabled"),
+		client:                  utils.GetClient(),
+		urlCache:                newUrlCache(),
+		k8sAuthHeader:           k8sAuthHeader,
+		fallbackAuthHeader:      fallbackAuthHeader,
+		fallBackBaseUrl:         fallBackBaseUrl,
+		internalGatewayHostname: configloader.GetOrDefaultString("security.m2m.kubernetes.url-cache.internal-gateway-hostname", "internal-gateway"),
+		k8sEnabled:              configloader.GetKoanf().Bool("security.m2m.kubernetes.enabled"),
 	}
 }
 
 func (m *m2MRestClient) DoRequest(ctx context.Context, httpMethod, url string, headers map[string][]string, bodyReader io.Reader) (*http.Response, error) {
-	cacheKey, err := calculateCacheKey(url)
+	cacheKey, err := calculateCacheKey(m.internalGatewayHostname, url)
 	if err != nil {
 		return nil, fmt.Errorf("url can not be parsed: %w", err)
 	}
@@ -98,7 +100,7 @@ func (m *m2MRestClient) DoRequest(ctx context.Context, httpMethod, url string, h
 			//authentication failed, need to use fallback approach
 			return m.doRequestFallback(ctx, cacheKey, requestProducer, &fallbackReason{desc: kubernetesTokenUnauthorizedError, url: url})
 		}
-		return response, requestError
+		return response, nil
 	}
 
 	//new authentication method is not applicable (we already know it from cache), need to use fallback approach

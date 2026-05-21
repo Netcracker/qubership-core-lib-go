@@ -36,65 +36,65 @@ func TestIsVersion(t *testing.T) {
 func TestCalculateCacheKey(t *testing.T) {
 	tests := []struct {
 		name        string
-		rawUrl      string
+		rawURL      string
 		expected    string
 		expectError bool
 	}{
 		{
 			name:     "simple host",
-			rawUrl:   "https://api.example.com/resource",
+			rawURL:   "https://api.example.com/resource",
 			expected: "api.example.com",
 		},
 		{
 			name:     "host with port",
-			rawUrl:   "https://api.example.com:8080/resource",
+			rawURL:   "https://api.example.com:8080/resource",
 			expected: "api.example.com:8080",
 		},
 		{
 			name:     "internal-gateway with version no service",
-			rawUrl:   "https://internal-gateway/v10",
+			rawURL:   "https://internal-gateway/v10",
 			expected: "internal-gateway/v10",
 		},
 		{
 			name:     "internal-gateway with trailing slash",
-			rawUrl:   "https://internal-gateway/api/v1/serviceName/",
+			rawURL:   "https://internal-gateway/api/v1/serviceName/",
 			expected: "internal-gateway/api/v1/serviceName",
 		},
 		{
 			name:     "internal-gateway with multiple path segments",
-			rawUrl:   "https://internal-gateway/some/path/to/something",
+			rawURL:   "https://internal-gateway/some/path/to/something",
 			expected: "internal-gateway/some/path/to/something",
 		},
 		{
 			name:     "internal-gateway with trailing slash",
-			rawUrl:   "https://internal-gateway/path/",
+			rawURL:   "https://internal-gateway/path/",
 			expected: "internal-gateway/path",
 		},
 		{
 			name:     "internal-gateway with query params",
-			rawUrl:   "https://internal-gateway/path?param=value",
+			rawURL:   "https://internal-gateway/path?param=value",
 			expected: "internal-gateway/path",
 		},
 		{
 			name:     "public api with complex path",
-			rawUrl:   "https://google.com/v10/api/resource/service",
+			rawURL:   "https://google.com/v10/api/resource/service",
 			expected: "google.com",
 		},
 		{
 			name:        "invalid URL",
-			rawUrl:      "://invalid-url",
+			rawURL:      "://invalid-url",
 			expectError: true,
 		},
 		{
 			name:     "empty URL",
-			rawUrl:   "",
+			rawURL:   "",
 			expected: "",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result, err := calculateCacheKey(tt.rawUrl)
+			result, err := calculateCacheKey("internal-gateway", tt.rawURL)
 			if tt.expectError {
 				assert.Error(t, err)
 			} else {

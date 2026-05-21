@@ -7,7 +7,6 @@ import (
 	"unicode"
 
 	cache "github.com/go-pkgz/expirable-cache/v3"
-	"github.com/netcracker/qubership-core-lib-go/v3/configloader"
 )
 
 var (
@@ -24,20 +23,19 @@ func newUrlCache() cache.Cache[string, empty] {
 		WithTTL(urlCacheTTL)
 }
 
-func calculateCacheKey(rawUrl string) (string, error) {
-	parsedUrl, err := url.Parse(rawUrl)
+func calculateCacheKey(internalGatewayHostName, rawURL string) (string, error) {
+	parsedURL, err := url.Parse(rawURL)
 	if err != nil {
 		return "", err
 	}
-	internalGatewayHostName := configloader.GetOrDefaultString("security.m2m.kubernetes.url-cache.internal-gateway-hostname", "internal-gateway")
-	if strings.Contains(parsedUrl.Host, internalGatewayHostName) {
-		return calculateCacheKeyForInternalGateway(parsedUrl), nil
+	if strings.Contains(parsedURL.Host, internalGatewayHostName) {
+		return calculateCacheKeyForInternalGateway(parsedURL), nil
 	}
-	return parsedUrl.Host, nil
+	return parsedURL.Host, nil
 }
 
-func calculateCacheKeyForInternalGateway(parsedUrl *url.URL) string {
-	segments := strings.Split(strings.Trim(parsedUrl.Path, "/"), "/")
+func calculateCacheKeyForInternalGateway(parsedURL *url.URL) string {
+	segments := strings.Split(strings.Trim(parsedURL.Path, "/"), "/")
 	var filteredSegments []string
 	var version string
 	var serviceName string
@@ -56,8 +54,8 @@ func calculateCacheKeyForInternalGateway(parsedUrl *url.URL) string {
 	if version == "" {
 		logger.Debug("internal-gateway url does not contain any api version; whole path will be used as a key for m2m decision cache")
 	}
-	key := parsedUrl.Host + "/" + strings.Join(filteredSegments, "/")
-	if strings.HasPrefix(parsedUrl.Path, "/api") && serviceName != "" {
+	key := parsedURL.Host + "/" + strings.Join(filteredSegments, "/")
+	if strings.HasPrefix(parsedURL.Path, "/api") && serviceName != "" {
 		key = key + "/" + serviceName
 	}
 	return key

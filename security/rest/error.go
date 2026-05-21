@@ -24,7 +24,7 @@ type fallbackReason struct {
 
 func (f *fallbackReason) Message() string {
 	if f.err != nil {
-		return fmt.Sprintf("failed to establish m2m connection to %s\n%s\n%v", f.url, f.desc, f.err.Error())
+		return fmt.Sprintf("failed to establish m2m connection to %s\n%s\n%v", f.url, f.desc, f.err)
 	}
 	return fmt.Sprintf("failed to establish m2m connection to %s\n%s", f.url, f.desc)
 
