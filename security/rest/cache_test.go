@@ -1,0 +1,122 @@
+package rest
+
+import (
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+)
+
+func TestIsVersion(t *testing.T) {
+	tests := []struct {
+		name     string
+		segment  string
+		expected bool
+	}{
+		{"valid version v1", "v1", true},
+		{"valid version v2", "v2", true},
+		{"valid version v123", "v123", true},
+		{"valid version v999", "v999", true},
+		{"invalid - no v prefix", "1", false},
+		{"invalid - too short", "v", false},
+		{"invalid - empty string", "", false},
+		{"invalid - contains letters", "v1a", false},
+		{"invalid - contains special chars", "v1.0", false},
+		{"invalid - uppercase V", "V1", false},
+		{"invalid - multiple v", "vv1", false},
+		{"invalid - negative", "v-1", false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.expected, isVersion(tt.segment))
+		})
+	}
+}
+
+func TestCalculateCacheKey(t *testing.T) {
+	tests := []struct {
+		name        string
+		rawURL      string
+		expected    string
+		expectError bool
+	}{
+		{
+			name:     "simple host",
+			rawURL:   "https://api.example.com/resource",
+			expected: "api.example.com",
+		},
+		{
+			name:     "host with port",
+			rawURL:   "https://api.example.com:8080/resource",
+			expected: "api.example.com:8080",
+		},
+		{
+			name:     "internal-gateway-service with version no service",
+			rawURL:   "https://internal-gateway-service/v10",
+			expected: "internal-gateway-service/v10",
+		},
+		{
+			name:     "internal-gateway-service with trailing slash",
+			rawURL:   "https://internal-gateway-service/api/v1/serviceName/",
+			expected: "internal-gateway-service/api/v1/serviceName",
+		},
+		{
+			name:     "internal-gateway-service with multiple path segments",
+			rawURL:   "https://internal-gateway-service/some/path/to/something",
+			expected: "internal-gateway-service/some/path/to/something",
+		},
+		{
+			name:     "internal-gateway-service with trailing slash",
+			rawURL:   "https://internal-gateway-service/path/",
+			expected: "internal-gateway-service/path",
+		},
+		{
+			name:     "internal-gateway-service with query params",
+			rawURL:   "https://internal-gateway-service/path?param=value",
+			expected: "internal-gateway-service/path",
+		},
+		{
+			name:     "public api with complex path",
+			rawURL:   "https://google.com/v10/api/resource/service",
+			expected: "google.com",
+		},
+		{
+			name:        "invalid URL",
+			rawURL:      "://invalid-url",
+			expectError: true,
+		},
+		{
+			name:     "empty URL",
+			rawURL:   "",
+			expected: "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result, err := calculateCacheKey("internal-gateway-service", tt.rawURL)
+			if tt.expectError {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+				assert.Equal(t, tt.expected, result)
+			}
+		})
+	}
+}
+
+func TestGetUrlCache(t *testing.T) {
+	cache := newUrlCache()
+	assert.NotNil(t, cache)
+
+	// Test basic cache operations
+	key := "test-key"
+	cache.Add(key, empty{})
+
+	_, exists := cache.Get(key)
+	assert.True(t, exists, "cache should contain the added key")
+
+	cache.Invalidate(key)
+	_, exists = cache.Get(key)
+	assert.False(t, exists, "cache should not contain invalidated key")
+}
