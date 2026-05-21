@@ -29,17 +29,17 @@ func init() {
 	logger = logging.GetLogger("rest-client")
 }
 
-// NewM2MRestClient returns a Client for making requests to internal services using kubernetes token with netcracker audience. If token is not available or a service doesn't support kubernetes tokens then it falls back to old m2m tokens
+// NewM2MRestClient returns a *M2MRestClient for making requests to internal services using kubernetes token with netcracker audience. If token is not available or a service doesn't support kubernetes tokens then it falls back to old m2m tokens
 func NewM2MRestClient() *M2MRestClient {
 	return newM2MRestClient(k8sAuthHeaderFunc(tokensource.AudienceNetcracker), keycloakAuthHeaderFunc(), "")
 }
 
-// NewDbaasRestClient returns a Client for making requests to dbaas using kubernetes token with dbaas audience. If token is not available or the current dbaas version doesn't support kubernetes tokens then it falls back to old approach making request through dbaas-agent
+// NewDbaasRestClient returns a *M2MRestClient for making requests to dbaas using kubernetes token with dbaas audience. If token is not available or the current dbaas version doesn't support kubernetes tokens then it falls back to old approach making request through dbaas-agent
 func NewDbaasRestClient() *M2MRestClient {
 	return newM2MRestClient(k8sAuthHeaderFunc(tokensource.AudienceDBaaS), keycloakAuthHeaderFunc(), DefaultDbaasAgentUrl)
 }
 
-// NewMaasRestClient returns a Client for making requests to maas using kubernetes token with maas audience. If token is not available or the current maas version doesn't support kubernetes tokens then it falls back to old approach making request through maas-agent
+// NewMaasRestClient returns a *M2MRestClient for making requests to maas using kubernetes token with maas audience. If token is not available or the current maas version doesn't support kubernetes tokens then it falls back to old approach making request through maas-agent
 func NewMaasRestClient() *M2MRestClient {
 	return newM2MRestClient(k8sAuthHeaderFunc(tokensource.AudienceMaaS), keycloakAuthHeaderFunc(), DefaultMaasAgentUrl)
 }
@@ -68,6 +68,7 @@ func newM2MRestClient(k8sAuthHeader, fallbackAuthHeader authHeaderFunc, fallBack
 	}
 }
 
+// DoRequest performs an HTTP request with automatic authentication handling and fallback.
 func (m *M2MRestClient) DoRequest(ctx context.Context, httpMethod, url string, headers map[string][]string, bodyReader io.Reader) (*http.Response, error) {
 	cacheKey, err := calculateCacheKey(m.internalGatewayHostname, url)
 	if err != nil {

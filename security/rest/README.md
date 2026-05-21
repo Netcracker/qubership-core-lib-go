@@ -23,16 +23,14 @@ The library offers three factory functions to create REST clients for different 
 
 ### Factory Functions
 
-* `NewM2MRestClient()` – returns a Client for internal service-to-service communication using Kubernetes tokens with Netcracker audience, with automatic fallback to Keycloak M2M tokens
-* `NewDbaasRestClient()` – returns a Client for DBaaS communication using Kubernetes tokens with DBaaS audience, with automatic fallback to dbaas-agent
-* `NewMaasRestClient()` – returns a Client for MaaS communication using Kubernetes tokens with MaaS audience, with automatic fallback to maas-agent
+* `NewM2MRestClient()` – returns a `*M2MRestClient` for internal service-to-service communication using Kubernetes tokens with Netcracker audience, with automatic fallback to Keycloak M2M tokens
+* `NewDbaasRestClient()` – returns a `*M2MRestClient` for DBaaS communication using Kubernetes tokens with DBaaS audience, with automatic fallback to dbaas-agent
+* `NewMaasRestClient()` – returns a `*M2MRestClient` for MaaS communication using Kubernetes tokens with MaaS audience, with automatic fallback to maas-agent
 
-### Client Interface
+### Client Methods
 
 ```go
-type Client interface {
-    DoRequest(ctx context.Context, httpMethod, url string, headers map[string][]string, body io.Reader) (*http.Response, error)
-}
+func (m *M2MRestClient) DoRequest(ctx context.Context, httpMethod, url string, headers map[string][]string, bodyReader io.Reader) (*http.Response, error)
 ```
 
 ## Examples
