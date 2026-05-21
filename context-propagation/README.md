@@ -355,8 +355,14 @@ Headers restricted by default:
 
 To unrestrict one or more of these headers, set the property to a comma-separated list in `application.yaml`:
 
+```yaml
+context.propagation.headers.enable.optional: X-Channel-Request-Id
+```
+
+Or by ENV:
+
 ```text
-context.propagation.headers.enable.optional=X-Channel-Request-Id
+CONTEXT_PROPAGATION_HEADERS_ENABLE_OPTIONAL=X-Channel-Request-Id
 ```
 
 > **Note**  
