@@ -29,29 +29,24 @@ func init() {
 	logger = logging.GetLogger("rest-client")
 }
 
-// Client represents a generic rest client to make requests to services. Use NewM2MRestClient, NewDbaasRestClient, NewMaasRestClient functions to get a Client for your task. All of them support Kubernetes tokens and falling back to old approach if they are not available either in client or server
-type Client interface {
-	DoRequest(ctx context.Context, httpMethod, url string, headers map[string][]string, body io.Reader) (*http.Response, error)
-}
-
 // NewM2MRestClient returns a Client for making requests to internal services using kubernetes token with netcracker audience. If token is not available or a service doesn't support kubernetes tokens then it falls back to old m2m tokens
-func NewM2MRestClient() Client {
+func NewM2MRestClient() *M2MRestClient {
 	return newM2MRestClient(k8sAuthHeaderFunc(tokensource.AudienceNetcracker), keycloakAuthHeaderFunc(), "")
 }
 
 // NewDbaasRestClient returns a Client for making requests to dbaas using kubernetes token with dbaas audience. If token is not available or the current dbaas version doesn't support kubernetes tokens then it falls back to old approach making request through dbaas-agent
-func NewDbaasRestClient() Client {
+func NewDbaasRestClient() *M2MRestClient {
 	return newM2MRestClient(k8sAuthHeaderFunc(tokensource.AudienceDBaaS), keycloakAuthHeaderFunc(), DefaultDbaasAgentUrl)
 }
 
 // NewMaasRestClient returns a Client for making requests to maas using kubernetes token with maas audience. If token is not available or the current maas version doesn't support kubernetes tokens then it falls back to old approach making request through maas-agent
-func NewMaasRestClient() Client {
+func NewMaasRestClient() *M2MRestClient {
 	return newM2MRestClient(k8sAuthHeaderFunc(tokensource.AudienceMaaS), keycloakAuthHeaderFunc(), DefaultMaasAgentUrl)
 }
 
 type authHeaderFunc func(ctx context.Context) (string, error)
 
-type m2MRestClient struct {
+type M2MRestClient struct {
 	client                  *http.Client
 	urlCache                cache.Cache[string, empty]
 	k8sAuthHeader           authHeaderFunc
@@ -61,19 +56,19 @@ type m2MRestClient struct {
 	k8sEnabled              bool
 }
 
-func newM2MRestClient(k8sAuthHeader, fallbackAuthHeader authHeaderFunc, fallBackBaseUrl string) Client {
-	return &m2MRestClient{
+func newM2MRestClient(k8sAuthHeader, fallbackAuthHeader authHeaderFunc, fallBackBaseUrl string) *M2MRestClient {
+	return &M2MRestClient{
 		client:                  utils.GetClient(),
 		urlCache:                newUrlCache(),
 		k8sAuthHeader:           k8sAuthHeader,
 		fallbackAuthHeader:      fallbackAuthHeader,
 		fallBackBaseUrl:         fallBackBaseUrl,
-		internalGatewayHostname: configloader.GetOrDefaultString("security.m2m.kubernetes.url-cache.internal-gateway-hostname", "internal-gateway"),
+		internalGatewayHostname: configloader.GetOrDefaultString("security.m2m.kubernetes.url-cache.internal-gateway-hostname", "internal-gateway-service"),
 		k8sEnabled:              configloader.GetKoanf().Bool("security.m2m.kubernetes.enabled"),
 	}
 }
 
-func (m *m2MRestClient) DoRequest(ctx context.Context, httpMethod, url string, headers map[string][]string, bodyReader io.Reader) (*http.Response, error) {
+func (m *M2MRestClient) DoRequest(ctx context.Context, httpMethod, url string, headers map[string][]string, bodyReader io.Reader) (*http.Response, error) {
 	cacheKey, err := calculateCacheKey(m.internalGatewayHostname, url)
 	if err != nil {
 		return nil, fmt.Errorf("url can not be parsed: %w", err)
@@ -110,7 +105,7 @@ func (m *m2MRestClient) DoRequest(ctx context.Context, httpMethod, url string, h
 	return m.doRequestFallback(ctx, cacheKey, requestProducer, nil)
 }
 
-func (m *m2MRestClient) doRequestFallback(ctx context.Context, cacheKey string, requestProducer *httpRequestProducer, reason *fallbackReason) (*http.Response, error) {
+func (m *M2MRestClient) doRequestFallback(ctx context.Context, cacheKey string, requestProducer *httpRequestProducer, reason *fallbackReason) (*http.Response, error) {
 	logger.Debugf("fallback: trying to send %s request to %s using fallback authentication method", requestProducer.httpMethod, requestProducer.url)
 
 	if m.k8sEnabled && m.fallBackBaseUrl != "" {
@@ -137,7 +132,7 @@ func (m *m2MRestClient) doRequestFallback(ctx context.Context, cacheKey string, 
 	return response, err
 }
 
-func (m *m2MRestClient) doRequest(ctx context.Context, requestProducer *httpRequestProducer) (*http.Response, error) {
+func (m *M2MRestClient) doRequest(ctx context.Context, requestProducer *httpRequestProducer) (*http.Response, error) {
 	httpRequest, err := requestProducer.produce(ctx)
 	if err != nil {
 		return nil, err

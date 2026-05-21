@@ -52,7 +52,7 @@ func calculateCacheKeyForInternalGateway(parsedURL *url.URL) string {
 	}
 
 	if version == "" {
-		logger.Debug("internal-gateway url does not contain any api version; whole path will be used as a key for m2m decision cache")
+		logger.Debug("internal-gateway-service url does not contain any api version; whole path will be used as a key for m2m decision cache")
 	}
 	key := parsedURL.Host + "/" + strings.Join(filteredSegments, "/")
 	if strings.HasPrefix(parsedURL.Path, "/api") && serviceName != "" {
