@@ -14,6 +14,7 @@ go get github.com/netcracker/qubership-core-lib-go/v3
 
 | Configuration Property | Default Value | Description |
 | --- | --- | --- |
+| `security.m2m.kubernetes.enabled` | false | Enable k8s tokens authentication |
 | `security.m2m.kubernetes.url-cache.ttl` | 5h | Time to live for values in the URL cache |
 | `security.m2m.kubernetes.url-cache.internal-gateway-hostname` | internal-gateway | Hostname of the internal-gateway |
 
