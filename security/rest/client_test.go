@@ -11,9 +11,19 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/knadh/koanf/providers/confmap"
+	"github.com/netcracker/qubership-core-lib-go/v3/configloader"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func init() {
+	configloader.Init(&configloader.PropertySource{
+		Provider: configloader.AsPropertyProvider(confmap.Provider(map[string]interface{}{
+			"security.m2m.kubernetes.enabled": true,
+		}, ".")),
+	})
+}
 
 // mockAuthHeaderFunc creates a mock auth header func for testing
 func mockAuthHeaderFunc(token string, err error) authHeaderFunc {
@@ -86,6 +96,7 @@ func TestM2MRestClient_DoRequest_FirstCallSuccess(t *testing.T) {
 		urlCache:           getUrlCache(),
 		k8sAuthHeader:      mockAuthHeaderFunc("Bearer new-token", nil),
 		fallbackAuthHeader: mockAuthHeaderFunc("Bearer fallback-token", nil),
+		k8sEnabled:         true,
 	}
 
 	ctx := context.Background()
@@ -123,6 +134,7 @@ func TestM2MRestClient_DoRequest_FirstCallUnauthorized_FallbackSuccess(t *testin
 		urlCache:           getUrlCache(),
 		k8sAuthHeader:      mockAuthHeaderFunc("Bearer new-token", nil),
 		fallbackAuthHeader: mockAuthHeaderFunc("Bearer fallback-token", nil),
+		k8sEnabled:         true,
 	}
 
 	ctx := context.Background()
@@ -154,6 +166,7 @@ func TestM2MRestClient_DoRequest_TokenAcquisitionError_Fallback(t *testing.T) {
 		urlCache:           getUrlCache(),
 		k8sAuthHeader:      mockAuthHeaderFunc("", errors.New("token acquisition failed")),
 		fallbackAuthHeader: mockAuthHeaderFunc("Bearer fallback-token", nil),
+		k8sEnabled:         true,
 	}
 
 	ctx := context.Background()
@@ -186,6 +199,7 @@ func TestM2MRestClient_DoRequest_CachedUrl_UsesFallback(t *testing.T) {
 		urlCache:           getUrlCache(),
 		k8sAuthHeader:      mockAuthHeaderFunc("Bearer new-token", nil),
 		fallbackAuthHeader: mockAuthHeaderFunc("Bearer fallback-token", nil),
+		k8sEnabled:         true,
 	}
 
 	ctx := context.Background()
@@ -223,6 +237,7 @@ func TestM2MRestClient_DoRequest_WithBody(t *testing.T) {
 		client:             server.Client(),
 		urlCache:           getUrlCache(),
 		k8sAuthHeader:      mockAuthHeaderFunc("Bearer token", nil),
+		k8sEnabled:         true,
 		fallbackAuthHeader: mockAuthHeaderFunc("Bearer fallback", nil),
 	}
 
@@ -252,6 +267,7 @@ func TestM2MRestClient_DoRequest_WithHeaders(t *testing.T) {
 		urlCache:           getUrlCache(),
 		k8sAuthHeader:      mockAuthHeaderFunc("Bearer token", nil),
 		fallbackAuthHeader: mockAuthHeaderFunc("Bearer fallback", nil),
+		k8sEnabled:         true,
 	}
 
 	ctx := context.Background()
@@ -278,6 +294,7 @@ func TestM2MRestClient_DoRequest_InvalidUrl(t *testing.T) {
 		urlCache:           getUrlCache(),
 		k8sAuthHeader:      mockAuthHeaderFunc("Bearer token", nil),
 		fallbackAuthHeader: mockAuthHeaderFunc("Bearer fallback", nil),
+		k8sEnabled:         true,
 	}
 
 	ctx := context.Background()
@@ -298,6 +315,7 @@ func TestM2MRestClient_DoRequest_BothAuthMethodsFail(t *testing.T) {
 		urlCache:           getUrlCache(),
 		k8sAuthHeader:      mockAuthHeaderFunc("", errors.New("new auth failed")),
 		fallbackAuthHeader: mockAuthHeaderFunc("", errors.New("fallback auth failed")),
+		k8sEnabled:         true,
 	}
 
 	ctx := context.Background()
@@ -320,6 +338,7 @@ func TestM2MRestClient_DoRequest_ServerError(t *testing.T) {
 		urlCache:           getUrlCache(),
 		k8sAuthHeader:      mockAuthHeaderFunc("Bearer token", nil),
 		fallbackAuthHeader: mockAuthHeaderFunc("Bearer fallback", nil),
+		k8sEnabled:         true,
 	}
 
 	ctx := context.Background()
@@ -349,6 +368,7 @@ func TestM2MRestClient_DoRequest_ConcurrentRequests(t *testing.T) {
 		urlCache:           getUrlCache(),
 		k8sAuthHeader:      mockAuthHeaderFunc("Bearer token", nil),
 		fallbackAuthHeader: mockAuthHeaderFunc("Bearer fallback", nil),
+		k8sEnabled:         true,
 	}
 
 	ctx := context.Background()
@@ -388,6 +408,7 @@ func TestM2MRestClient_DoRequest_DifferentHttpMethods(t *testing.T) {
 				urlCache:           getUrlCache(),
 				k8sAuthHeader:      mockAuthHeaderFunc("Bearer token", nil),
 				fallbackAuthHeader: mockAuthHeaderFunc("Bearer fallback", nil),
+				k8sEnabled:         true,
 			}
 
 			ctx := context.Background()
@@ -419,6 +440,7 @@ func TestM2MRestClient_DoRequest_FallbackCachesUrl(t *testing.T) {
 		urlCache:           getUrlCache(),
 		k8sAuthHeader:      mockAuthHeaderFunc("Bearer new-token", nil),
 		fallbackAuthHeader: mockAuthHeaderFunc("Bearer fallback-token", nil),
+		k8sEnabled:         true,
 	}
 
 	ctx := context.Background()
@@ -446,6 +468,7 @@ func TestM2MRestClient_DoRequest_BodyReaderError(t *testing.T) {
 		urlCache:           getUrlCache(),
 		k8sAuthHeader:      mockAuthHeaderFunc("Bearer token", nil),
 		fallbackAuthHeader: mockAuthHeaderFunc("Bearer fallback", nil),
+		k8sEnabled:         true,
 	}
 
 	// Create an error reader
@@ -501,6 +524,7 @@ func TestM2MRestClient_DoRequest_InternalGatewayUrlCaching(t *testing.T) {
 		urlCache:           getUrlCache(),
 		k8sAuthHeader:      mockAuthHeaderFunc("Bearer new-token", nil),
 		fallbackAuthHeader: mockAuthHeaderFunc("Bearer fallback-token", nil),
+		k8sEnabled:         true,
 	}
 
 	ctx := context.Background()
@@ -537,6 +561,7 @@ func TestM2MRestClient_DoRequestFallback(t *testing.T) {
 		urlCache:           getUrlCache(),
 		k8sAuthHeader:      mockAuthHeaderFunc("Bearer new", nil),
 		fallbackAuthHeader: mockAuthHeaderFunc("Bearer fallback", nil),
+		k8sEnabled:         true,
 	}
 
 	ctx := context.Background()
@@ -577,6 +602,7 @@ func TestM2MRestClient_DoRequest_MultipleBodyReads(t *testing.T) {
 		urlCache:           getUrlCache(),
 		k8sAuthHeader:      mockAuthHeaderFunc("Bearer new", nil),
 		fallbackAuthHeader: mockAuthHeaderFunc("Bearer fallback", nil),
+		k8sEnabled:         true,
 	}
 
 	ctx := context.Background()
@@ -605,6 +631,7 @@ func TestM2MRestClient_DoRequest_FallbackRebasesUrl(t *testing.T) {
 		k8sAuthHeader:      mockAuthHeaderFunc("Bearer new-token", nil),
 		fallbackAuthHeader: mockAuthHeaderFunc("Bearer fallback-token", nil),
 		fallBackBaseUrl:    agentServer.URL,
+		k8sEnabled:         true,
 	}
 
 	ctx := context.Background()
