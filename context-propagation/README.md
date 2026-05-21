@@ -342,25 +342,25 @@ Otherwise, you need to take care that this parameter is in system#environment.
 
 ##### Optionally enabled headers
 
-Some headers are blocked from propagation by default. The `context.propagation.headers.enable.optional` property
-lets you unblock specific headers so they are propagated again.
+Some headers are restricted from propagation by default. The `context.propagation.headers.enable.optional` property
+lets you unrestrict specific headers so they are propagated again.
 
 For getting the property value, the framework uses [configloader](../configloader), so you must ensure that your main function contains `configloader#Init(propertySources []*PropertySource)`.
 
-Headers blocked by default:
+Headers restricted by default:
 
-| Header | Default |
-|---|---|
-| `X-Channel-Request-Id` | blocked |
+| Header | Default    |
+|---|------------|
+| `X-Channel-Request-Id` | restricted |
 
-To unblock one or more of these headers, set the property to a comma-separated list in `application.yaml`:
+To unrestrict one or more of these headers, set the property to a comma-separated list in `application.yaml`:
 
 ```text
 context.propagation.headers.enable.optional=X-Channel-Request-Id
 ```
 
 > **Note**  
-> A header present in both `headers.allowed` and the default blocked list will remain blocked unless it is also listed in `context.propagation.headers.enable.optional`.
+> A header present in both `headers.allowed` and the default restricted list will remain restricted unless it is also listed in `context.propagation.headers.enable.optional`.
 
 
 ##### API version
