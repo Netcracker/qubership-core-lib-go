@@ -24,8 +24,8 @@ The library offers three factory functions to create REST clients for different 
 ### Factory Functions
 
 * `NewM2MRestClient()` – returns a Client for internal service-to-service communication using Kubernetes tokens with Netcracker audience, with automatic fallback to Keycloak M2M tokens
-* `NewDbaasRestClient(username, password string)` – returns a Client for DBaaS communication using Kubernetes tokens with DBaaS audience, with automatic fallback to dbaas-agent
-* `NewMaasRestClient(username, password string)` – returns a Client for MaaS communication using Kubernetes tokens with MaaS audience, with automatic fallback to maas-agent
+* `NewDbaasRestClient()` – returns a Client for DBaaS communication using Kubernetes tokens with DBaaS audience, with automatic fallback to dbaas-agent
+* `NewMaasRestClient()` – returns a Client for MaaS communication using Kubernetes tokens with MaaS audience, with automatic fallback to maas-agent
 
 ### Client Interface
 
@@ -144,8 +144,8 @@ import (
 )
 
 func createDatabase(ctx context.Context, dbName string) error {
-    // Create client with DBaaS credentials
-    client := rest.NewDbaasRestClient("dbaas-user", "dbaas-password")
+    // Create client for DBaaS communication
+    client := rest.NewDbaasRestClient()
     
     headers := map[string][]string{
         "Content-Type": {"application/json"},
@@ -187,8 +187,8 @@ import (
 )
 
 func sendMessage(ctx context.Context, topic, message string) error {
-    // Create client with MaaS credentials
-    client := rest.NewMaasRestClient("maas-user", "maas-password")
+    // Create client for MaaS communication
+    client := rest.NewMaasRestClient()
     
     headers := map[string][]string{
         "Content-Type": {"application/json"},
