@@ -91,6 +91,7 @@ func (m *m2MRestClient) DoRequest(ctx context.Context, httpMethod, url string, h
 		if requestError != nil {
 			tae := &TokenAcquisitionError{}
 			if errors.As(requestError, &tae) {
+				response.Body.Close()
 				return m.doRequestFallback(ctx, cacheKey, requestProducer, &fallbackReason{desc: kubernetesTokenAcquisitionError, url: url, err: tae})
 			}
 			return nil, requestError
@@ -98,6 +99,7 @@ func (m *m2MRestClient) DoRequest(ctx context.Context, httpMethod, url string, h
 
 		if response.StatusCode == http.StatusUnauthorized {
 			//authentication failed, need to use fallback approach
+			response.Body.Close()
 			return m.doRequestFallback(ctx, cacheKey, requestProducer, &fallbackReason{desc: kubernetesTokenUnauthorizedError, url: url})
 		}
 		return response, nil
