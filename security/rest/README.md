@@ -10,6 +10,13 @@ To install the rest client, use:
 go get github.com/netcracker/qubership-core-lib-go/v3
 ```
 
+## Override properties
+
+| Configuration Property | Default Value | Description |
+| --- | --- | --- |
+| `security.m2m.kubernetes.url-cache.ttl` | 5h | Time to live for values in the URL cache |
+| `security.m2m.kubernetes.url-cache.internal-gateway-hostname` | internal-gateway | Hostname of the internal-gateway |
+
 ## Usage
 
 The library offers three factory functions to create REST clients for different use cases:

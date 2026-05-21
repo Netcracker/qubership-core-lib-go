@@ -12,7 +12,7 @@ import (
 
 var (
 	urlCacheSize = 400
-	urlCacheTTL  = configloader.GetOrDefault("security.m2m.kubernetes.url-cache.timeout", 5*time.Hour)
+	urlCacheTTL  = configloader.GetOrDefault("security.m2m.kubernetes.url-cache.ttl", 5*time.Hour).(time.Duration)
 )
 
 type empty struct{}
