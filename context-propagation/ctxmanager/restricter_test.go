@@ -67,8 +67,8 @@ func TestOptionalHeaders_UnknownHeader_DoesNotUnrestrict(t *testing.T) {
 func TestIsBlackListed_NotInDefaultList(t *testing.T) {
 	resetSingleton(nil)
 
-	if IsContextRestricted("X-Request-Id") {
-		t.Error("expected 'X-Request-Id' not to be restricted (not in default restricted list)")
+	if IsContextRestricted("X-Some-Other-Header") {
+		t.Error("expected 'X-Some-Other-Header' not to be restricted (not in default restricted list)")
 	}
 	if IsContextRestricted("") {
 		t.Error("expected empty string not to be restricted")
