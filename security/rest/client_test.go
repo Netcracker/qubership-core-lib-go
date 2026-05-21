@@ -39,49 +39,6 @@ func TestKubernetesAuthHeaderFunc(t *testing.T) {
 	assert.NotNil(t, supplier)
 }
 
-func TestBasicAuthHeaderFunc(t *testing.T) {
-	tests := []struct {
-		name     string
-		username string
-		password string
-		expected string
-	}{
-		{
-			name:     "valid credentials",
-			username: "user",
-			password: "pass",
-			expected: "Basic dXNlcjpwYXNz",
-		},
-		{
-			name:     "empty password",
-			username: "admin",
-			password: "",
-			expected: "Basic YWRtaW46",
-		},
-		{
-			name:     "empty username",
-			username: "",
-			password: "secret",
-			expected: "Basic OnNlY3JldA==",
-		},
-		{
-			name:     "special characters",
-			username: "user@domain.com",
-			password: "p@ss:w0rd!",
-			expected: "Basic dXNlckBkb21haW4uY29tOnBAc3M6dzByZCE=",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			supplier := basicAuthHeaderFunc(tt.username, tt.password)
-			result, err := supplier(context.Background())
-			assert.NoError(t, err)
-			assert.Equal(t, tt.expected, result)
-		})
-	}
-}
-
 func TestM2MRestClient_DoRequest_FirstCallSuccess(t *testing.T) {
 	// Mock HTTP server that returns 200 OK
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -93,7 +50,7 @@ func TestM2MRestClient_DoRequest_FirstCallSuccess(t *testing.T) {
 
 	client := &m2MRestClient{
 		client:             server.Client(),
-		urlCache:           getUrlCache(),
+		urlCache:           newUrlCache(),
 		k8sAuthHeader:      mockAuthHeaderFunc("Bearer new-token", nil),
 		fallbackAuthHeader: mockAuthHeaderFunc("Bearer fallback-token", nil),
 		k8sEnabled:         true,
@@ -131,7 +88,7 @@ func TestM2MRestClient_DoRequest_FirstCallUnauthorized_FallbackSuccess(t *testin
 
 	client := &m2MRestClient{
 		client:             server.Client(),
-		urlCache:           getUrlCache(),
+		urlCache:           newUrlCache(),
 		k8sAuthHeader:      mockAuthHeaderFunc("Bearer new-token", nil),
 		fallbackAuthHeader: mockAuthHeaderFunc("Bearer fallback-token", nil),
 		k8sEnabled:         true,
@@ -163,7 +120,7 @@ func TestM2MRestClient_DoRequest_TokenAcquisitionError_Fallback(t *testing.T) {
 
 	client := &m2MRestClient{
 		client:             server.Client(),
-		urlCache:           getUrlCache(),
+		urlCache:           newUrlCache(),
 		k8sAuthHeader:      mockAuthHeaderFunc("", errors.New("token acquisition failed")),
 		fallbackAuthHeader: mockAuthHeaderFunc("Bearer fallback-token", nil),
 		k8sEnabled:         true,
@@ -196,7 +153,7 @@ func TestM2MRestClient_DoRequest_CachedUrl_UsesFallback(t *testing.T) {
 
 	client := &m2MRestClient{
 		client:             server.Client(),
-		urlCache:           getUrlCache(),
+		urlCache:           newUrlCache(),
 		k8sAuthHeader:      mockAuthHeaderFunc("Bearer new-token", nil),
 		fallbackAuthHeader: mockAuthHeaderFunc("Bearer fallback-token", nil),
 		k8sEnabled:         true,
@@ -235,7 +192,7 @@ func TestM2MRestClient_DoRequest_WithBody(t *testing.T) {
 
 	client := &m2MRestClient{
 		client:             server.Client(),
-		urlCache:           getUrlCache(),
+		urlCache:           newUrlCache(),
 		k8sAuthHeader:      mockAuthHeaderFunc("Bearer token", nil),
 		k8sEnabled:         true,
 		fallbackAuthHeader: mockAuthHeaderFunc("Bearer fallback", nil),
@@ -264,7 +221,7 @@ func TestM2MRestClient_DoRequest_WithHeaders(t *testing.T) {
 
 	client := &m2MRestClient{
 		client:             server.Client(),
-		urlCache:           getUrlCache(),
+		urlCache:           newUrlCache(),
 		k8sAuthHeader:      mockAuthHeaderFunc("Bearer token", nil),
 		fallbackAuthHeader: mockAuthHeaderFunc("Bearer fallback", nil),
 		k8sEnabled:         true,
@@ -291,7 +248,7 @@ func TestM2MRestClient_DoRequest_WithHeaders(t *testing.T) {
 func TestM2MRestClient_DoRequest_InvalidUrl(t *testing.T) {
 	client := &m2MRestClient{
 		client:             http.DefaultClient,
-		urlCache:           getUrlCache(),
+		urlCache:           newUrlCache(),
 		k8sAuthHeader:      mockAuthHeaderFunc("Bearer token", nil),
 		fallbackAuthHeader: mockAuthHeaderFunc("Bearer fallback", nil),
 		k8sEnabled:         true,
@@ -312,7 +269,7 @@ func TestM2MRestClient_DoRequest_BothAuthMethodsFail(t *testing.T) {
 
 	client := &m2MRestClient{
 		client:             server.Client(),
-		urlCache:           getUrlCache(),
+		urlCache:           newUrlCache(),
 		k8sAuthHeader:      mockAuthHeaderFunc("", errors.New("new auth failed")),
 		fallbackAuthHeader: mockAuthHeaderFunc("", errors.New("fallback auth failed")),
 		k8sEnabled:         true,
@@ -335,7 +292,7 @@ func TestM2MRestClient_DoRequest_ServerError(t *testing.T) {
 
 	client := &m2MRestClient{
 		client:             server.Client(),
-		urlCache:           getUrlCache(),
+		urlCache:           newUrlCache(),
 		k8sAuthHeader:      mockAuthHeaderFunc("Bearer token", nil),
 		fallbackAuthHeader: mockAuthHeaderFunc("Bearer fallback", nil),
 		k8sEnabled:         true,
@@ -365,7 +322,7 @@ func TestM2MRestClient_DoRequest_ConcurrentRequests(t *testing.T) {
 
 	client := &m2MRestClient{
 		client:             server.Client(),
-		urlCache:           getUrlCache(),
+		urlCache:           newUrlCache(),
 		k8sAuthHeader:      mockAuthHeaderFunc("Bearer token", nil),
 		fallbackAuthHeader: mockAuthHeaderFunc("Bearer fallback", nil),
 		k8sEnabled:         true,
@@ -405,7 +362,7 @@ func TestM2MRestClient_DoRequest_DifferentHttpMethods(t *testing.T) {
 
 			client := &m2MRestClient{
 				client:             server.Client(),
-				urlCache:           getUrlCache(),
+				urlCache:           newUrlCache(),
 				k8sAuthHeader:      mockAuthHeaderFunc("Bearer token", nil),
 				fallbackAuthHeader: mockAuthHeaderFunc("Bearer fallback", nil),
 				k8sEnabled:         true,
@@ -437,7 +394,7 @@ func TestM2MRestClient_DoRequest_FallbackCachesUrl(t *testing.T) {
 
 	client := &m2MRestClient{
 		client:             server.Client(),
-		urlCache:           getUrlCache(),
+		urlCache:           newUrlCache(),
 		k8sAuthHeader:      mockAuthHeaderFunc("Bearer new-token", nil),
 		fallbackAuthHeader: mockAuthHeaderFunc("Bearer fallback-token", nil),
 		k8sEnabled:         true,
@@ -465,7 +422,7 @@ func TestM2MRestClient_DoRequest_FallbackCachesUrl(t *testing.T) {
 func TestM2MRestClient_DoRequest_BodyReaderError(t *testing.T) {
 	client := &m2MRestClient{
 		client:             http.DefaultClient,
-		urlCache:           getUrlCache(),
+		urlCache:           newUrlCache(),
 		k8sAuthHeader:      mockAuthHeaderFunc("Bearer token", nil),
 		fallbackAuthHeader: mockAuthHeaderFunc("Bearer fallback", nil),
 		k8sEnabled:         true,
@@ -521,7 +478,7 @@ func TestM2MRestClient_DoRequest_InternalGatewayUrlCaching(t *testing.T) {
 
 	client := &m2MRestClient{
 		client:             server.Client(),
-		urlCache:           getUrlCache(),
+		urlCache:           newUrlCache(),
 		k8sAuthHeader:      mockAuthHeaderFunc("Bearer new-token", nil),
 		fallbackAuthHeader: mockAuthHeaderFunc("Bearer fallback-token", nil),
 		k8sEnabled:         true,
@@ -558,7 +515,7 @@ func TestM2MRestClient_DoRequestFallback(t *testing.T) {
 
 	client := &m2MRestClient{
 		client:             server.Client(),
-		urlCache:           getUrlCache(),
+		urlCache:           newUrlCache(),
 		k8sAuthHeader:      mockAuthHeaderFunc("Bearer new", nil),
 		fallbackAuthHeader: mockAuthHeaderFunc("Bearer fallback", nil),
 		k8sEnabled:         true,
@@ -599,7 +556,7 @@ func TestM2MRestClient_DoRequest_MultipleBodyReads(t *testing.T) {
 
 	client := &m2MRestClient{
 		client:             server.Client(),
-		urlCache:           getUrlCache(),
+		urlCache:           newUrlCache(),
 		k8sAuthHeader:      mockAuthHeaderFunc("Bearer new", nil),
 		fallbackAuthHeader: mockAuthHeaderFunc("Bearer fallback", nil),
 		k8sEnabled:         true,
@@ -627,7 +584,7 @@ func TestM2MRestClient_DoRequest_FallbackRebasesUrl(t *testing.T) {
 
 	client := &m2MRestClient{
 		client:             agentServer.Client(),
-		urlCache:           getUrlCache(),
+		urlCache:           newUrlCache(),
 		k8sAuthHeader:      mockAuthHeaderFunc("Bearer new-token", nil),
 		fallbackAuthHeader: mockAuthHeaderFunc("Bearer fallback-token", nil),
 		fallBackBaseUrl:    agentServer.URL,

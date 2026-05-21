@@ -106,7 +106,7 @@ func TestCalculateCacheKey(t *testing.T) {
 }
 
 func TestGetUrlCache(t *testing.T) {
-	cache := getUrlCache()
+	cache := newUrlCache()
 	assert.NotNil(t, cache)
 
 	// Test basic cache operations

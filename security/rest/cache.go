@@ -17,7 +17,7 @@ var (
 
 type empty struct{}
 
-func getUrlCache() cache.Cache[string, empty] {
+func newUrlCache() cache.Cache[string, empty] {
 	return cache.NewCache[string, empty]().
 		WithMaxKeys(urlCacheSize).
 		WithLRU().

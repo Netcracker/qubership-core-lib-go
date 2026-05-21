@@ -2,7 +2,6 @@ package rest
 
 import (
 	"context"
-	"encoding/base64"
 	"errors"
 	"fmt"
 	"io"
@@ -64,7 +63,7 @@ type m2MRestClient struct {
 func newM2MRestClient(k8sAuthHeader, fallbackAuthHeader authHeaderFunc, fallBackBaseUrl string) Client {
 	return &m2MRestClient{
 		client:             utils.GetClient(),
-		urlCache:           getUrlCache(),
+		urlCache:           newUrlCache(),
 		k8sAuthHeader:      k8sAuthHeader,
 		fallbackAuthHeader: fallbackAuthHeader,
 		fallBackBaseUrl:    fallBackBaseUrl,
@@ -165,15 +164,6 @@ func keycloakAuthHeaderFunc() authHeaderFunc {
 			return "", err
 		}
 		return fmt.Sprintf("Bearer %s", token), nil
-	}
-}
-
-func basicAuthHeaderFunc(username, password string) authHeaderFunc {
-	credentials := username + ":" + password
-	encoded := base64.StdEncoding.EncodeToString([]byte(credentials))
-	authHeader := "Basic " + encoded
-	return func(ctx context.Context) (string, error) {
-		return authHeader, nil
 	}
 }
 
