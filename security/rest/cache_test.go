@@ -56,6 +56,11 @@ func TestCalculateCacheKey(t *testing.T) {
 			expected: "internal-gateway/v10",
 		},
 		{
+			name:     "internal-gateway with trailing slash",
+			rawUrl:   "https://internal-gateway/api/v1/serviceName/",
+			expected: "internal-gateway/api/v1/serviceName",
+		},
+		{
 			name:     "internal-gateway with multiple path segments",
 			rawUrl:   "https://internal-gateway/some/path/to/something",
 			expected: "internal-gateway/some/path/to/something",
