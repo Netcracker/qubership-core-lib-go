@@ -340,28 +340,27 @@ headers.allowed=myheader1,myheader2,...
 
 Otherwise, you need to take care that this parameter is in system#environment.
 
-##### Blocked headers
+##### Optionally enabled headers
 
-Allows blocking specific headers from being propagated. To set a list of blocked headers you should put either
-`HEADERS_BLOCKED` environment variable or set the `headers.blocked` property.
-For getting the `headers.blocked` value, the framework uses [configloader](../configloader), so you must ensure that your main function contains `configloader#Init(propertySources []*PropertySource)`.
+Some headers are blocked from propagation by default. The `context.propagation.headers.enable.optional` property
+lets you unblock specific headers so they are propagated again.
 
-The default blocked header is `X-Channel-Request-Id`.
+For getting the property value, the framework uses [configloader](../configloader), so you must ensure that your main function contains `configloader#Init(propertySources []*PropertySource)`.
 
-If you use `application.yaml`, specify the property in the following format:
+Headers blocked by default:
+
+| Header | Default |
+|---|---|
+| `X-Channel-Request-Id` | blocked |
+
+To unblock one or more of these headers, set the property to a comma-separated list in `application.yaml`:
 
 ```text
-headers.blocked=myheader1,myheader2,...
-```
-
-To set an empty blocklist (i.e. block nothing), set the property to an empty string:
-
-```text
-headers.blocked=
+context.propagation.headers.enable.optional=X-Channel-Request-Id
 ```
 
 > **Note**  
-> Blocked headers take effect across all propagatable contexts. A header present in both `headers.allowed` and `headers.blocked` will be blocked.
+> A header present in both `headers.allowed` and the default blocked list will remain blocked unless it is also listed in `context.propagation.headers.enable.optional`.
 
 
 ##### API version
