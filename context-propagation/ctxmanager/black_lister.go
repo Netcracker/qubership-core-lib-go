@@ -1,13 +1,14 @@
 package ctxmanager
 
 import (
+	"slices"
 	"strings"
 	"sync"
 
 	"github.com/netcracker/qubership-core-lib-go/v3/configloader"
 )
 
-const defaultInBlackList = "X-Channel-Request-Id"
+var defaultBlockedHeaders = []string{"X-Channel-Request-Id"}
 
 var (
 	globalBlackLister *contextBlackLister
@@ -20,18 +21,30 @@ func IsContextBlackListed(name string) bool {
 
 func getBlackLister() *contextBlackLister {
 	once.Do(func() {
-		raw := configloader.GetOrDefault("headers.blocked", defaultInBlackList) // we don't use GetOrDefaultString because we should handle empty string value
-		var entries []string
-		for _, entry := range strings.Split(raw.(string), ",") {
+		raw := configloader.GetOrDefaultString("context.propagation.headers.enable.optional", "")
+		var enabled []string
+		for _, entry := range strings.Split(raw, ",") {
 			if trimmed := strings.TrimSpace(entry); trimmed != "" {
-				entries = append(entries, trimmed)
+				enabled = append(enabled, trimmed)
 			}
 		}
-
-		globalBlackLister = &contextBlackLister{blackListedContexts: entries}
+		globalBlackLister = newBlackLister(enabled)
 	})
 
 	return globalBlackLister
+}
+
+// newBlackLister builds the effective blocked-headers list by starting from
+// defaultBlockedHeaders and removing any headers listed in optionallyEnabled.
+func newBlackLister(optionallyEnabled []string) *contextBlackLister {
+	var effectiveBlocked []string
+	for _, blocked := range defaultBlockedHeaders {
+		if !slices.ContainsFunc(optionallyEnabled, func(s string) bool { return strings.EqualFold(s, blocked) }) {
+			effectiveBlocked = append(effectiveBlocked, blocked)
+		}
+	}
+
+	return &contextBlackLister{blackListedContexts: effectiveBlocked}
 }
 
 type contextBlackLister struct {
@@ -39,10 +52,5 @@ type contextBlackLister struct {
 }
 
 func (cbl *contextBlackLister) isBlackListed(contextName string) bool {
-	for _, blackListedContext := range cbl.blackListedContexts {
-		if strings.EqualFold(blackListedContext, contextName) {
-			return true
-		}
-	}
-	return false
+	return slices.ContainsFunc(cbl.blackListedContexts, func(s string) bool { return strings.EqualFold(s, contextName) })
 }
