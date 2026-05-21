@@ -365,10 +365,6 @@ Or by ENV:
 CONTEXT_PROPAGATION_HEADERS_ENABLE_OPTIONAL=X-Channel-Request-Id
 ```
 
-> **Note**  
-> A header present in both `headers.allowed` and the default restricted list will remain restricted unless it is also listed in `context.propagation.headers.enable.optional`.
-
-
 ##### API version
 
 This context `provider` retrieves API version from an incoming request URL and stores it.
