@@ -129,7 +129,7 @@ func AssembleDefaultCustomLogFields(ctx context.Context) string {
 }
 
 func JoinStringsWithSpace(elem ...string) string {
-	elems := []string{}
+	var elems []string
 	for _, s := range elem {
 		if len(s) > 0 {
 			elems = append(elems, s)
