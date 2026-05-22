@@ -28,7 +28,7 @@ func calculateCacheKey(internalGatewayHostName, rawURL string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	if strings.Contains(parsedURL.Host, internalGatewayHostName) {
+	if parsedURL.Hostname() == internalGatewayHostName {
 		return calculateCacheKeyForInternalGateway(parsedURL), nil
 	}
 	return parsedURL.Host, nil
