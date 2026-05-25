@@ -54,7 +54,7 @@ func TestM2MRestClient_DoRequest_FirstCallSuccess(t *testing.T) {
 		k8sAuthHeader:           mockAuthHeaderFunc("Bearer new-token", nil),
 		fallbackAuthHeader:      mockAuthHeaderFunc("Bearer fallback-token", nil),
 		internalGatewayHostname: "internal-gateway-service",
-		k8sEnabled:              true,
+		k8sM2mEnabled:              true,
 	}
 
 	ctx := context.Background()
@@ -93,7 +93,7 @@ func TestM2MRestClient_DoRequest_FirstCallUnauthorized_FallbackSuccess(t *testin
 		k8sAuthHeader:           mockAuthHeaderFunc("Bearer new-token", nil),
 		fallbackAuthHeader:      mockAuthHeaderFunc("Bearer fallback-token", nil),
 		internalGatewayHostname: "internal-gateway-service",
-		k8sEnabled:              true,
+		k8sM2mEnabled:              true,
 	}
 
 	ctx := context.Background()
@@ -126,7 +126,7 @@ func TestM2MRestClient_DoRequest_TokenAcquisitionError_Fallback(t *testing.T) {
 		k8sAuthHeader:           mockAuthHeaderFunc("", errors.New("token acquisition failed")),
 		fallbackAuthHeader:      mockAuthHeaderFunc("Bearer fallback-token", nil),
 		internalGatewayHostname: "internal-gateway-service",
-		k8sEnabled:              true,
+		k8sM2mEnabled:              true,
 	}
 
 	ctx := context.Background()
@@ -160,7 +160,7 @@ func TestM2MRestClient_DoRequest_CachedUrl_UsesFallback(t *testing.T) {
 		k8sAuthHeader:           mockAuthHeaderFunc("Bearer new-token", nil),
 		fallbackAuthHeader:      mockAuthHeaderFunc("Bearer fallback-token", nil),
 		internalGatewayHostname: "internal-gateway-service",
-		k8sEnabled:              true,
+		k8sM2mEnabled:              true,
 	}
 
 	ctx := context.Background()
@@ -198,7 +198,7 @@ func TestM2MRestClient_DoRequest_WithBody(t *testing.T) {
 		client:                  server.Client(),
 		urlCache:                newUrlCache(),
 		k8sAuthHeader:           mockAuthHeaderFunc("Bearer token", nil),
-		k8sEnabled:              true,
+		k8sM2mEnabled:              true,
 		fallbackAuthHeader:      mockAuthHeaderFunc("Bearer fallback", nil),
 		internalGatewayHostname: "internal-gateway-service",
 	}
@@ -230,7 +230,7 @@ func TestM2MRestClient_DoRequest_WithHeaders(t *testing.T) {
 		k8sAuthHeader:           mockAuthHeaderFunc("Bearer token", nil),
 		fallbackAuthHeader:      mockAuthHeaderFunc("Bearer fallback", nil),
 		internalGatewayHostname: "internal-gateway-service",
-		k8sEnabled:              true,
+		k8sM2mEnabled:              true,
 	}
 
 	ctx := context.Background()
@@ -258,7 +258,7 @@ func TestM2MRestClient_DoRequest_InvalidUrl(t *testing.T) {
 		k8sAuthHeader:           mockAuthHeaderFunc("Bearer token", nil),
 		fallbackAuthHeader:      mockAuthHeaderFunc("Bearer fallback", nil),
 		internalGatewayHostname: "internal-gateway-service",
-		k8sEnabled:              true,
+		k8sM2mEnabled:              true,
 	}
 
 	ctx := context.Background()
@@ -280,7 +280,7 @@ func TestM2MRestClient_DoRequest_BothAuthMethodsFail(t *testing.T) {
 		k8sAuthHeader:           mockAuthHeaderFunc("", errors.New("new auth failed")),
 		fallbackAuthHeader:      mockAuthHeaderFunc("", errors.New("fallback auth failed")),
 		internalGatewayHostname: "internal-gateway-service",
-		k8sEnabled:              true,
+		k8sM2mEnabled:              true,
 	}
 
 	ctx := context.Background()
@@ -304,7 +304,7 @@ func TestM2MRestClient_DoRequest_ServerError(t *testing.T) {
 		k8sAuthHeader:           mockAuthHeaderFunc("Bearer token", nil),
 		fallbackAuthHeader:      mockAuthHeaderFunc("Bearer fallback", nil),
 		internalGatewayHostname: "internal-gateway-service",
-		k8sEnabled:              true,
+		k8sM2mEnabled:              true,
 	}
 
 	ctx := context.Background()
@@ -335,7 +335,7 @@ func TestM2MRestClient_DoRequest_ConcurrentRequests(t *testing.T) {
 		k8sAuthHeader:           mockAuthHeaderFunc("Bearer token", nil),
 		fallbackAuthHeader:      mockAuthHeaderFunc("Bearer fallback", nil),
 		internalGatewayHostname: "internal-gateway-service",
-		k8sEnabled:              true,
+		k8sM2mEnabled:              true,
 	}
 
 	ctx := context.Background()
@@ -376,7 +376,7 @@ func TestM2MRestClient_DoRequest_DifferentHttpMethods(t *testing.T) {
 				k8sAuthHeader:           mockAuthHeaderFunc("Bearer token", nil),
 				fallbackAuthHeader:      mockAuthHeaderFunc("Bearer fallback", nil),
 				internalGatewayHostname: "internal-gateway-service",
-				k8sEnabled:              true,
+				k8sM2mEnabled:              true,
 			}
 
 			ctx := context.Background()
@@ -409,7 +409,7 @@ func TestM2MRestClient_DoRequest_FallbackCachesUrl(t *testing.T) {
 		k8sAuthHeader:           mockAuthHeaderFunc("Bearer new-token", nil),
 		fallbackAuthHeader:      mockAuthHeaderFunc("Bearer fallback-token", nil),
 		internalGatewayHostname: "internal-gateway-service",
-		k8sEnabled:              true,
+		k8sM2mEnabled:              true,
 	}
 
 	ctx := context.Background()
@@ -438,7 +438,7 @@ func TestM2MRestClient_DoRequest_BodyReaderError(t *testing.T) {
 		k8sAuthHeader:           mockAuthHeaderFunc("Bearer token", nil),
 		fallbackAuthHeader:      mockAuthHeaderFunc("Bearer fallback", nil),
 		internalGatewayHostname: "internal-gateway-service",
-		k8sEnabled:              true,
+		k8sM2mEnabled:              true,
 	}
 
 	// Create an error reader
@@ -493,7 +493,7 @@ func TestM2MRestClient_DoRequest_InternalGatewayUrlCaching(t *testing.T) {
 		k8sAuthHeader:           mockAuthHeaderFunc("Bearer new-token", nil),
 		fallbackAuthHeader:      mockAuthHeaderFunc("Bearer fallback-token", nil),
 		internalGatewayHostname: "internal-gateway-service",
-		k8sEnabled:              true,
+		k8sM2mEnabled:              true,
 	}
 
 	ctx := context.Background()
@@ -531,7 +531,7 @@ func TestM2MRestClient_DoRequestFallback(t *testing.T) {
 		k8sAuthHeader:           mockAuthHeaderFunc("Bearer new", nil),
 		fallbackAuthHeader:      mockAuthHeaderFunc("Bearer fallback", nil),
 		internalGatewayHostname: "internal-gateway-service",
-		k8sEnabled:              true,
+		k8sM2mEnabled:              true,
 	}
 
 	ctx := context.Background()
@@ -573,7 +573,7 @@ func TestM2MRestClient_DoRequest_MultipleBodyReads(t *testing.T) {
 		k8sAuthHeader:           mockAuthHeaderFunc("Bearer new", nil),
 		fallbackAuthHeader:      mockAuthHeaderFunc("Bearer fallback", nil),
 		internalGatewayHostname: "internal-gateway-service",
-		k8sEnabled:              true,
+		k8sM2mEnabled:              true,
 	}
 
 	ctx := context.Background()
@@ -603,7 +603,7 @@ func TestM2MRestClient_DoRequest_FallbackRebasesUrl(t *testing.T) {
 		fallbackAuthHeader:      mockAuthHeaderFunc("Bearer fallback-token", nil),
 		fallBackBaseUrl:         agentServer.URL,
 		internalGatewayHostname: "internal-gateway-service",
-		k8sEnabled:              true,
+		k8sM2mEnabled:              true,
 	}
 
 	ctx := context.Background()

@@ -53,7 +53,7 @@ type M2MRestClient struct {
 	fallbackAuthHeader      authHeaderFunc
 	fallBackBaseUrl         string
 	internalGatewayHostname string
-	k8sEnabled              bool
+	k8sM2mEnabled              bool
 }
 
 func newM2MRestClient(k8sAuthHeader, fallbackAuthHeader authHeaderFunc, fallBackBaseUrl string) *M2MRestClient {
@@ -64,7 +64,7 @@ func newM2MRestClient(k8sAuthHeader, fallbackAuthHeader authHeaderFunc, fallBack
 		fallbackAuthHeader:      fallbackAuthHeader,
 		fallBackBaseUrl:         fallBackBaseUrl,
 		internalGatewayHostname: configloader.GetOrDefaultString("security.m2m.kubernetes.url-cache.internal-gateway-hostname", "internal-gateway-service"),
-		k8sEnabled:              configloader.GetKoanf().Bool("security.m2m.kubernetes.enabled"),
+		k8sM2mEnabled:              configloader.GetKoanf().Bool("security.m2m.kubernetes.enabled"),
 	}
 }
 
@@ -79,7 +79,7 @@ func (m *M2MRestClient) DoRequest(ctx context.Context, httpMethod, url string, h
 		return nil, err
 	}
 	_, ok := m.urlCache.Get(cacheKey)
-	if m.k8sEnabled && !ok {
+	if m.k8sM2mEnabled && !ok {
 		logger.Debugf("trying to send %s request to %s using new authentication method", httpMethod, url)
 		//first call (no information) / new authentication method is applicable
 		requestProducer.authHeader = m.k8sAuthHeader
@@ -109,7 +109,7 @@ func (m *M2MRestClient) DoRequest(ctx context.Context, httpMethod, url string, h
 func (m *M2MRestClient) doRequestFallback(ctx context.Context, cacheKey string, requestProducer *httpRequestProducer, reason *fallbackReason) (*http.Response, error) {
 	logger.Debugf("fallback: trying to send %s request to %s using fallback authentication method", requestProducer.httpMethod, requestProducer.url)
 
-	if m.k8sEnabled && m.fallBackBaseUrl != "" {
+	if m.k8sM2mEnabled && m.fallBackBaseUrl != "" {
 		rebasedUrl, err := rebaseUrl(requestProducer.url, m.fallBackBaseUrl)
 		if err != nil {
 			return nil, fmt.Errorf("failed to rebase url %q to fallback base url %q: %w", requestProducer.url, m.fallBackBaseUrl, err)
@@ -123,7 +123,7 @@ func (m *M2MRestClient) doRequestFallback(ctx context.Context, cacheKey string, 
 		m.urlCache.Add(cacheKey, empty{})
 	}
 	if reason != nil {
-		if reason.desc == kubernetesTokenAcquisitionError && m.k8sEnabled {
+		if reason.desc == kubernetesTokenAcquisitionError && m.k8sM2mEnabled {
 			logger.WarnC(ctx, "%s", reason.Message())
 		} else {
 			logger.DebugC(ctx, "%s", reason.Message())
