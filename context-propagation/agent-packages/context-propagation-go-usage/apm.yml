@@ -1,0 +1,4 @@
+name: context-propagation-go-usage
+version: 1.0.0
+description: Request context propagation for Qubership Go microservices.
+author: Qubership
