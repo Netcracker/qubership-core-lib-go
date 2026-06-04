@@ -50,8 +50,9 @@ func TestM2MRestClient_DoRequest_FirstCallSuccess(t *testing.T) {
 	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
 	require.NoError(t, err)
 
-	now := time.Now().Unix()
-	exp := time.Now().Add(time.Hour).Unix()
+	issued := time.Now()
+    now := issued.Unix()
+    exp := issued.Add(time.Hour).Unix()
 	claims := jwt.MapClaims{
 		"aud": []string{"test"},
 		"exp": exp,
