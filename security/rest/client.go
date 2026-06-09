@@ -7,6 +7,8 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"os"
+	"strconv"
 
 	cache "github.com/go-pkgz/expirable-cache/v3"
 	"github.com/netcracker/qubership-core-lib-go/v3/configloader"
@@ -53,10 +55,14 @@ type M2MRestClient struct {
 	fallbackAuthHeader      authHeaderFunc
 	fallBackBaseUrl         string
 	internalGatewayHostname string
-	k8sM2mEnabled              bool
+	k8sM2mEnabled           bool
 }
 
 func newM2MRestClient(k8sAuthHeader, fallbackAuthHeader authHeaderFunc, fallBackBaseUrl string) *M2MRestClient {
+	k8sM2mEnabled, err := strconv.ParseBool(os.Getenv("SECURITY_M2M_KUBERNETES_ENABLED"))
+	if err != nil {
+		k8sM2mEnabled = false
+	}
 	return &M2MRestClient{
 		client:                  utils.GetClient(),
 		urlCache:                newUrlCache(),
@@ -64,7 +70,7 @@ func newM2MRestClient(k8sAuthHeader, fallbackAuthHeader authHeaderFunc, fallBack
 		fallbackAuthHeader:      fallbackAuthHeader,
 		fallBackBaseUrl:         fallBackBaseUrl,
 		internalGatewayHostname: configloader.GetOrDefaultString("security.m2m.kubernetes.url-cache.internal-gateway-hostname", "internal-gateway-service"),
-		k8sM2mEnabled:              configloader.GetKoanf().Bool("security.m2m.kubernetes.enabled"),
+		k8sM2mEnabled:           k8sM2mEnabled,
 	}
 }
 
