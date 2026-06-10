@@ -1,6 +1,6 @@
 module github.com/netcracker/qubership-core-lib-go/v3
 
-go 1.26.3
+go 1.26.4
 
 require (
 	github.com/KimMachineGun/automemlimit v0.7.5
@@ -17,7 +17,7 @@ require (
 	github.com/knadh/koanf/providers/env v1.1.0
 	github.com/knadh/koanf/providers/file v1.2.1
 	github.com/knadh/koanf/providers/rawbytes v0.1.0
-	github.com/knadh/koanf/v2 v2.3.4
+	github.com/knadh/koanf/v2 v2.3.5
 	github.com/pkg/errors v0.9.1
 	github.com/stretchr/testify v1.11.1
 	github.com/viney-shih/go-lock v1.1.2
