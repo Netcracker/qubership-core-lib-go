@@ -59,7 +59,7 @@ type M2MRestClient struct {
 }
 
 func newM2MRestClient(k8sAuthHeader, fallbackAuthHeader authHeaderFunc, fallBackBaseUrl string) *M2MRestClient {
-	k8sM2mEnabled, err := strconv.ParseBool(os.Getenv("SECURITY_M2M_KUBERNETES_ENABLED"))
+	k8sM2mEnabled, err := strconv.ParseBool(os.Getenv("KUBERNETES_M2M_ENABLED"))
 	if err != nil {
 		k8sM2mEnabled = false
 	}
