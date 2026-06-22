@@ -31,7 +31,10 @@ type flattenEnvProvider struct {
 }
 
 func Provider(prefix, delim string, cb func(s string) string) *flattenEnvProvider {
-	return &flattenEnvProvider{koanfEnv: env.Provider(prefix, delim, cb)}
+	transformFunc := func(k, v string) (string, any) {
+		return cb(k), v
+	}
+	return &flattenEnvProvider{koanfEnv: env.Provider(delim, env.Opt{Prefix: prefix, TransformFunc: transformFunc})}
 }
 
 // ReadBytes is not supported by the env provider.
