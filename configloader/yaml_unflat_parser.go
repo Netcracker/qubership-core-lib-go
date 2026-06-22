@@ -3,7 +3,7 @@ package configloader
 import (
 	"github.com/knadh/koanf/maps"
 	"github.com/knadh/koanf/parsers/yaml"
-	"github.com/knadh/koanf/providers/env"
+	"github.com/knadh/koanf/providers/env/v2"
 	"github.com/knadh/koanf/v2"
 )
 
@@ -31,7 +31,10 @@ type flattenEnvProvider struct {
 }
 
 func Provider(prefix, delim string, cb func(s string) string) *flattenEnvProvider {
-	return &flattenEnvProvider{koanfEnv: env.Provider(prefix, delim, cb)}
+	transformFunc := func(k, v string) (string, any) {
+		return cb(k), v
+	}
+	return &flattenEnvProvider{koanfEnv: env.Provider(delim, env.Opt{Prefix: prefix, TransformFunc: transformFunc})}
 }
 
 // ReadBytes is not supported by the env provider.
