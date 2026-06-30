@@ -28,7 +28,6 @@ type Structure struct {
 
 const (
 	defaultMetadataURL = "http://169.254.169.254"
-	probeTimeout       = 10 * time.Second
 )
 
 var (
