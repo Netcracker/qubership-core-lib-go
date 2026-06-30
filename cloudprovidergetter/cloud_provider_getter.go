@@ -2,14 +2,9 @@ package cloudprovidergetter
 
 import (
 	"context"
-	"encoding/json"
-	"os"
-	"path/filepath"
-	"strings"
-)
-
-const (
-	topologyFileName = "data"
+	"net/http"
+	"sync"
+	"time"
 )
 
 var (
@@ -24,29 +19,81 @@ var cloudProviderByString = map[string]CloudProvider{
 	"onprem": CloudProviderOnPrem,
 }
 
+const (
+	defaultMetadataURL = "http://169.254.169.254" //NOSONAR
+	probeTimeout       = 10 * time.Second
+)
+
 type DefaultCloudProviderFileReader struct {
+	detectOnce sync.Once
+	detected   CloudProvider
 }
 
 type Structure struct {
 	CloudProvider string `json:"cloudProvider"`
 }
 
-func (r DefaultCloudProviderFileReader) GetCloudProvider(_ context.Context) CloudProvider {
-	fileName := filepath.Join(DefaultTopologyDir, topologyFileName)
-	bytes, err := os.ReadFile(fileName)
-	structure := &Structure{}
-	if err == nil {
-		err = json.Unmarshal(bytes, structure)
-		if err == nil {
-			return stringToCloudProvider(structure.CloudProvider)
-		}
+func (r *DefaultCloudProviderFileReader) GetCloudProvider(ctx context.Context) CloudProvider {
+	r.detectOnce.Do(func() {
+		r.detected = detect(ctx, defaultMetadataURL)
+	})
+	return r.detected
+}
+
+func detect(ctx context.Context, metadataURL string) CloudProvider {
+	if isGke(ctx, metadataURL) {
+		return CloudProviderGKE
+	}
+	if isEks(ctx, metadataURL) {
+		return CloudProviderEKS
+	}
+	if isAks(ctx, metadataURL) {
+		return CloudProviderAKS
 	}
 	return CloudProviderOnPrem
 }
 
-func stringToCloudProvider(str string) CloudProvider {
-	if cloudProvider, ok := cloudProviderByString[strings.ToLower(str)]; ok {
-		return cloudProvider
+func isGke(ctx context.Context, metadataURL string) bool {
+	resp, err := probe(ctx, metadataURL+"/computeMetadata/v1/", map[string]string{
+		"Metadata-Flavor": "Google",
+	})
+	if err != nil {
+		return false
 	}
-	return CloudProviderOnPrem
+	defer resp.Body.Close()
+	return resp.StatusCode == http.StatusOK && resp.Header.Get("Metadata-Flavor") == "Google"
+}
+
+func isEks(ctx context.Context, metadataURL string) bool {
+	resp, err := probe(ctx, metadataURL+"/latest/meta-data/", nil)
+	if err != nil {
+		return false
+	}
+	defer resp.Body.Close()
+	return resp.StatusCode == http.StatusOK || resp.StatusCode == http.StatusUnauthorized
+}
+
+func isAks(ctx context.Context, metadataURL string) bool {
+	resp, err := probe(ctx, metadataURL+"/metadata/instance?api-version=2021-02-01", map[string]string{
+		"Metadata": "true",
+	})
+	if err != nil {
+		return false
+	}
+	defer resp.Body.Close()
+	return resp.StatusCode == http.StatusOK
+}
+
+func probe(ctx context.Context, url string, headers map[string]string) (*http.Response, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+	for k, v := range headers {
+		req.Header.Set(k, v)
+	}
+	client := http.Client{
+		Timeout: probeTimeout,
+	}
+	return client.Do(req)
 }
