@@ -1,86 +1,177 @@
 package cloudprovidergetter
 
 import (
-	"os"
-	"path/filepath"
+	"context"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 )
 
-func TestStringToCloudProvider_KnownAndCaseInsensitive(t *testing.T) {
-	testCases := []struct {
-		str      string
-		expected string
-	}{
-		{"eks", CloudProviderEKS},
-		{"EKS", CloudProviderEKS},
-		{"gke", CloudProviderGKE},
-		{"GkE", CloudProviderGKE},
-		{"aks", CloudProviderAKS},
-		{"AKS", CloudProviderAKS},
-		{"onprem", CloudProviderOnPrem},
-		{"OnPrEm", CloudProviderOnPrem},
-	}
-
-	for _, testCase := range testCases {
-		actual := stringToCloudProvider(testCase.str)
-		assert.Equal(t, testCase.expected, string(actual))
-	}
-}
-
-func TestStringToCloudProvider_Unknown(t *testing.T) {
-	testCases := []string{"", "unknown", "something", "eks ", " gke"}
-	for _, str := range testCases {
-		actual := stringToCloudProvider(str)
-		assert.Equal(t, CloudProviderOnPrem, string(actual))
-	}
-}
-
-func TestDefaultCloudProviderFileReader_GetCloudProvider_FileMissing(t *testing.T) {
-	withCompositeStructureFileState(t, nil, func() {
-		cloudProvider := GetCloudProvider(t.Context())
-		assert.Equal(t, CloudProviderOnPrem, string(cloudProvider))
+func TestDetect_ReturnsGKE_WhenMetadataFlavorIsGoogle(t *testing.T) {
+	server := newMetadataServer(t, func(mux *http.ServeMux) {
+		mux.HandleFunc("/computeMetadata/v1/", func(w http.ResponseWriter, _ *http.Request) {
+			w.Header().Set("Metadata-Flavor", "Google")
+			w.WriteHeader(http.StatusOK)
+		})
+		mux.HandleFunc("/latest/meta-data/", notFoundHandler)
+		mux.HandleFunc("/metadata/instance", notFoundHandler)
 	})
+	defer server.Close()
+
+	assert.Equal(t, CloudProvider(CloudProviderGKE), detect(context.Background(), server.URL))
 }
 
-func TestDefaultCloudProviderFileReader_GetCloudProvider_InvalidJSON(t *testing.T) {
-	withCompositeStructureFileState(t, []byte(`{"cloudProvider":`), func() {
-		cloudProvider := GetCloudProvider(t.Context())
-		assert.Equal(t, CloudProviderOnPrem, string(cloudProvider))
+func TestDetect_NotGKE_WhenMetadataFlavorHeaderAbsent(t *testing.T) {
+	server := newMetadataServer(t, func(mux *http.ServeMux) {
+		mux.HandleFunc("/computeMetadata/v1/", func(w http.ResponseWriter, _ *http.Request) {
+			w.WriteHeader(http.StatusOK)
+		})
+		mux.HandleFunc("/latest/meta-data/", notFoundHandler)
+		mux.HandleFunc("/metadata/instance", notFoundHandler)
 	})
+	defer server.Close()
+
+	assert.Equal(t, CloudProvider(CloudProviderOnPrem), detect(context.Background(), server.URL))
 }
 
-func TestDefaultCloudProviderFileReader_GetCloudProvider_ValidJSONKnownProvider(t *testing.T) {
-	withCompositeStructureFileState(t, []byte(`{"cloudProvider":"EKS"}`), func() {
-		cloudProvider := GetCloudProvider(t.Context())
-		assert.Equal(t, CloudProviderEKS, string(cloudProvider))
+func TestDetect_ReturnsEKS_WhenImdsV1Returns200(t *testing.T) {
+	server := newMetadataServer(t, func(mux *http.ServeMux) {
+		mux.HandleFunc("/computeMetadata/v1/", notFoundHandler)
+		mux.HandleFunc("/latest/meta-data/", func(w http.ResponseWriter, _ *http.Request) {
+			w.WriteHeader(http.StatusOK)
+		})
+		mux.HandleFunc("/metadata/instance", notFoundHandler)
 	})
+	defer server.Close()
+
+	assert.Equal(t, CloudProvider(CloudProviderEKS), detect(context.Background(), server.URL))
 }
 
-func TestDefaultCloudProviderFileReader_GetCloudProvider_ValidJSONUnknownProvider(t *testing.T) {
-	withCompositeStructureFileState(t, []byte(`{"cloudProvider":"some-new-cloud"}`), func() {
-		cloudProvider := GetCloudProvider(t.Context())
-		assert.Equal(t, CloudProviderOnPrem, string(cloudProvider))
+func TestDetect_ReturnsEKS_WhenImdsV2Returns401(t *testing.T) {
+	server := newMetadataServer(t, func(mux *http.ServeMux) {
+		mux.HandleFunc("/computeMetadata/v1/", notFoundHandler)
+		mux.HandleFunc("/latest/meta-data/", func(w http.ResponseWriter, _ *http.Request) {
+			w.WriteHeader(http.StatusUnauthorized)
+		})
+		mux.HandleFunc("/metadata/instance", notFoundHandler)
 	})
+	defer server.Close()
+
+	assert.Equal(t, CloudProvider(CloudProviderEKS), detect(context.Background(), server.URL))
 }
 
-func withCompositeStructureFileState(t *testing.T, content []byte, test func()) {
+func TestDetect_NotEKS_WhenImdsReturns403(t *testing.T) {
+	server := newMetadataServer(t, func(mux *http.ServeMux) {
+		mux.HandleFunc("/computeMetadata/v1/", notFoundHandler)
+		mux.HandleFunc("/latest/meta-data/", func(w http.ResponseWriter, _ *http.Request) {
+			w.WriteHeader(http.StatusForbidden)
+		})
+		mux.HandleFunc("/metadata/instance", notFoundHandler)
+	})
+	defer server.Close()
+
+	assert.Equal(t, CloudProvider(CloudProviderOnPrem), detect(context.Background(), server.URL))
+}
+
+func TestDetect_ReturnsAKS_WhenAzureInstanceEndpointReturns200(t *testing.T) {
+	server := newMetadataServer(t, func(mux *http.ServeMux) {
+		mux.HandleFunc("/computeMetadata/v1/", notFoundHandler)
+		mux.HandleFunc("/latest/meta-data/", notFoundHandler)
+		mux.HandleFunc("/metadata/instance", func(w http.ResponseWriter, _ *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{"compute":{"azEnvironment":"AzurePublicCloud"}}`))
+		})
+	})
+	defer server.Close()
+
+	assert.Equal(t, CloudProvider(CloudProviderAKS), detect(context.Background(), server.URL))
+}
+
+func TestDetect_NotAKS_WhenAzureEndpointReturns404(t *testing.T) {
+	server := newMetadataServer(t, func(mux *http.ServeMux) {
+		mux.HandleFunc("/computeMetadata/v1/", notFoundHandler)
+		mux.HandleFunc("/latest/meta-data/", notFoundHandler)
+		mux.HandleFunc("/metadata/instance", notFoundHandler)
+	})
+	defer server.Close()
+
+	assert.Equal(t, CloudProvider(CloudProviderOnPrem), detect(context.Background(), server.URL))
+}
+
+func TestDetect_ReturnsOnPrem_WhenMetadataUnreachable(t *testing.T) {
+	assert.Equal(t, CloudProvider(CloudProviderOnPrem), detect(context.Background(), "http://127.0.0.1:1"))
+}
+
+func TestDetect_ReturnsOnPrem_WhenAllEndpointsReturn500(t *testing.T) {
+	server := newMetadataServer(t, func(mux *http.ServeMux) {
+		mux.HandleFunc("/computeMetadata/v1/", statusHandler(http.StatusInternalServerError))
+		mux.HandleFunc("/latest/meta-data/", statusHandler(http.StatusInternalServerError))
+		mux.HandleFunc("/metadata/instance", statusHandler(http.StatusInternalServerError))
+	})
+	defer server.Close()
+
+	assert.Equal(t, CloudProvider(CloudProviderOnPrem), detect(context.Background(), server.URL))
+}
+
+func TestDetect_PrefersGKE_WhenBothGKEAndEKSProbesSucceed(t *testing.T) {
+	server := newMetadataServer(t, func(mux *http.ServeMux) {
+		mux.HandleFunc("/computeMetadata/v1/", func(w http.ResponseWriter, _ *http.Request) {
+			w.Header().Set("Metadata-Flavor", "Google")
+			w.WriteHeader(http.StatusOK)
+		})
+		mux.HandleFunc("/latest/meta-data/", func(w http.ResponseWriter, _ *http.Request) {
+			w.WriteHeader(http.StatusOK)
+		})
+		mux.HandleFunc("/metadata/instance", notFoundHandler)
+	})
+	defer server.Close()
+
+	assert.Equal(t, CloudProvider(CloudProviderGKE), detect(context.Background(), server.URL))
+}
+
+func TestGetCloudProvider_IsUncomputed_BeforeFirstDetection(t *testing.T) {
+	resetCache(t)
+
+	assert.Equal(t, CloudProvider(""), detected)
+}
+
+func TestGetCloudProvider_ReturnsAndKeepsCachedValue_OnceDetected(t *testing.T) {
+	resetCache(t)
+	detected = CloudProvider(CloudProviderAKS)
+
+	reader := DefaultCloudProviderFileReader{}
+	assert.Equal(t, CloudProvider(CloudProviderAKS), reader.GetCloudProvider(context.Background()))
+	assert.Equal(t, CloudProvider(CloudProviderAKS), reader.GetCloudProvider(context.Background()))
+}
+
+func newMetadataServer(t *testing.T, register func(mux *http.ServeMux)) *httptest.Server {
 	t.Helper()
+	mux := http.NewServeMux()
+	register(mux)
+	return httptest.NewServer(mux)
+}
 
-	dir := t.TempDir()
-	DefaultTopologyDir = dir
-	file := filepath.Join(dir, topologyFileName)
+func notFoundHandler(w http.ResponseWriter, _ *http.Request) {
+	w.WriteHeader(http.StatusNotFound)
+}
 
-	err := os.MkdirAll(dir, 0775)
-	assert.NoError(t, err)
-	if content != nil {
-		err = os.WriteFile(file, content, 0644)
-		assert.NoError(t, err)
+func statusHandler(status int) http.HandlerFunc {
+	return func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(status)
 	}
+}
 
-	test()
-
-	_ = os.Remove(file)
-	_ = os.Remove(dir)
+func resetCache(t *testing.T) {
+	t.Helper()
+	detectedMu.Lock()
+	detected = ""
+	detectedMu.Unlock()
+	t.Cleanup(func() {
+		detectedMu.Lock()
+		detected = ""
+		detectedMu.Unlock()
+	})
 }
