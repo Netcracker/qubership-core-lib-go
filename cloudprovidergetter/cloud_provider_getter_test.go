@@ -133,16 +133,17 @@ func TestDetect_PrefersGKE_WhenBothGKEAndEKSProbesSucceed(t *testing.T) {
 }
 
 func TestGetCloudProvider_IsUncomputed_BeforeFirstDetection(t *testing.T) {
-	resetCache(t)
-
-	assert.Equal(t, CloudProvider(""), detected)
+	reader := &DefaultCloudProviderFileReader{}
+	assert.Equal(t, CloudProvider(""), reader.detected)
 }
 
 func TestGetCloudProvider_ReturnsAndKeepsCachedValue_OnceDetected(t *testing.T) {
-	resetCache(t)
-	detected = CloudProvider(CloudProviderAKS)
+	reader := &DefaultCloudProviderFileReader{}
 
-	reader := DefaultCloudProviderFileReader{}
+	// Manually prime the cache for the test case
+	reader.detected = CloudProvider(CloudProviderAKS)
+	reader.detectOnce.Do(func() {}) // Lock the sync.Once
+
 	assert.Equal(t, CloudProvider(CloudProviderAKS), reader.GetCloudProvider(context.Background()))
 	assert.Equal(t, CloudProvider(CloudProviderAKS), reader.GetCloudProvider(context.Background()))
 }
@@ -162,16 +163,4 @@ func statusHandler(status int) http.HandlerFunc {
 	return func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(status)
 	}
-}
-
-func resetCache(t *testing.T) {
-	t.Helper()
-	detectedMu.Lock()
-	detected = ""
-	detectedMu.Unlock()
-	t.Cleanup(func() {
-		detectedMu.Lock()
-		detected = ""
-		detectedMu.Unlock()
-	})
 }

@@ -19,29 +19,25 @@ var cloudProviderByString = map[string]CloudProvider{
 	"onprem": CloudProviderOnPrem,
 }
 
+const (
+	defaultMetadataURL = "http://169.254.169.254" //NOSONAR
+	probeTimeout       = 10 * time.Second
+)
+
 type DefaultCloudProviderFileReader struct {
+	detectOnce sync.Once
+	detected   CloudProvider
 }
 
 type Structure struct {
 	CloudProvider string `json:"cloudProvider"`
 }
 
-const (
-	defaultMetadataURL = "http://169.254.169.254"
-)
-
-var (
-	detected   CloudProvider
-	detectedMu sync.Mutex
-)
-
-func (r DefaultCloudProviderFileReader) GetCloudProvider(ctx context.Context) CloudProvider {
-	detectedMu.Lock()
-	defer detectedMu.Unlock()
-	if detected == "" {
-		detected = detect(ctx, defaultMetadataURL)
-	}
-	return detected
+func (r *DefaultCloudProviderFileReader) GetCloudProvider(ctx context.Context) CloudProvider {
+	r.detectOnce.Do(func() {
+		r.detected = detect(ctx, defaultMetadataURL)
+	})
+	return r.detected
 }
 
 func detect(ctx context.Context, metadataURL string) CloudProvider {
@@ -96,5 +92,8 @@ func probe(ctx context.Context, url string, headers map[string]string) (*http.Re
 	for k, v := range headers {
 		req.Header.Set(k, v)
 	}
-	return http.DefaultClient.Do(req)
+	client := http.Client{
+		Timeout: probeTimeout,
+	}
+	return client.Do(req)
 }
