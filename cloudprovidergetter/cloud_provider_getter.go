@@ -21,7 +21,7 @@ var cloudProviderByString = map[string]CloudProvider{
 
 const (
 	defaultMetadataURL = "http://169.254.169.254" //NOSONAR
-	probeTimeout       = 10 * time.Second
+	probeTimeout       = 5 * time.Second
 )
 
 type DefaultCloudProviderFileReader struct {
