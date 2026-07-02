@@ -6,8 +6,6 @@ import (
 	"testing"
 
 	"github.com/golang-jwt/jwt/v5"
-	"github.com/netcracker/qubership-core-lib-go/v3/logging"
-
 	"github.com/netcracker/qubership-core-lib-go/v3/security/test"
 	"github.com/netcracker/qubership-core-lib-go/v3/serviceloader"
 	"github.com/stretchr/testify/assert"
@@ -15,10 +13,6 @@ import (
 
 type mockKeycloakToken struct {
 	token string
-}
-
-func init() {
-	logger = logging.GetLogger("dummy-services")
 }
 
 func (s *mockKeycloakToken) GetToken(ctx context.Context) (string, error) {
