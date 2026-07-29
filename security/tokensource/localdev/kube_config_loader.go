@@ -155,9 +155,22 @@ func resolveAuthProviderToken(authProvider map[string]interface{}) (string, erro
 }
 
 func runExecCredential(execCfg map[string]interface{}) (string, error) {
+	command, args, err := buildExecCommand(execCfg)
+	if err != nil {
+		return "", err
+	}
+	kubeLogger.Debugf("Resolving kubeconfig credentials via exec: %v", args)
+	output, err := executeExecCredential(command, args, execCfg)
+	if err != nil {
+		return "", err
+	}
+	return parseExecCredentialToken(output)
+}
+
+func buildExecCommand(execCfg map[string]interface{}) (string, []string, error) {
 	command := getKubeConfigStringField(execCfg, kubeConfigCommand)
 	if command == "" {
-		return "", fmt.Errorf("kubeconfig exec.command is empty")
+		return "", nil, fmt.Errorf("kubeconfig exec.command is empty")
 	}
 	args := []string{command}
 	if rawArgs, ok := execCfg[kubeConfigArgs].([]interface{}); ok {
@@ -167,30 +180,43 @@ func runExecCredential(execCfg map[string]interface{}) (string, error) {
 			}
 		}
 	}
-	kubeLogger.Debugf("Resolving kubeconfig credentials via exec: %v", args)
+	return command, args, nil
+}
+
+func executeExecCredential(command string, args []string, execCfg map[string]interface{}) ([]byte, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), kubeConfigExecTimeout)
 	defer cancel()
 	cmd := exec.CommandContext(ctx, args[0], args[1:]...)
-	if envVars, ok := execCfg[kubeConfigEnv].([]interface{}); ok {
-		for _, item := range envVars {
-			envMap, ok := item.(map[string]interface{})
-			if !ok {
-				continue
-			}
-			name := getKubeConfigStringField(envMap, kubeConfigName)
-			if name == "" {
-				continue
-			}
-			cmd.Env = append(cmd.Env, fmt.Sprintf("%s=%s", name, getKubeConfigStringField(envMap, kubeConfigValue)))
-		}
-	}
+	applyExecEnvironment(cmd, execCfg)
 	output, err := cmd.CombinedOutput()
 	if ctx.Err() == context.DeadlineExceeded {
-		return "", fmt.Errorf("kubeconfig exec timed out after %s: %s", kubeConfigExecTimeout, command)
+		return nil, fmt.Errorf("kubeconfig exec timed out after %s: %s", kubeConfigExecTimeout, command)
 	}
 	if err != nil {
-		return "", fmt.Errorf("kubeconfig exec failed: %s: %w", string(output), err)
+		return nil, fmt.Errorf("kubeconfig exec failed: %s: %w", string(output), err)
 	}
+	return output, nil
+}
+
+func applyExecEnvironment(cmd *exec.Cmd, execCfg map[string]interface{}) {
+	envVars, ok := execCfg[kubeConfigEnv].([]interface{})
+	if !ok {
+		return
+	}
+	for _, item := range envVars {
+		envMap, ok := item.(map[string]interface{})
+		if !ok {
+			continue
+		}
+		name := getKubeConfigStringField(envMap, kubeConfigName)
+		if name == "" {
+			continue
+		}
+		cmd.Env = append(cmd.Env, fmt.Sprintf("%s=%s", name, getKubeConfigStringField(envMap, kubeConfigValue)))
+	}
+}
+
+func parseExecCredentialToken(output []byte) (string, error) {
 	var credential struct {
 		Status struct {
 			Token string `json:"token"`

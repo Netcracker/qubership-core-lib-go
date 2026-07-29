@@ -27,7 +27,7 @@ func newHTTPClient(credentials *KubeConfigCredentials) *http.Client {
 func newInsecureIdpHTTPClient() *http.Client {
 	transport := &http.Transport{
 		ForceAttemptHTTP2:     false,
-		TLSClientConfig:       &tls.Config{InsecureSkipVerify: true}, //nolint:gosec // local-dev IdP only
+		TLSClientConfig:       localDevInsecureTLSConfig(),
 		MaxIdleConns:          100,
 		IdleConnTimeout:       90 * time.Second,
 		TLSHandshakeTimeout:   10 * time.Second,
@@ -44,10 +44,7 @@ func tlsConfig(credentials *KubeConfigCredentials) *tls.Config {
 		return &tls.Config{MinVersion: tls.VersionTLS12}
 	}
 	if credentials.InsecureSkipTLSVerify {
-		return &tls.Config{
-			InsecureSkipVerify: true, //nolint:gosec // kubeconfig insecure-skip-tls-verify
-			MinVersion:         tls.VersionTLS12,
-		}
+		return localDevInsecureTLSConfig()
 	}
 	if len(credentials.CertificateAuthorityData) == 0 {
 		return &tls.Config{MinVersion: tls.VersionTLS12}
@@ -62,6 +59,14 @@ func tlsConfig(credentials *KubeConfigCredentials) *tls.Config {
 	}
 }
 
+// localDevInsecureTLSConfig is for local development only (kubeconfig insecure-skip-tls-verify or IdP private CA).
+func localDevInsecureTLSConfig() *tls.Config {
+	return &tls.Config{
+		MinVersion:         tls.VersionTLS12,
+		InsecureSkipVerify: true, // NOSONAR
+	}
+}
+
 func certPoolFromBytes(data []byte) (*x509.CertPool, error) {
 	pool := x509.NewCertPool()
 	rest := data
@@ -69,30 +74,51 @@ func certPoolFromBytes(data []byte) (*x509.CertPool, error) {
 	for len(rest) > 0 {
 		block, remaining := pem.Decode(rest)
 		if block != nil {
-			if block.Type == "CERTIFICATE" {
-				cert, err := x509.ParseCertificate(block.Bytes)
-				if err != nil {
-					return nil, err
-				}
-				pool.AddCert(cert)
+			ok, err := addPEMCertificateToPool(pool, block)
+			if err != nil {
+				return nil, err
+			}
+			if ok {
 				added = true
 			}
 			rest = remaining
 			continue
 		}
-		cert, err := x509.ParseCertificate(rest)
+		ok, err := addDERCertificateToPool(pool, rest)
 		if err != nil {
 			if !added {
 				return nil, fmt.Errorf("failed to parse kubeconfig CA: %w", err)
 			}
 			break
 		}
-		pool.AddCert(cert)
-		added = true
+		if ok {
+			added = true
+		}
 		break
 	}
 	if !added {
 		return nil, fmt.Errorf("no certificates found in kubeconfig certificate-authority-data")
 	}
 	return pool, nil
+}
+
+func addPEMCertificateToPool(pool *x509.CertPool, block *pem.Block) (bool, error) {
+	if block.Type != "CERTIFICATE" {
+		return false, nil
+	}
+	cert, err := x509.ParseCertificate(block.Bytes)
+	if err != nil {
+		return false, err
+	}
+	pool.AddCert(cert)
+	return true, nil
+}
+
+func addDERCertificateToPool(pool *x509.CertPool, data []byte) (bool, error) {
+	cert, err := x509.ParseCertificate(data)
+	if err != nil {
+		return false, err
+	}
+	pool.AddCert(cert)
+	return true, nil
 }
