@@ -32,6 +32,21 @@
 go get github.com/netcracker/qubership-core-lib-go/v3
 ```
 
+### Local development (kubeconfig TokenRequest)
+
+When env `PROFILE=dev`, call `localdev.Bootstrap()` after `configloader.Init` (or use `git.netcracker.com/.../security/v3/localdev.Bootstrap()`). Required env:
+
+| Env | Purpose |
+|---|---|
+| `PROFILE=dev` | Enables local-dev TokenRequest |
+| `microservice.name` | Kubernetes service account name (`application.yaml` or env `MICROSERVICE_NAME`) |
+| `CLOUD_NAMESPACE` | Namespace for TokenRequest |
+| `KUBERNETES_M2M_ENABLED=true` | K8s M2M path in security |
+
+Prod continues to use projected volume token files (`DefaultTokenFileProvider`).
+
+Inbound K8s JWT validation in local-dev uses OIDC discovery + reachable JWKS on the kube API (`tokenverifier` local-dev path); no projected SA file required.
+
 ## Quick Start
 
 ### Default Service Account Token
