@@ -95,3 +95,43 @@ func TestLocalDevTokenSourceReturnsKubeUserTokenForSA(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "kube-user", token)
 }
+
+func TestLocalDevTokenSourceLoadsFromKubeconfig(t *testing.T) {
+	t.Setenv(ProfileEnv, "dev")
+	t.Setenv("MICROSERVICE_NAME", "my-sa")
+	t.Setenv(NamespaceEnv, "my-ns")
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(`{"status":{"token":"minted","expirationTimestamp":"` +
+			time.Now().Add(2*time.Hour).Format(time.RFC3339) + `"}}`))
+	}))
+	defer server.Close()
+
+	path := writeTestKubeconfig(t, server.URL)
+	t.Setenv("KUBECONFIG", path)
+	ResetCache()
+	defer ResetCache()
+
+	source := &LocalDevTokenSource{
+		fallback: &stubTokenSource{},
+		cache:    make(map[string]cachedAudienceToken),
+	}
+
+	token, err := source.GetServiceAccountToken(context.Background())
+	require.NoError(t, err)
+	assert.Equal(t, "kube-user-token", token)
+
+	audienceToken, err := source.GetAudienceToken(context.Background(), tokensource.AudienceNetcracker)
+	require.NoError(t, err)
+	assert.Equal(t, "minted", audienceToken)
+}
+
+func TestLocalDevTokenSourceDelegatesServiceAccountWhenDisabled(t *testing.T) {
+	t.Setenv(ProfileEnv, "")
+	source := &LocalDevTokenSource{
+		fallback: &stubTokenSource{saToken: "file-sa"},
+	}
+	token, err := source.GetServiceAccountToken(context.Background())
+	require.NoError(t, err)
+	assert.Equal(t, "file-sa", token)
+}

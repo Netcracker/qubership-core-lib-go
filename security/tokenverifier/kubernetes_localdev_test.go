@@ -43,6 +43,37 @@ func TestLocalDevTransportSkipsBearerOnPublicJwks(t *testing.T) {
 	assert.False(t, sawAuthorization)
 }
 
+func TestLocalDevTransportAddsBearerOnProtectedEndpoint(t *testing.T) {
+	var authorization string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		authorization = r.Header.Get("Authorization")
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer server.Close()
+
+	transport := newLocalDevTransport(func() (string, error) {
+		return "kube-user", nil
+	}, http.DefaultTransport)
+
+	req, err := http.NewRequest(http.MethodGet, server.URL+"/api/v1/namespaces/default", nil)
+	require.NoError(t, err)
+	resp, err := transport.RoundTrip(req)
+	require.NoError(t, err)
+	resp.Body.Close()
+	assert.Equal(t, "Bearer kube-user", authorization)
+}
+
+func TestLocalDevTransportFailsWhenTokenMissing(t *testing.T) {
+	transport := newLocalDevTransport(func() (string, error) {
+		return "", assert.AnError
+	}, http.DefaultTransport)
+
+	req, err := http.NewRequest(http.MethodGet, "https://api.example/api/v1/pods", nil)
+	require.NoError(t, err)
+	_, err = transport.RoundTrip(req)
+	assert.Error(t, err)
+}
+
 func TestLocalDevKubernetesVerifierWithoutServiceAccountFile(t *testing.T) {
 	t.Setenv("PROFILE", "dev")
 	qubetest.MustInitDefaultTestKeys()

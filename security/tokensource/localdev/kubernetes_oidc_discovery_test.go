@@ -3,8 +3,6 @@ package localdev
 import (
 	"net/http"
 	"net/http/httptest"
-	"os"
-	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -57,29 +55,4 @@ func TestResolveIssuerClaimFromDiscoveryFallback(t *testing.T) {
 	issuer, err := ResolveIssuerClaimFromDiscovery()
 	require.NoError(t, err)
 	assert.Equal(t, DefaultKubernetesIssuer, issuer)
-}
-
-func writeTestKubeconfig(t *testing.T, serverURL string) string {
-	dir := t.TempDir()
-	path := filepath.Join(dir, "config")
-	content := `apiVersion: v1
-kind: Config
-current-context: test
-contexts:
-- context:
-    cluster: test
-    user: test
-  name: test
-clusters:
-- cluster:
-    server: ` + serverURL + `
-    insecure-skip-tls-verify: true
-  name: test
-users:
-- name: test
-  user:
-    token: kube-user-token
-`
-	require.NoError(t, os.WriteFile(path, []byte(content), 0o600))
-	return path
 }
