@@ -61,9 +61,9 @@ func tlsConfig(credentials *KubeConfigCredentials) *tls.Config {
 
 // localDevInsecureTLSConfig is for local development only (kubeconfig insecure-skip-tls-verify or IdP private CA).
 func localDevInsecureTLSConfig() *tls.Config {
-	return &tls.Config{
+	return &tls.Config{ // NOSONAR
 		MinVersion:         tls.VersionTLS12,
-		InsecureSkipVerify: true, // NOSONAR
+		InsecureSkipVerify: true,
 	}
 }
 
