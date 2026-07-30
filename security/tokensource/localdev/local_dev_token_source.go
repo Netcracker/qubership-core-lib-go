@@ -92,7 +92,7 @@ func (s *LocalDevTokenSource) requestToken(audience string) (*TokenRequestResult
 		return nil, err
 	}
 	localDevTokenLogger.Infof(
-		"Local-dev TokenSource active: requesting token for audience=%s, sa=%s, namespace=%s",
+		"local-dev token source active: requesting token for audience=%s, sa=%s, namespace=%s",
 		audience, serviceAccount, namespace,
 	)
 	return client.RequestToken(namespace, serviceAccount, audience)

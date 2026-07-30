@@ -37,10 +37,7 @@ func (c *TokenRequestClient) RequestToken(namespace, serviceAccountName, audienc
 	return c.requestToken(namespace, serviceAccountName, audience, tokenRequestExpirationSeconds)
 }
 
-func (c *TokenRequestClient) requestToken(
-	namespace, serviceAccountName, audience string,
-	expirationSeconds int64,
-) (*TokenRequestResult, error) {
+func (c *TokenRequestClient) requestToken(namespace, serviceAccountName, audience string, expirationSeconds int64) (*TokenRequestResult, error) {
 	url := fmt.Sprintf("%s/api/v1/namespaces/%s/serviceaccounts/%s/token",
 		c.serverURL, namespace, serviceAccountName)
 	body, err := buildTokenRequestBody(audience, expirationSeconds)
@@ -48,7 +45,7 @@ func (c *TokenRequestClient) requestToken(
 		return nil, err
 	}
 	tokenRequestLogger.Infof(
-		"Requesting local-dev SA token: namespace=%s, sa=%s, audience=%s, ttl=%ds",
+		"requesting local-dev SA token: namespace=%s, sa=%s, audience=%s, ttl=%ds",
 		namespace, serviceAccountName, audience, expirationSeconds,
 	)
 	req, err := http.NewRequest(http.MethodPost, url, bytes.NewReader(body))
@@ -100,10 +97,10 @@ func (c *TokenRequestClient) requestToken(
 }
 
 func buildTokenRequestBody(audience string, expirationSeconds int64) ([]byte, error) {
-	payload := map[string]interface{}{
+	payload := map[string]any{
 		"apiVersion": tokenRequestAPIVersion,
 		"kind":       tokenRequestKind,
-		"spec": map[string]interface{}{
+		"spec": map[string]any{
 			tokenRequestSpecAudiences:         []string{audience},
 			tokenRequestSpecExpirationSeconds: expirationSeconds,
 		},

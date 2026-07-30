@@ -4,6 +4,8 @@ import (
 	"net/url"
 	"strings"
 	"sync"
+
+	"github.com/netcracker/qubership-core-lib-go/v3/security/oidc"
 )
 
 var (
@@ -45,13 +47,13 @@ func IsPublicOidcEndpoint(rawURL string) bool {
 	}
 	parsed, err := url.Parse(rawURL)
 	if err != nil {
-		return strings.Contains(rawURL, wellKnownOpenIDConfigPath) || strings.Contains(rawURL, JwksPath)
+		return strings.Contains(rawURL, oidc.ProviderSubPath) || strings.Contains(rawURL, JwksPath)
 	}
 	path := parsed.Path
 	if path == "" {
 		return false
 	}
-	return strings.HasSuffix(path, wellKnownOpenIDConfigPath) ||
+	return strings.HasSuffix(path, oidc.ProviderSubPath) ||
 		strings.HasSuffix(path, JwksPath) ||
 		strings.Contains(path, JwksPath)
 }
@@ -67,7 +69,7 @@ func cachedKubeConfig() (*KubeConfigCredentials, error) {
 		return nil, err
 	}
 	cachedCredentials = creds
-	kubeLogger.Infof("Local-dev kubeconfig: API server %s", creds.ServerURL)
+	kubeLogger.Infof("local-dev kubeconfig: API server %s", creds.ServerURL)
 	return cachedCredentials, nil
 }
 

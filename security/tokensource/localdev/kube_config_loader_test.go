@@ -139,16 +139,16 @@ func TestRunExecCredential(t *testing.T) {
 	require.NoError(t, os.WriteFile(jsonPath, []byte(`{"status":{"token":"exec-token"}}`), 0o600))
 
 	var command string
-	var args []interface{}
+	var args []any
 	if runtime.GOOS == "windows" {
 		command = "cmd"
-		args = []interface{}{"/c", "type", jsonPath}
+		args = []any{"/c", "type", jsonPath}
 	} else {
 		command = "cat"
-		args = []interface{}{jsonPath}
+		args = []any{jsonPath}
 	}
 
-	execCfg := map[string]interface{}{
+	execCfg := map[string]any{
 		kubeConfigCommand: command,
 		kubeConfigArgs:    args,
 	}

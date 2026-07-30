@@ -11,18 +11,19 @@ import (
 	"time"
 
 	"github.com/netcracker/qubership-core-lib-go/v3/logging"
+	"github.com/netcracker/qubership-core-lib-go/v3/security/oidc"
 )
 
 var oidcLogger = logging.GetLogger("oidc-auth-provider")
 
-func resolveOidcAuthProviderToken(config map[string]interface{}) (string, error) {
+func resolveOidcAuthProviderToken(config map[string]any) (string, error) {
 	client := idpHTTPClient()
 	cached := firstNonBlank(
 		getKubeConfigStringField(config, kubeConfigIDToken),
 		getKubeConfigStringField(config, kubeConfigAccessToken),
 	)
 	if cached != "" && !isJwtExpired(cached) {
-		oidcLogger.Debug("Using non-expired OIDC id-token from kubeconfig auth-provider")
+		oidcLogger.Debug("using non-expired oidc id-token from kubeconfig auth-provider")
 		return cached, nil
 	}
 	issuerURL := getKubeConfigStringField(config, kubeConfigIDPIssuerURL)
@@ -31,16 +32,16 @@ func resolveOidcAuthProviderToken(config map[string]interface{}) (string, error)
 	clientSecret := getKubeConfigStringField(config, kubeConfigClientSecret)
 	if issuerURL == "" || refreshToken == "" || clientID == "" {
 		if cached != "" {
-			oidcLogger.Warn("OIDC auth-provider id-token is expired/missing refresh fields; falling back to cached token")
+			oidcLogger.Warn("oidc auth-provider id-token is expired or missing refresh fields; falling back to cached token")
 			return cached, nil
 		}
 		return "", nil
 	}
-	oidcLogger.Infof("Refreshing OIDC kubeconfig token via idp-issuer-url=%s", issuerURL)
+	oidcLogger.Infof("refreshing oidc kubeconfig token via idp-issuer-url=%s", issuerURL)
 	tokenEndpoint, err := discoverTokenEndpoint(client, issuerURL)
 	if err != nil {
 		if cached != "" {
-			oidcLogger.Warnf("OIDC token refresh failed; falling back to cached id-token: %v", err)
+			oidcLogger.Warnf("oidc token refresh failed; falling back to cached id-token: %v", err)
 			return cached, nil
 		}
 		return "", err
@@ -48,7 +49,7 @@ func resolveOidcAuthProviderToken(config map[string]interface{}) (string, error)
 	token, err := refreshIdToken(client, tokenEndpoint, clientID, clientSecret, refreshToken)
 	if err != nil {
 		if cached != "" {
-			oidcLogger.Warnf("OIDC token refresh failed; falling back to cached id-token: %v", err)
+			oidcLogger.Warnf("oidc token refresh failed; falling back to cached id-token: %v", err)
 			return cached, nil
 		}
 		return "", err
@@ -64,7 +65,10 @@ func idpHTTPClient() *http.Client {
 }
 
 func discoverTokenEndpoint(client *http.Client, issuerURL string) (string, error) {
-	discoveryURL := strings.TrimRight(issuerURL, "/") + wellKnownOpenIDConfigPath
+	discoveryURL, err := oidc.GetProviderUrl(issuerURL)
+	if err != nil {
+		return "", fmt.Errorf("oidc discovery URL invalid for %s: %w", issuerURL, err)
+	}
 	req, err := http.NewRequest(http.MethodGet, discoveryURL, nil)
 	if err != nil {
 		return "", err
@@ -72,7 +76,7 @@ func discoverTokenEndpoint(client *http.Client, issuerURL string) (string, error
 	req.Header.Set(acceptHeader, applicationJSON)
 	resp, err := client.Do(req)
 	if err != nil {
-		return "", fmt.Errorf("OIDC discovery failed for %s: %w", discoveryURL, err)
+		return "", fmt.Errorf("oidc discovery failed for %s: %w", discoveryURL, err)
 	}
 	defer resp.Body.Close()
 	body, err := io.ReadAll(resp.Body)
@@ -80,17 +84,17 @@ func discoverTokenEndpoint(client *http.Client, issuerURL string) (string, error
 		return "", err
 	}
 	if isFailed(resp.StatusCode) {
-		return "", fmt.Errorf("OIDC discovery failed (HTTP %d) for %s: %s",
+		return "", fmt.Errorf("oidc discovery failed (HTTP %d) for %s: %s",
 			resp.StatusCode, discoveryURL, truncateResponseBody(body))
 	}
 	var doc struct {
 		TokenEndpoint string `json:"token_endpoint"`
 	}
 	if err := json.Unmarshal(body, &doc); err != nil {
-		return "", fmt.Errorf("OIDC discovery failed for %s: %w", discoveryURL, err)
+		return "", fmt.Errorf("oidc discovery failed for %s: %w", discoveryURL, err)
 	}
 	if doc.TokenEndpoint == "" {
-		return "", fmt.Errorf("OIDC discovery response has no token_endpoint: %s", discoveryURL)
+		return "", fmt.Errorf("oidc discovery response has no token_endpoint: %s", discoveryURL)
 	}
 	return doc.TokenEndpoint, nil
 }
@@ -111,7 +115,7 @@ func refreshIdToken(client *http.Client, tokenEndpoint, clientID, clientSecret, 
 	req.Header.Set(acceptHeader, applicationJSON)
 	resp, err := client.Do(req)
 	if err != nil {
-		return "", fmt.Errorf("OIDC refresh_token grant failed for %s: %w", tokenEndpoint, err)
+		return "", fmt.Errorf("oidc refresh_token grant failed for %s: %w", tokenEndpoint, err)
 	}
 	defer resp.Body.Close()
 	body, err := io.ReadAll(resp.Body)
@@ -119,7 +123,7 @@ func refreshIdToken(client *http.Client, tokenEndpoint, clientID, clientSecret, 
 		return "", err
 	}
 	if isFailed(resp.StatusCode) {
-		return "", fmt.Errorf("OIDC refresh_token grant failed (HTTP %d) for %s: %s",
+		return "", fmt.Errorf("oidc refresh_token grant failed (HTTP %d) for %s: %s",
 			resp.StatusCode, tokenEndpoint, truncateResponseBody(body))
 	}
 	var tokenResponse struct {
@@ -131,7 +135,7 @@ func refreshIdToken(client *http.Client, tokenEndpoint, clientID, clientSecret, 
 	}
 	token := firstNonBlank(tokenResponse.IDToken, tokenResponse.AccessToken)
 	if token == "" {
-		return "", fmt.Errorf("OIDC token response has neither id_token nor access_token: %s", tokenEndpoint)
+		return "", fmt.Errorf("oidc token response has neither id_token nor access_token: %s", tokenEndpoint)
 	}
 	return token, nil
 }

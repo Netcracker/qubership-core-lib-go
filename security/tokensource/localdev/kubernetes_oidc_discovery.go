@@ -7,6 +7,8 @@ import (
 	"net/http"
 	"strings"
 	"sync"
+
+	"github.com/netcracker/qubership-core-lib-go/v3/security/oidc"
 )
 
 var (
@@ -42,7 +44,7 @@ func DiscoveryURL() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return server + wellKnownOpenIDConfigPath, nil
+	return oidc.GetProviderUrl(server)
 }
 
 // IsKubernetesIssuer reports whether the value looks like a Kubernetes cluster issuer.
@@ -63,7 +65,7 @@ func ResolveIssuerClaimFromDiscovery() (string, error) {
 	}
 	body, err := getPublicJSON(discoveryURL)
 	if err != nil {
-		kubeLogger.Warnf("Failed to resolve Kubernetes issuer from discovery at %s in local-dev, using default %s: %v",
+		kubeLogger.Warnf("failed to resolve Kubernetes issuer from discovery at %s in local-dev, using default %s: %v",
 			discoveryURL, DefaultKubernetesIssuer, err)
 		return DefaultKubernetesIssuer, nil
 	}
@@ -71,14 +73,14 @@ func ResolveIssuerClaimFromDiscovery() (string, error) {
 		Issuer string `json:"issuer"`
 	}
 	if err := json.Unmarshal(body, &discovery); err != nil {
-		kubeLogger.Warnf("Failed to parse OIDC discovery at %s in local-dev, using default %s: %v",
+		kubeLogger.Warnf("failed to parse OIDC discovery at %s in local-dev, using default %s: %v",
 			discoveryURL, DefaultKubernetesIssuer, err)
 		return DefaultKubernetesIssuer, nil
 	}
 	if strings.TrimSpace(discovery.Issuer) != "" {
 		return discovery.Issuer, nil
 	}
-	kubeLogger.Warnf("OIDC discovery at %s has no issuer in local-dev, using default %s", discoveryURL, DefaultKubernetesIssuer)
+	kubeLogger.Warnf("oidc discovery at %s has no issuer in local-dev, using default %s", discoveryURL, DefaultKubernetesIssuer)
 	return DefaultKubernetesIssuer, nil
 }
 

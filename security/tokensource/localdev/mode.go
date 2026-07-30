@@ -5,24 +5,20 @@ import (
 	"os"
 	"strings"
 
-	constants "github.com/netcracker/qubership-core-lib-go/v3/const"
 	"github.com/netcracker/qubership-core-lib-go/v3/configloader"
+	constants "github.com/netcracker/qubership-core-lib-go/v3/const"
 )
 
 const (
-	EnabledEnv     = "SECURITY_LOCAL_DEV_ENABLED"
-	ProfileEnv     = "PROFILE"
-	NamespaceEnv   = "CLOUD_NAMESPACE"
-	DevProfile     = "dev"
+	ProfileEnv   = "PROFILE"
+	NamespaceEnv = "CLOUD_NAMESPACE"
+	DevProfile   = "dev"
 
 	InsecureIdpTlsEnv = "SECURITY_LOCAL_DEV_INSECURE_IDP_TLS"
 )
 
-// IsEnabled reports whether local-dev TokenRequest mode is active.
+// IsEnabled reports whether local-dev TokenRequest mode is active (PROFILE=dev).
 func IsEnabled() bool {
-	if isTrue(os.Getenv(EnabledEnv)) {
-		return true
-	}
 	return strings.EqualFold(strings.TrimSpace(os.Getenv(ProfileEnv)), DevProfile)
 }
 
@@ -54,8 +50,4 @@ func isInsecureIdpTlsEnabled() bool {
 		return true
 	}
 	return !strings.EqualFold(configured, "false") && configured != "0"
-}
-
-func isTrue(value string) bool {
-	return strings.EqualFold(strings.TrimSpace(value), "true") || strings.TrimSpace(value) == "1"
 }

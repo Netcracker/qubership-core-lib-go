@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/netcracker/qubership-core-lib-go/v3/security/oidc"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -24,7 +25,7 @@ func TestIsJwtExpired(t *testing.T) {
 
 func TestDiscoverTokenEndpoint(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		assert.Equal(t, wellKnownOpenIDConfigPath, r.URL.Path)
+		assert.Equal(t, oidc.ProviderSubPath, r.URL.Path)
 		_, _ = w.Write([]byte(`{"token_endpoint":"https://idp.example/token"}`))
 	}))
 	defer server.Close()
@@ -100,7 +101,7 @@ func TestRefreshIdTokenErrors(t *testing.T) {
 func TestResolveOidcAuthProviderTokenUsesCachedNonExpired(t *testing.T) {
 	t.Setenv(ProfileEnv, "")
 	token := buildTestJWT(time.Now().Add(2 * time.Hour))
-	got, err := resolveOidcAuthProviderToken(map[string]interface{}{
+	got, err := resolveOidcAuthProviderToken(map[string]any{
 		kubeConfigIDToken: token,
 	})
 	require.NoError(t, err)
@@ -115,7 +116,7 @@ func TestResolveOidcAuthProviderTokenRefresh(t *testing.T) {
 	var tokenURL string
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
-		case wellKnownOpenIDConfigPath:
+		case oidc.ProviderSubPath:
 			_ = json.NewEncoder(w).Encode(map[string]string{
 				"token_endpoint": tokenURL,
 			})
@@ -130,7 +131,7 @@ func TestResolveOidcAuthProviderTokenRefresh(t *testing.T) {
 	tokenURL = server.URL + "/token"
 
 	expired := buildTestJWT(time.Now().Add(-2 * time.Hour))
-	got, err := resolveOidcAuthProviderToken(map[string]interface{}{
+	got, err := resolveOidcAuthProviderToken(map[string]any{
 		kubeConfigIDToken:      expired,
 		kubeConfigIDPIssuerURL: server.URL,
 		kubeConfigRefreshToken: "refresh-value",
@@ -145,7 +146,7 @@ func TestResolveOidcAuthProviderTokenRefresh(t *testing.T) {
 func TestResolveOidcAuthProviderTokenFallbackToCachedOnRefreshFailure(t *testing.T) {
 	t.Setenv(ProfileEnv, "")
 	expired := buildTestJWT(time.Now().Add(-2 * time.Hour))
-	got, err := resolveOidcAuthProviderToken(map[string]interface{}{
+	got, err := resolveOidcAuthProviderToken(map[string]any{
 		kubeConfigIDToken:      expired,
 		kubeConfigIDPIssuerURL: "http://127.0.0.1:1",
 		kubeConfigRefreshToken: "refresh",
@@ -157,13 +158,13 @@ func TestResolveOidcAuthProviderTokenFallbackToCachedOnRefreshFailure(t *testing
 
 func TestResolveOidcAuthProviderTokenMissingRefreshFields(t *testing.T) {
 	expired := buildTestJWT(time.Now().Add(-2 * time.Hour))
-	got, err := resolveOidcAuthProviderToken(map[string]interface{}{
+	got, err := resolveOidcAuthProviderToken(map[string]any{
 		kubeConfigIDToken: expired,
 	})
 	require.NoError(t, err)
 	assert.Equal(t, expired, got)
 
-	got, err = resolveOidcAuthProviderToken(map[string]interface{}{})
+	got, err = resolveOidcAuthProviderToken(map[string]any{})
 	require.NoError(t, err)
 	assert.Equal(t, "", got)
 }

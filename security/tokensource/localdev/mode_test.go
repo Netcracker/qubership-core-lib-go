@@ -8,13 +8,8 @@ import (
 )
 
 func TestIsEnabled(t *testing.T) {
-	t.Setenv(EnabledEnv, "")
 	t.Setenv(ProfileEnv, "")
 	assert.False(t, IsEnabled())
-
-	t.Setenv(EnabledEnv, "true")
-	assert.True(t, IsEnabled())
-	t.Setenv(EnabledEnv, "")
 
 	t.Setenv(ProfileEnv, "dev")
 	assert.True(t, IsEnabled())

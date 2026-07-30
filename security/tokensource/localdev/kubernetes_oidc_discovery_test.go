@@ -5,6 +5,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/netcracker/qubership-core-lib-go/v3/security/oidc"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -23,7 +24,7 @@ func TestIsKubernetesIssuer(t *testing.T) {
 
 func TestResolveIssuerClaimFromDiscovery(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == wellKnownOpenIDConfigPath {
+		if r.URL.Path == oidc.ProviderSubPath {
 			_, _ = w.Write([]byte(`{"issuer":"https://cluster.example"}`))
 			return
 		}

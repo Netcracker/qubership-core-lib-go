@@ -134,10 +134,10 @@ func TestLocalDevKubernetesVerifierWithoutServiceAccountFile(t *testing.T) {
 	assert.NoError(t, err)
 }
 
-func buildTestJWKS() map[string]interface{} {
+func buildTestJWKS() map[string]any {
 	publicKey := qubetest.DefaultPublicKeys[qubetest.DefaultKid]
-	return map[string]interface{}{
-		"keys": []map[string]interface{}{
+	return map[string]any{
+		"keys": []map[string]any{
 			{
 				"kty": "RSA",
 				"kid": qubetest.DefaultKid,

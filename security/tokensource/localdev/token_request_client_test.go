@@ -16,8 +16,8 @@ func TestTokenRequestClientSuccess(t *testing.T) {
 		assert.Equal(t, http.MethodPost, r.Method)
 		assert.Equal(t, "Bearer kube-user-token", r.Header.Get("Authorization"))
 		assert.Contains(t, r.URL.Path, "/serviceaccounts/my-sa/token")
-		resp := map[string]interface{}{
-			"status": map[string]interface{}{
+		resp := map[string]any{
+			"status": map[string]any{
 				"token":               "minted-token",
 				"expirationTimestamp": time.Now().Add(2 * time.Hour).Format(time.RFC3339),
 			},

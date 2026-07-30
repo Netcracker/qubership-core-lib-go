@@ -10,13 +10,11 @@ import (
 
 func TestBootstrapWhenDisabled(t *testing.T) {
 	t.Setenv(ProfileEnv, "")
-	t.Setenv(EnabledEnv, "")
 	Bootstrap()
 }
 
 func TestBootstrapWhenEnabled(t *testing.T) {
 	t.Setenv(ProfileEnv, "dev")
-	t.Setenv(EnabledEnv, "")
 	Bootstrap()
 
 	_, found := serviceloader.Load[tokensource.TokenSource]()

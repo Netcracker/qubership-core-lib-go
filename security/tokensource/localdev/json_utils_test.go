@@ -9,10 +9,10 @@ import (
 
 func TestGetKubeConfigStringField(t *testing.T) {
 	assert.Equal(t, "", getKubeConfigStringField(nil, "key"))
-	assert.Equal(t, "", getKubeConfigStringField(map[string]interface{}{}, "key"))
-	assert.Equal(t, "", getKubeConfigStringField(map[string]interface{}{"key": nil}, "key"))
-	assert.Equal(t, "", getKubeConfigStringField(map[string]interface{}{"key": 42}, "key"))
-	assert.Equal(t, "value", getKubeConfigStringField(map[string]interface{}{"key": " value "}, "key"))
+	assert.Equal(t, "", getKubeConfigStringField(map[string]any{}, "key"))
+	assert.Equal(t, "", getKubeConfigStringField(map[string]any{"key": nil}, "key"))
+	assert.Equal(t, "", getKubeConfigStringField(map[string]any{"key": 42}, "key"))
+	assert.Equal(t, "value", getKubeConfigStringField(map[string]any{"key": " value "}, "key"))
 }
 
 func TestGetKubeConfigBoolField(t *testing.T) {
@@ -20,11 +20,11 @@ func TestGetKubeConfigBoolField(t *testing.T) {
 	assert.False(t, ok)
 	assert.False(t, present)
 
-	ok, present = getKubeConfigBoolField(map[string]interface{}{"flag": true}, "flag")
+	ok, present = getKubeConfigBoolField(map[string]any{"flag": true}, "flag")
 	assert.True(t, ok)
 	assert.True(t, present)
 
-	ok, present = getKubeConfigBoolField(map[string]interface{}{"flag": "true"}, "flag")
+	ok, present = getKubeConfigBoolField(map[string]any{"flag": "true"}, "flag")
 	assert.False(t, ok)
 	assert.False(t, present)
 }

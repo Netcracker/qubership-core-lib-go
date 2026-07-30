@@ -29,7 +29,6 @@ func (s *stubTokenSource) GetServiceAccountToken(_ context.Context) (string, err
 
 func TestLocalDevTokenSourceDelegatesWhenDisabled(t *testing.T) {
 	t.Setenv(ProfileEnv, "")
-	t.Setenv(EnabledEnv, "")
 
 	source := &LocalDevTokenSource{
 		fallback: &stubTokenSource{audienceToken: "file-token"},
@@ -49,8 +48,8 @@ func TestLocalDevTokenSourceMintsAndCachesWhenEnabled(t *testing.T) {
 	calls := 0
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		calls++
-		resp := map[string]interface{}{
-			"status": map[string]interface{}{
+		resp := map[string]any{
+			"status": map[string]any{
 				"token":               "minted-token",
 				"expirationTimestamp": time.Now().Add(2 * time.Hour).Format(time.RFC3339),
 			},

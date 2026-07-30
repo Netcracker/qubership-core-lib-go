@@ -32,10 +32,10 @@ type kubeConfig struct {
 }
 
 type namedEntry struct {
-	Name    string                 `yaml:"name"`
-	Cluster map[string]interface{} `yaml:"cluster"`
-	Context map[string]interface{} `yaml:"context"`
-	User    map[string]interface{} `yaml:"user"`
+	Name    string         `yaml:"name"`
+	Cluster map[string]any `yaml:"cluster"`
+	Context map[string]any `yaml:"context"`
+	User    map[string]any `yaml:"user"`
 }
 
 // LoadKubeConfig reads the current kubeconfig context and resolves API credentials.
@@ -112,11 +112,11 @@ func resolveKubeConfigPath() (string, error) {
 	return filepath.Join(home, ".kube", "config"), nil
 }
 
-func resolveUserToken(user map[string]interface{}) (string, error) {
+func resolveUserToken(user map[string]any) (string, error) {
 	if token := getKubeConfigStringField(user, kubeConfigToken); token != "" {
 		return token, nil
 	}
-	if authProvider, ok := user[kubeConfigAuthProvider].(map[string]interface{}); ok {
+	if authProvider, ok := user[kubeConfigAuthProvider].(map[string]any); ok {
 		token, err := resolveAuthProviderToken(authProvider)
 		if err != nil {
 			return "", err
@@ -131,7 +131,7 @@ func resolveUserToken(user map[string]interface{}) (string, error) {
 	if accessToken := getKubeConfigStringField(user, kubeConfigAccessToken); accessToken != "" {
 		return accessToken, nil
 	}
-	if execCfg, ok := user[kubeConfigExec].(map[string]interface{}); ok {
+	if execCfg, ok := user[kubeConfigExec].(map[string]any); ok {
 		return runExecCredential(execCfg)
 	}
 	return "", fmt.Errorf(
@@ -139,8 +139,8 @@ func resolveUserToken(user map[string]interface{}) (string, error) {
 	)
 }
 
-func resolveAuthProviderToken(authProvider map[string]interface{}) (string, error) {
-	config, ok := authProvider[kubeConfigConfig].(map[string]interface{})
+func resolveAuthProviderToken(authProvider map[string]any) (string, error) {
+	config, ok := authProvider[kubeConfigConfig].(map[string]any)
 	if !ok || config == nil {
 		return "", nil
 	}
@@ -154,12 +154,12 @@ func resolveAuthProviderToken(authProvider map[string]interface{}) (string, erro
 	return getKubeConfigStringField(config, kubeConfigAccessToken), nil
 }
 
-func runExecCredential(execCfg map[string]interface{}) (string, error) {
+func runExecCredential(execCfg map[string]any) (string, error) {
 	command, args, err := buildExecCommand(execCfg)
 	if err != nil {
 		return "", err
 	}
-	kubeLogger.Debugf("Resolving kubeconfig credentials via exec: %v", args)
+	kubeLogger.Debugf("resolving kubeconfig credentials via exec: %v", args)
 	output, err := executeExecCredential(command, args, execCfg)
 	if err != nil {
 		return "", err
@@ -167,13 +167,13 @@ func runExecCredential(execCfg map[string]interface{}) (string, error) {
 	return parseExecCredentialToken(output)
 }
 
-func buildExecCommand(execCfg map[string]interface{}) (string, []string, error) {
+func buildExecCommand(execCfg map[string]any) (string, []string, error) {
 	command := getKubeConfigStringField(execCfg, kubeConfigCommand)
 	if command == "" {
 		return "", nil, fmt.Errorf("kubeconfig exec.command is empty")
 	}
 	args := []string{command}
-	if rawArgs, ok := execCfg[kubeConfigArgs].([]interface{}); ok {
+	if rawArgs, ok := execCfg[kubeConfigArgs].([]any); ok {
 		for _, arg := range rawArgs {
 			if s, ok := arg.(string); ok {
 				args = append(args, s)
@@ -183,7 +183,7 @@ func buildExecCommand(execCfg map[string]interface{}) (string, []string, error) 
 	return command, args, nil
 }
 
-func executeExecCredential(command string, args []string, execCfg map[string]interface{}) ([]byte, error) {
+func executeExecCredential(command string, args []string, execCfg map[string]any) ([]byte, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), kubeConfigExecTimeout)
 	defer cancel()
 	cmd := exec.CommandContext(ctx, args[0], args[1:]...)
@@ -198,13 +198,13 @@ func executeExecCredential(command string, args []string, execCfg map[string]int
 	return output, nil
 }
 
-func applyExecEnvironment(cmd *exec.Cmd, execCfg map[string]interface{}) {
-	envVars, ok := execCfg[kubeConfigEnv].([]interface{})
+func applyExecEnvironment(cmd *exec.Cmd, execCfg map[string]any) {
+	envVars, ok := execCfg[kubeConfigEnv].([]any)
 	if !ok {
 		return
 	}
 	for _, item := range envVars {
-		envMap, ok := item.(map[string]interface{})
+		envMap, ok := item.(map[string]any)
 		if !ok {
 			continue
 		}
