@@ -23,8 +23,8 @@ import (
 var (
 	logger logging.Logger
 
-	DefaultDbaasAgentUrl string = "http://dbaas-agent:8080"
-	DefaultMaasAgentUrl  string = "http://maas-agent:8080"
+	DefaultDbaasAgentUrl = "http://dbaas-agent:8080"
+	DefaultMaasAgentUrl  = "http://maas-agent:8080"
 )
 
 func init() {
@@ -115,7 +115,7 @@ func (m *M2MRestClient) DoRequest(ctx context.Context, httpMethod, url string, h
 func (m *M2MRestClient) doRequestFallback(ctx context.Context, cacheKey string, requestProducer *httpRequestProducer, reason *fallbackReason) (*http.Response, error) {
 	logger.Debugf("fallback: trying to send %s request to %s using fallback authentication method", requestProducer.httpMethod, requestProducer.url)
 
-	if m.k8sM2mEnabled && m.fallBackBaseUrl != "" {
+	if m.fallBackBaseUrl != "" {
 		rebasedUrl, err := rebaseUrl(requestProducer.url, m.fallBackBaseUrl)
 		if err != nil {
 			return nil, fmt.Errorf("failed to rebase url %q to fallback base url %q: %w", requestProducer.url, m.fallBackBaseUrl, err)
