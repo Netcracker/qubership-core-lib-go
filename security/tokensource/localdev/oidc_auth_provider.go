@@ -19,17 +19,17 @@ var oidcLogger = logging.GetLogger("oidc-auth-provider")
 func resolveOidcAuthProviderToken(config map[string]any) (string, error) {
 	client := idpHTTPClient()
 	cached := firstNonBlank(
-		getKubeConfigStringField(config, kubeConfigIDToken),
-		getKubeConfigStringField(config, kubeConfigAccessToken),
+		getStringField(config, kubeConfigIDToken),
+		getStringField(config, kubeConfigAccessToken),
 	)
 	if cached != "" && !isJwtExpired(cached) {
 		oidcLogger.Debug("using non-expired oidc id-token from kubeconfig auth-provider")
 		return cached, nil
 	}
-	issuerURL := getKubeConfigStringField(config, kubeConfigIDPIssuerURL)
-	refreshToken := getKubeConfigStringField(config, kubeConfigRefreshToken)
-	clientID := getKubeConfigStringField(config, kubeConfigClientID)
-	clientSecret := getKubeConfigStringField(config, kubeConfigClientSecret)
+	issuerURL := getStringField(config, kubeConfigIDPIssuerURL)
+	refreshToken := getStringField(config, kubeConfigRefreshToken)
+	clientID := getStringField(config, kubeConfigClientID)
+	clientSecret := getStringField(config, kubeConfigClientSecret)
 	if issuerURL == "" || refreshToken == "" || clientID == "" {
 		if cached != "" {
 			oidcLogger.Warn("oidc auth-provider id-token is expired or missing refresh fields; falling back to cached token")
@@ -90,7 +90,7 @@ func discoverTokenEndpoint(client *http.Client, issuerURL string) (string, error
 	var doc struct {
 		TokenEndpoint string `json:"token_endpoint"`
 	}
-	if err := json.Unmarshal(body, &doc); err != nil {
+	if err = json.Unmarshal(body, &doc); err != nil {
 		return "", fmt.Errorf("oidc discovery failed for %s: %w", discoveryURL, err)
 	}
 	if doc.TokenEndpoint == "" {
@@ -130,7 +130,7 @@ func refreshIdToken(client *http.Client, tokenEndpoint, clientID, clientSecret, 
 		IDToken     string `json:"id_token"`
 		AccessToken string `json:"access_token"`
 	}
-	if err := json.Unmarshal(body, &tokenResponse); err != nil {
+	if err = json.Unmarshal(body, &tokenResponse); err != nil {
 		return "", err
 	}
 	token := firstNonBlank(tokenResponse.IDToken, tokenResponse.AccessToken)
@@ -152,7 +152,7 @@ func isJwtExpired(jwt string) bool {
 	var claims struct {
 		Exp int64 `json:"exp"`
 	}
-	if err := json.Unmarshal(payload, &claims); err != nil || claims.Exp == 0 {
+	if err = json.Unmarshal(payload, &claims); err != nil || claims.Exp == 0 {
 		return true
 	}
 	return time.Now().Add(oidcExpirySkew).After(time.Unix(claims.Exp, 0))

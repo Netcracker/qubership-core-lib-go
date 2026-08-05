@@ -7,10 +7,10 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestIsUnauthorized(t *testing.T) {
-	assert.True(t, isUnauthorized(http.StatusUnauthorized))
-	assert.True(t, isUnauthorized(http.StatusForbidden))
-	assert.False(t, isUnauthorized(http.StatusOK))
+func TestIsUnauthorizedOrForbidden(t *testing.T) {
+	assert.True(t, isUnauthorizedOrForbidden(http.StatusUnauthorized))
+	assert.True(t, isUnauthorizedOrForbidden(http.StatusForbidden))
+	assert.False(t, isUnauthorizedOrForbidden(http.StatusOK))
 }
 
 func TestIsFailed(t *testing.T) {

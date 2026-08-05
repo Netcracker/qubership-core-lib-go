@@ -7,24 +7,24 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestGetKubeConfigStringField(t *testing.T) {
-	assert.Equal(t, "", getKubeConfigStringField(nil, "key"))
-	assert.Equal(t, "", getKubeConfigStringField(map[string]any{}, "key"))
-	assert.Equal(t, "", getKubeConfigStringField(map[string]any{"key": nil}, "key"))
-	assert.Equal(t, "", getKubeConfigStringField(map[string]any{"key": 42}, "key"))
-	assert.Equal(t, "value", getKubeConfigStringField(map[string]any{"key": " value "}, "key"))
+func TestGetStringField(t *testing.T) {
+	assert.Equal(t, "", getStringField(nil, "key"))
+	assert.Equal(t, "", getStringField(map[string]any{}, "key"))
+	assert.Equal(t, "", getStringField(map[string]any{"key": nil}, "key"))
+	assert.Equal(t, "", getStringField(map[string]any{"key": 42}, "key"))
+	assert.Equal(t, "value", getStringField(map[string]any{"key": " value "}, "key"))
 }
 
-func TestGetKubeConfigBoolField(t *testing.T) {
-	ok, present := getKubeConfigBoolField(nil, "flag")
+func TestGetBoolField(t *testing.T) {
+	ok, present := getBoolField(nil, "flag")
 	assert.False(t, ok)
 	assert.False(t, present)
 
-	ok, present = getKubeConfigBoolField(map[string]any{"flag": true}, "flag")
+	ok, present = getBoolField(map[string]any{"flag": true}, "flag")
 	assert.True(t, ok)
 	assert.True(t, present)
 
-	ok, present = getKubeConfigBoolField(map[string]any{"flag": "true"}, "flag")
+	ok, present = getBoolField(map[string]any{"flag": "true"}, "flag")
 	assert.False(t, ok)
 	assert.False(t, present)
 }

@@ -72,7 +72,7 @@ func ResolveIssuerClaimFromDiscovery() (string, error) {
 	var discovery struct {
 		Issuer string `json:"issuer"`
 	}
-	if err := json.Unmarshal(body, &discovery); err != nil {
+	if err = json.Unmarshal(body, &discovery); err != nil {
 		kubeLogger.Warnf("failed to parse OIDC discovery at %s in local-dev, using default %s: %v",
 			discoveryURL, DefaultKubernetesIssuer, err)
 		return DefaultKubernetesIssuer, nil

@@ -46,49 +46,83 @@ func LoadKubeConfig() (*KubeConfigCredentials, error) {
 		return nil, err
 	}
 
+	root, err := readAndParseKubeConfig(path)
+	if err != nil {
+		return nil, err
+	}
+
+	clusterEntry, userEntry, err := resolveActiveKubeConfigEntries(root, path)
+	if err != nil {
+		return nil, err
+	}
+
+	return credentialsFromKubeConfigEntries(clusterEntry, userEntry)
+}
+
+func readAndParseKubeConfig(path string) (kubeConfig, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
-		return nil, fmt.Errorf("kubeconfig not found at %s: %w", path, err)
+		return kubeConfig{}, fmt.Errorf("kubeconfig not found at %s: %w", path, err)
 	}
 
 	var root kubeConfig
-	if err := yaml.Unmarshal(data, &root); err != nil {
-		return nil, fmt.Errorf("failed to parse kubeconfig %s: %w", path, err)
+	if err = yaml.Unmarshal(data, &root); err != nil {
+		return kubeConfig{}, fmt.Errorf("failed to parse kubeconfig %s: %w", path, err)
 	}
 	if strings.TrimSpace(root.CurrentContext) == "" {
-		return nil, fmt.Errorf("kubeconfig has no current-context: %s", path)
+		return kubeConfig{}, fmt.Errorf("kubeconfig has no current-context: %s", path)
 	}
+	return root, nil
+}
 
+func resolveActiveKubeConfigEntries(root kubeConfig, path string) (namedEntry, namedEntry, error) {
 	contextEntry, err := findKubeConfigEntryByName(root.Contexts, root.CurrentContext)
 	if err != nil {
-		return nil, err
+		return namedEntry{}, namedEntry{}, err
 	}
-	clusterName := getKubeConfigStringField(contextEntry.Context, kubeConfigCluster)
-	userName := getKubeConfigStringField(contextEntry.Context, kubeConfigUser)
+
+	clusterName := getStringField(contextEntry.Context, kubeConfigCluster)
+	userName := getStringField(contextEntry.Context, kubeConfigUser)
 	if clusterName == "" || userName == "" {
-		return nil, fmt.Errorf("context %q must define cluster and user in %s", root.CurrentContext, path)
+		return namedEntry{}, namedEntry{}, fmt.Errorf(
+			"context %q must define cluster and user in %s",
+			root.CurrentContext,
+			path,
+		)
 	}
-	clusterEntry, err := findKubeConfigEntryByName(root.Clusters, clusterName)
+
+	var clusterEntry, userEntry namedEntry
+	clusterEntry, err = findKubeConfigEntryByName(root.Clusters, clusterName)
 	if err != nil {
-		return nil, err
+		return namedEntry{}, namedEntry{}, err
 	}
-	userEntry, err := findKubeConfigEntryByName(root.Users, userName)
+
+	userEntry, err = findKubeConfigEntryByName(root.Users, userName)
 	if err != nil {
-		return nil, err
+		return namedEntry{}, namedEntry{}, err
 	}
-	server := getKubeConfigStringField(clusterEntry.Cluster, kubeConfigServer)
+
+	return clusterEntry, userEntry, nil
+}
+
+func credentialsFromKubeConfigEntries(clusterEntry, userEntry namedEntry) (*KubeConfigCredentials, error) {
+	clusterName := clusterEntry.Name
+	server := getStringField(clusterEntry.Cluster, kubeConfigServer)
 	if server == "" {
 		return nil, fmt.Errorf("cluster %q has no server URL", clusterName)
 	}
-	caData, err := decodeOptionalBase64(getKubeConfigStringField(clusterEntry.Cluster, kubeConfigCertificateAuthorityData))
+
+	caData, err := decodeOptionalBase64(getStringField(clusterEntry.Cluster, kubeConfigCertificateAuthorityData))
 	if err != nil {
 		return nil, err
 	}
+
 	userToken, err := resolveUserToken(userEntry.User)
 	if err != nil {
 		return nil, err
 	}
-	insecure, _ := getKubeConfigBoolField(clusterEntry.Cluster, kubeConfigInsecureSkipTLSVerify)
+
+	insecure, _ := getBoolField(clusterEntry.Cluster, kubeConfigInsecureSkipTLSVerify)
 	return &KubeConfigCredentials{
 		ServerURL:                strings.TrimRight(server, "/"),
 		UserToken:                userToken,
@@ -113,7 +147,7 @@ func resolveKubeConfigPath() (string, error) {
 }
 
 func resolveUserToken(user map[string]any) (string, error) {
-	if token := getKubeConfigStringField(user, kubeConfigToken); token != "" {
+	if token := getStringField(user, kubeConfigToken); token != "" {
 		return token, nil
 	}
 	if authProvider, ok := user[kubeConfigAuthProvider].(map[string]any); ok {
@@ -125,10 +159,10 @@ func resolveUserToken(user map[string]any) (string, error) {
 			return token, nil
 		}
 	}
-	if idToken := getKubeConfigStringField(user, kubeConfigIDToken); idToken != "" {
+	if idToken := getStringField(user, kubeConfigIDToken); idToken != "" {
 		return idToken, nil
 	}
-	if accessToken := getKubeConfigStringField(user, kubeConfigAccessToken); accessToken != "" {
+	if accessToken := getStringField(user, kubeConfigAccessToken); accessToken != "" {
 		return accessToken, nil
 	}
 	if execCfg, ok := user[kubeConfigExec].(map[string]any); ok {
@@ -144,14 +178,14 @@ func resolveAuthProviderToken(authProvider map[string]any) (string, error) {
 	if !ok || config == nil {
 		return "", nil
 	}
-	name := getKubeConfigStringField(authProvider, kubeConfigName)
+	name := getStringField(authProvider, kubeConfigName)
 	if strings.EqualFold(name, oidcAuthProviderName) {
 		return resolveOidcAuthProviderToken(config)
 	}
-	if token := getKubeConfigStringField(config, kubeConfigIDToken); token != "" {
+	if token := getStringField(config, kubeConfigIDToken); token != "" {
 		return token, nil
 	}
-	return getKubeConfigStringField(config, kubeConfigAccessToken), nil
+	return getStringField(config, kubeConfigAccessToken), nil
 }
 
 func runExecCredential(execCfg map[string]any) (string, error) {
@@ -168,7 +202,7 @@ func runExecCredential(execCfg map[string]any) (string, error) {
 }
 
 func buildExecCommand(execCfg map[string]any) (string, []string, error) {
-	command := getKubeConfigStringField(execCfg, kubeConfigCommand)
+	command := getStringField(execCfg, kubeConfigCommand)
 	if command == "" {
 		return "", nil, fmt.Errorf("kubeconfig exec.command is empty")
 	}
@@ -208,11 +242,11 @@ func applyExecEnvironment(cmd *exec.Cmd, execCfg map[string]any) {
 		if !ok {
 			continue
 		}
-		name := getKubeConfigStringField(envMap, kubeConfigName)
+		name := getStringField(envMap, kubeConfigName)
 		if name == "" {
 			continue
 		}
-		cmd.Env = append(cmd.Env, fmt.Sprintf("%s=%s", name, getKubeConfigStringField(envMap, kubeConfigValue)))
+		cmd.Env = append(cmd.Env, fmt.Sprintf("%s=%s", name, getStringField(envMap, kubeConfigValue)))
 	}
 }
 

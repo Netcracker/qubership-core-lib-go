@@ -4,7 +4,7 @@ import (
 	"strings"
 )
 
-func getKubeConfigStringField(m map[string]any, field string) string {
+func getStringField(m map[string]any, field string) string {
 	if m == nil {
 		return ""
 	}
@@ -19,7 +19,7 @@ func getKubeConfigStringField(m map[string]any, field string) string {
 	return strings.TrimSpace(s)
 }
 
-func getKubeConfigBoolField(m map[string]any, field string) (bool, bool) {
+func getBoolField(m map[string]any, field string) (bool, bool) {
 	if m == nil {
 		return false, false
 	}

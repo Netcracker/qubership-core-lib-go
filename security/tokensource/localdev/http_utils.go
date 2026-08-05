@@ -2,7 +2,7 @@ package localdev
 
 import "net/http"
 
-func isUnauthorized(statusCode int) bool {
+func isUnauthorizedOrForbidden(statusCode int) bool {
 	return statusCode == http.StatusUnauthorized || statusCode == http.StatusForbidden
 }
 

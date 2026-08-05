@@ -65,7 +65,7 @@ func (c *TokenRequestClient) requestToken(namespace, serviceAccountName, audienc
 	if err != nil {
 		return nil, err
 	}
-	if isUnauthorized(resp.StatusCode) {
+	if isUnauthorizedOrForbidden(resp.StatusCode) {
 		return nil, fmt.Errorf(
 			"local-dev TokenRequest unauthorized (HTTP %d) for SA %q in namespace %q. Check RBAC for serviceaccounts/token. Response: %s",
 			resp.StatusCode, serviceAccountName, namespace, truncateResponseBody(respBody),
@@ -83,7 +83,7 @@ func (c *TokenRequestClient) requestToken(namespace, serviceAccountName, audienc
 			ExpirationTimestamp string `json:"expirationTimestamp"`
 		} `json:"status"`
 	}
-	if err := json.Unmarshal(respBody, &parsed); err != nil {
+	if err = json.Unmarshal(respBody, &parsed); err != nil {
 		return nil, fmt.Errorf("invalid TokenRequest response: %w", err)
 	}
 	if strings.TrimSpace(parsed.Status.Token) == "" {
