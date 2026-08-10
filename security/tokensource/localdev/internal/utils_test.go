@@ -1,11 +1,19 @@
-package localdev
+package internal
 
 import (
+	"net/http"
 	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 )
+
+func TestIsFailed(t *testing.T) {
+	assert.False(t, isFailed(http.StatusOK))
+	assert.False(t, isFailed(http.StatusCreated))
+	assert.True(t, isFailed(http.StatusBadRequest))
+	assert.True(t, isFailed(http.StatusInternalServerError))
+}
 
 func TestGetStringField(t *testing.T) {
 	assert.Equal(t, "", getStringField(nil, "key"))

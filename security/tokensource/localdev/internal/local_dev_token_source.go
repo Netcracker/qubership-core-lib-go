@@ -1,4 +1,4 @@
-package localdev
+package internal
 
 import (
 	"context"
@@ -40,7 +40,7 @@ func NewLocalDevTokenSource() *LocalDevTokenSource {
 }
 
 func (s *LocalDevTokenSource) GetAudienceToken(ctx context.Context, audience tokensource.TokenAudience) (string, error) {
-	if !IsEnabled() {
+	if !IsDevEnabled() {
 		return s.fallback.GetAudienceToken(ctx, audience)
 	}
 	if string(audience) == "" {
@@ -68,7 +68,7 @@ func (s *LocalDevTokenSource) GetAudienceToken(ctx context.Context, audience tok
 }
 
 func (s *LocalDevTokenSource) GetServiceAccountToken(ctx context.Context) (string, error) {
-	if !IsEnabled() {
+	if !IsDevEnabled() {
 		return s.fallback.GetServiceAccountToken(ctx)
 	}
 	creds, err := s.loadCredentials()

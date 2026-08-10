@@ -21,6 +21,8 @@ import (
 	"golang.org/x/time/rate"
 )
 
+const localDevJwksPath = "/openid/v1/jwks"
+
 func TestLocalDevTransportSkipsBearerOnPublicJwks(t *testing.T) {
 	var sawAuthorization bool
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -35,7 +37,7 @@ func TestLocalDevTransportSkipsBearerOnPublicJwks(t *testing.T) {
 		return "kube-user", nil
 	}, http.DefaultTransport)
 
-	req, err := http.NewRequest(http.MethodGet, server.URL+localdev.JwksPath, nil)
+	req, err := http.NewRequest(http.MethodGet, server.URL+localDevJwksPath, nil)
 	require.NoError(t, err)
 	resp, err := transport.RoundTrip(req)
 	require.NoError(t, err)
@@ -84,7 +86,7 @@ func TestLocalDevKubernetesVerifierWithoutServiceAccountFile(t *testing.T) {
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
-		case localdev.JwksPath:
+		case localDevJwksPath:
 			if r.Header.Get("Authorization") != "" {
 				w.WriteHeader(http.StatusUnauthorized)
 				return

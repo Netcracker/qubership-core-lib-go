@@ -1,4 +1,4 @@
-package localdev
+package internal
 
 import (
 	"os"
@@ -179,4 +179,12 @@ func TestDecodeOptionalBase64(t *testing.T) {
 
 	_, err = decodeOptionalBase64("!!!")
 	assert.Error(t, err)
+}
+
+func TestResolveKubeConfigPathDefaultHome(t *testing.T) {
+	t.Setenv("KUBECONFIG", "")
+	path, err := resolveKubeConfigPath()
+	require.NoError(t, err)
+	assert.Contains(t, path, ".kube")
+	assert.Contains(t, path, "config")
 }

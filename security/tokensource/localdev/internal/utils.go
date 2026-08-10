@@ -1,8 +1,12 @@
-package localdev
+package internal
 
 import (
 	"strings"
 )
+
+func isFailed(statusCode int) bool {
+	return statusCode/100 != 2
+}
 
 func getStringField(m map[string]any, field string) string {
 	if m == nil {

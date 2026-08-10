@@ -1,4 +1,4 @@
-package localdev
+package internal
 
 import (
 	"encoding/json"

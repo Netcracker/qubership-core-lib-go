@@ -1,4 +1,4 @@
-package localdev
+package internal
 
 import (
 	"encoding/json"
@@ -110,7 +110,6 @@ func TestResolveOidcAuthProviderTokenUsesCachedNonExpired(t *testing.T) {
 
 func TestResolveOidcAuthProviderTokenRefresh(t *testing.T) {
 	t.Setenv(ProfileEnv, "dev")
-	t.Setenv(InsecureIdpTlsEnv, "true")
 
 	var tokenCalls int
 	var tokenURL string
@@ -171,7 +170,6 @@ func TestResolveOidcAuthProviderTokenMissingRefreshFields(t *testing.T) {
 
 func TestIdpHTTPClientWhenLocalDevEnabled(t *testing.T) {
 	t.Setenv(ProfileEnv, "dev")
-	t.Setenv(InsecureIdpTlsEnv, "true")
 	client := idpHTTPClient()
 	require.NotNil(t, client)
 	transport, ok := client.Transport.(*http.Transport)

@@ -1,4 +1,4 @@
-package localdev
+package internal
 
 import (
 	"context"
@@ -10,11 +10,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/netcracker/qubership-core-lib-go/v3/logging"
 	"gopkg.in/yaml.v3"
 )
-
-var kubeLogger = logging.GetLogger("kubeconfig-loader")
 
 // KubeConfigCredentials holds kube API server URL, user credentials, and TLS settings from kubeconfig.
 type KubeConfigCredentials struct {

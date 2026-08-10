@@ -2,6 +2,7 @@ package localdev
 
 import (
 	"github.com/netcracker/qubership-core-lib-go/v3/logging"
+	"github.com/netcracker/qubership-core-lib-go/v3/security/tokensource/localdev/internal"
 	"github.com/netcracker/qubership-core-lib-go/v3/serviceloader"
 )
 
@@ -16,5 +17,5 @@ func Bootstrap() {
 		return
 	}
 	bootstrapLogger.Info("local-dev enabled: registering LocalDevTokenSource (kubeconfig TokenRequest)")
-	serviceloader.Register(localDevTokenSourcePriority, NewLocalDevTokenSource())
+	serviceloader.Register(localDevTokenSourcePriority, internal.NewLocalDevTokenSource())
 }

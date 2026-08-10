@@ -1,4 +1,4 @@
-package localdev
+package internal
 
 import (
 	"testing"
@@ -7,15 +7,15 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestIsEnabled(t *testing.T) {
+func TestIsDevEnabled(t *testing.T) {
 	t.Setenv(ProfileEnv, "")
-	assert.False(t, IsEnabled())
+	assert.False(t, IsDevEnabled())
 
 	t.Setenv(ProfileEnv, "dev")
-	assert.True(t, IsEnabled())
+	assert.True(t, IsDevEnabled())
 
 	t.Setenv(ProfileEnv, "DEV")
-	assert.True(t, IsEnabled())
+	assert.True(t, IsDevEnabled())
 }
 
 func TestRequireServiceNameAndNamespace(t *testing.T) {
@@ -28,13 +28,13 @@ func TestRequireServiceNameAndNamespace(t *testing.T) {
 	assert.Error(t, err)
 
 	t.Setenv("MICROSERVICE_NAME", "my-service")
-	t.Setenv(NamespaceEnv, "my-ns")
 	configloader.Init(configloader.EnvPropertySource())
-
 	name, err := RequireServiceName()
 	assert.NoError(t, err)
 	assert.Equal(t, "my-service", name)
-	ns, err := RequireNamespace()
+
+	t.Setenv(NamespaceEnv, "my-ns")
+	namespace, err := RequireNamespace()
 	assert.NoError(t, err)
-	assert.Equal(t, "my-ns", ns)
+	assert.Equal(t, "my-ns", namespace)
 }

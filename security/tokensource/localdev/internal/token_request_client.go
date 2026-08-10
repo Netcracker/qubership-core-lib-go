@@ -1,4 +1,4 @@
-package localdev
+package internal
 
 import (
 	"bytes"
@@ -65,7 +65,8 @@ func (c *TokenRequestClient) requestToken(namespace, serviceAccountName, audienc
 	if err != nil {
 		return nil, err
 	}
-	if isUnauthorizedOrForbidden(resp.StatusCode) {
+
+	if resp.StatusCode == http.StatusUnauthorized || resp.StatusCode == http.StatusForbidden {
 		return nil, fmt.Errorf(
 			"local-dev TokenRequest unauthorized (HTTP %d) for SA %q in namespace %q. Check RBAC for serviceaccounts/token. Response: %s",
 			resp.StatusCode, serviceAccountName, namespace, truncateResponseBody(respBody),

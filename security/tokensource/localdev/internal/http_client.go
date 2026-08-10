@@ -1,4 +1,4 @@
-package localdev
+package internal
 
 import (
 	"crypto/tls"
@@ -6,16 +6,15 @@ import (
 	"encoding/pem"
 	"fmt"
 	"net/http"
-	"time"
 )
 
 func newHTTPClient(credentials *KubeConfigCredentials) *http.Client {
 	transport := &http.Transport{
 		ForceAttemptHTTP2:     false,
-		MaxIdleConns:          100,
-		IdleConnTimeout:       90 * time.Second,
-		TLSHandshakeTimeout:   10 * time.Second,
-		ExpectContinueTimeout: 1 * time.Second,
+		MaxIdleConns:          httpMaxIdleConns,
+		IdleConnTimeout:       httpIdleConnTimeout,
+		TLSHandshakeTimeout:   httpTLSHandshakeTimeout,
+		ExpectContinueTimeout: httpExpectContinueTimeout,
 		TLSClientConfig:       tlsConfig(credentials),
 	}
 	return &http.Client{
@@ -28,10 +27,10 @@ func newInsecureIdpHTTPClient() *http.Client {
 	transport := &http.Transport{
 		ForceAttemptHTTP2:     false,
 		TLSClientConfig:       localDevInsecureTLSConfig(),
-		MaxIdleConns:          100,
-		IdleConnTimeout:       90 * time.Second,
-		TLSHandshakeTimeout:   10 * time.Second,
-		ExpectContinueTimeout: 1 * time.Second,
+		MaxIdleConns:          httpMaxIdleConns,
+		IdleConnTimeout:       httpIdleConnTimeout,
+		TLSHandshakeTimeout:   httpTLSHandshakeTimeout,
+		ExpectContinueTimeout: httpExpectContinueTimeout,
 	}
 	return &http.Client{
 		Timeout:   httpRequestTimeout,

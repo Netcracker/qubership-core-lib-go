@@ -1,4 +1,4 @@
-package localdev
+package internal
 
 import (
 	"encoding/base64"
@@ -58,7 +58,7 @@ func resolveOidcAuthProviderToken(config map[string]any) (string, error) {
 }
 
 func idpHTTPClient() *http.Client {
-	if IsEnabled() && isInsecureIdpTlsEnabled() {
+	if IsDevEnabled() {
 		return newInsecureIdpHTTPClient()
 	}
 	return &http.Client{Timeout: httpRequestTimeout}

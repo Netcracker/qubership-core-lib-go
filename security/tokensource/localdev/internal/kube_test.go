@@ -1,4 +1,4 @@
-package localdev
+package internal
 
 import (
 	"net/http"
@@ -10,16 +10,44 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestIsPublicOidcEndpoint(t *testing.T) {
-	assert.True(t, IsPublicOidcEndpoint("https://api.example/openid/v1/jwks"))
-	assert.True(t, IsPublicOidcEndpoint("https://api.example/.well-known/openid-configuration"))
-	assert.False(t, IsPublicOidcEndpoint("https://api.example/api/v1/namespaces/default"))
-}
-
 func TestIsKubernetesIssuer(t *testing.T) {
 	assert.True(t, IsKubernetesIssuer("https://kubernetes.default.svc"))
 	assert.True(t, IsKubernetesIssuer("https://kubernetes.default.svc.cluster.local"))
 	assert.False(t, IsKubernetesIssuer("https://accounts.google.com"))
+}
+
+func TestIsPublicOidcEndpointEdgeCases(t *testing.T) {
+	assert.False(t, IsPublicOidcEndpoint(""))
+	assert.False(t, IsPublicOidcEndpoint("not-a-url"))
+	assert.True(t, IsPublicOidcEndpoint("https://api.example/openid/v1/jwks/extra"))
+}
+
+func TestKubernetesOIDCHelpers(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer server.Close()
+
+	path := writeTestKubeconfig(t, server.URL)
+	t.Setenv("KUBECONFIG", path)
+	ResetCache()
+	defer ResetCache()
+
+	apiURL, err := APIServerURL()
+	require.NoError(t, err)
+	assert.Equal(t, server.URL, apiURL)
+
+	userToken, err := UserToken()
+	require.NoError(t, err)
+	assert.Equal(t, "kube-user-token", userToken)
+
+	jwksURL, err := JwksURL()
+	require.NoError(t, err)
+	assert.Equal(t, server.URL+jwksPath, jwksURL)
+
+	client, err := HTTPClient()
+	require.NoError(t, err)
+	require.NotNil(t, client)
 }
 
 func TestResolveIssuerClaimFromDiscovery(t *testing.T) {
@@ -55,5 +83,5 @@ func TestResolveIssuerClaimFromDiscoveryFallback(t *testing.T) {
 
 	issuer, err := ResolveIssuerClaimFromDiscovery()
 	require.NoError(t, err)
-	assert.Equal(t, DefaultKubernetesIssuer, issuer)
+	assert.Equal(t, defaultKubernetesIssuer, issuer)
 }

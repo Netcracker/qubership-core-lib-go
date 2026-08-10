@@ -1,12 +1,6 @@
-package localdev
+package internal
 
 import "time"
-
-// Exported OIDC / Kubernetes constants (also referenced from tokenverifier).
-const (
-	DefaultKubernetesIssuer = "https://kubernetes.default.svc"
-	JwksPath                = "/openid/v1/jwks"
-)
 
 const (
 	applicationJSON           = "application/json"
@@ -16,42 +10,37 @@ const (
 	acceptHeader              = "Accept"
 	bearerPrefix              = "Bearer "
 
+	defaultKubernetesIssuer = "https://kubernetes.default.svc"
+	jwksPath                = "/openid/v1/jwks"
+
 	tokenRequestExpirationSeconds = 28800 // 8 hours
 	maxErrorBodyLength            = 500
 	jwtBase64PadLength            = 4
 
-	httpRequestTimeout    = 30 * time.Second
-	kubeConfigExecTimeout = 30 * time.Second
-	oidcExpirySkew        = 60 * time.Second
-	tokenCacheExpirySkew  = 5 * time.Minute
+	httpRequestTimeout        = 30 * time.Second
+	httpMaxIdleConns          = 100
+	httpIdleConnTimeout       = 90 * time.Second
+	httpTLSHandshakeTimeout   = 10 * time.Second
+	httpExpectContinueTimeout = 1 * time.Second
+	kubeConfigExecTimeout     = 30 * time.Second
+	oidcExpirySkew            = 60 * time.Second
+	tokenCacheExpirySkew      = 5 * time.Minute
 
 	tokenRequestAPIVersion            = "authentication.k8s.io/v1"
 	tokenRequestKind                  = "TokenRequest"
 	tokenRequestSpecAudiences         = "audiences"
 	tokenRequestSpecExpirationSeconds = "expirationSeconds"
 
-	k8sTokenStatusToken      = "token"
-	k8sTokenStatusExpiration = "expirationTimestamp"
-
-	oidcDiscoveryTokenEndpoint = "token_endpoint"
-	oidcDiscoveryIssuer        = "issuer"
-	oidcTokenIDToken           = "id_token"
-	oidcTokenAccessToken       = "access_token"
-	oidcGrantRefreshToken      = "refresh_token"
-	oidcFormClientID           = "client_id"
-	oidcFormClientSecret       = "client_secret"
-	oidcFormGrantType          = "grant_type"
+	oidcGrantRefreshToken = "refresh_token"
+	oidcFormClientID      = "client_id"
+	oidcFormClientSecret  = "client_secret"
+	oidcFormGrantType     = "grant_type"
 
 	oidcAuthProviderName = "oidc"
 )
 
 // Kubeconfig YAML / map field names.
 const (
-	kubeConfigCurrentContext           = "current-context"
-	kubeConfigContexts                 = "contexts"
-	kubeConfigClusters                 = "clusters"
-	kubeConfigUsers                    = "users"
-	kubeConfigContext                  = "context"
 	kubeConfigCluster                  = "cluster"
 	kubeConfigUser                     = "user"
 	kubeConfigName                     = "name"
@@ -65,7 +54,6 @@ const (
 	kubeConfigArgs                     = "args"
 	kubeConfigEnv                      = "env"
 	kubeConfigValue                    = "value"
-	kubeConfigStatus                   = "status"
 	kubeConfigConfig                   = "config"
 	kubeConfigIDToken                  = "id-token"
 	kubeConfigAccessToken              = "access-token"
