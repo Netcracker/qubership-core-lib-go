@@ -16,6 +16,8 @@ go get github.com/netcracker/qubership-core-lib-go/v3
 | --- | --- | --- |
 | `security.m2m.kubernetes.enabled` | false | Enable k8s tokens authentication |
 | `security.m2m.kubernetes.url-cache.internal-gateway-hostname` | internal-gateway-service | Hostname of the internal-gateway |
+| `dbaas.agent` | http://dbaas-agent:8080 | Address of the dbaas-agent used as fallback by `NewDbaasRestClient()` |
+| `maas.agent.url` | http://maas-agent:8080 | Address of the maas-agent used as fallback by `NewMaasRestClient()` |
 
 ## Usage
 

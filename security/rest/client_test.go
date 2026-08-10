@@ -9,6 +9,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"strings"
 	"sync"
 	"testing"
@@ -19,12 +20,18 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/knadh/koanf/providers/confmap"
 	"github.com/netcracker/qubership-core-lib-go/v3/configloader"
+	"github.com/netcracker/qubership-core-lib-go/v3/security"
 	"github.com/netcracker/qubership-core-lib-go/v3/security/tokenverifier"
+	"github.com/netcracker/qubership-core-lib-go/v3/serviceloader"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 func init() {
+	initTestConfig()
+}
+
+func initTestConfig() {
 	configloader.Init(&configloader.PropertySource{
 		Provider: configloader.AsPropertyProvider(confmap.Provider(map[string]interface{}{
 			"security.m2m.kubernetes.enabled": true,
@@ -51,8 +58,8 @@ func TestM2MRestClient_DoRequest_FirstCallSuccess(t *testing.T) {
 	require.NoError(t, err)
 
 	issued := time.Now()
-    now := issued.Unix()
-    exp := issued.Add(time.Hour).Unix()
+	now := issued.Unix()
+	exp := issued.Add(time.Hour).Unix()
 	claims := jwt.MapClaims{
 		"aud": []string{"test"},
 		"exp": exp,
@@ -677,4 +684,103 @@ func TestM2MRestClient_DoRequest_FallbackRebasesUrl(t *testing.T) {
 		assert.Equal(t, http.StatusOK, resp.StatusCode)
 		resp.Body.Close()
 	})
+}
+
+func TestM2MRestClient_DoRequest_RebasesUrlWhenK8sM2mDisabled(t *testing.T) {
+	agentCalls := 0
+	agentServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		agentCalls++
+		assert.Equal(t, "Bearer fallback-token", r.Header.Get("Authorization"))
+		assert.Equal(t, "/api/v1/resource", r.URL.Path)
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer agentServer.Close()
+
+	originalCalls := 0
+	originalServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		originalCalls++
+		w.WriteHeader(http.StatusUnauthorized)
+	}))
+	defer originalServer.Close()
+
+	client := &M2MRestClient{
+		client:                  agentServer.Client(),
+		urlCache:                newUrlCache(),
+		k8sAuthHeader:           mockAuthHeaderFunc("Bearer new-token", nil),
+		fallbackAuthHeader:      mockAuthHeaderFunc("Bearer fallback-token", nil),
+		fallBackBaseUrl:         agentServer.URL,
+		internalGatewayHostname: "internal-gateway-service",
+		k8sM2mEnabled:           false,
+	}
+
+	resp, err := client.DoRequest(context.Background(), "GET", originalServer.URL+"/api/v1/resource", nil, nil)
+	require.NoError(t, err)
+	defer resp.Body.Close()
+
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+	assert.Equal(t, 1, agentCalls, "request must be rebased onto the agent")
+	assert.Equal(t, 0, originalCalls, "directly addressed service must not be contacted")
+}
+
+func TestNewM2MRestClient_K8sM2mDisabledWhenEnvNotSet(t *testing.T) {
+	os.Unsetenv("KUBERNETES_M2M_ENABLED")
+
+	m2mClient := newM2MRestClient(mockAuthHeaderFunc("Bearer new", nil), mockAuthHeaderFunc("Bearer fallback", nil), DefaultDbaasAgentUrl)
+
+	assert.False(t, m2mClient.k8sM2mEnabled)
+}
+
+// initConfigWith re-initializes configloader with the given properties and restores the default test configuration afterwards
+func initConfigWith(t *testing.T, properties map[string]any) {
+	t.Helper()
+	configloader.Init(&configloader.PropertySource{
+		Provider: configloader.AsPropertyProvider(confmap.Provider(properties, ".")),
+	})
+	t.Cleanup(initTestConfig)
+}
+
+func TestNewDbaasRestClient_AgentUrlFromProperty(t *testing.T) {
+	serviceloader.Register(1, &security.DummyToken{})
+	initConfigWith(t, map[string]any{
+		"security.m2m.kubernetes.enabled": true,
+		DbaasAgentUrlProperty:             "http://custom-dbaas-agent:8081",
+	})
+
+	m2mClient := NewDbaasRestClient()
+
+	assert.Equal(t, "http://custom-dbaas-agent:8081", m2mClient.fallBackBaseUrl)
+}
+
+func TestNewDbaasRestClient_AgentUrlDefaultWhenPropertyNotFound(t *testing.T) {
+	serviceloader.Register(1, &security.DummyToken{})
+	initConfigWith(t, map[string]any{
+		"security.m2m.kubernetes.enabled": true,
+	})
+
+	m2mClient := NewDbaasRestClient()
+
+	assert.Equal(t, DefaultDbaasAgentUrl, m2mClient.fallBackBaseUrl)
+}
+
+func TestNewMaasRestClient_AgentUrlFromProperty(t *testing.T) {
+	serviceloader.Register(1, &security.DummyToken{})
+	initConfigWith(t, map[string]any{
+		"security.m2m.kubernetes.enabled": true,
+		MaasAgentUrlProperty:              "http://custom-maas-agent:8082",
+	})
+
+	m2mClient := NewMaasRestClient()
+
+	assert.Equal(t, "http://custom-maas-agent:8082", m2mClient.fallBackBaseUrl)
+}
+
+func TestNewMaasRestClient_AgentUrlDefaultWhenPropertyNotFound(t *testing.T) {
+	serviceloader.Register(1, &security.DummyToken{})
+	initConfigWith(t, map[string]any{
+		"security.m2m.kubernetes.enabled": true,
+	})
+
+	m2mClient := NewMaasRestClient()
+
+	assert.Equal(t, DefaultMaasAgentUrl, m2mClient.fallBackBaseUrl)
 }

@@ -4,7 +4,7 @@
 # Uses generic-go-build.yaml for the actual build process.
 #
 # Triggers:
-#   - Push to main branch
+#   - Push to main or an lts/** branch
 #   - Pull requests
 #
 # See generic-go-build.yaml for full documentation on build features and required secrets/vars.
@@ -20,6 +20,7 @@ on:
   push:
     branches:
       - main
+      - 'lts/**'
   pull_request:
     types: [opened, synchronize, reopened]
 

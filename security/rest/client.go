@@ -20,11 +20,16 @@ import (
 	"github.com/netcracker/qubership-core-lib-go/v3/logging"
 )
 
+const (
+	DbaasAgentUrlProperty = "dbaas.agent"
+	MaasAgentUrlProperty  = "maas.agent.url"
+)
+
 var (
 	logger logging.Logger
 
-	DefaultDbaasAgentUrl string = "http://dbaas-agent:8080"
-	DefaultMaasAgentUrl  string = "http://maas-agent:8080"
+	DefaultDbaasAgentUrl = "http://dbaas-agent:8080"
+	DefaultMaasAgentUrl  = "http://maas-agent:8080"
 )
 
 func init() {
@@ -38,12 +43,14 @@ func NewM2MRestClient() *M2MRestClient {
 
 // NewDbaasRestClient returns a *M2MRestClient for making requests to dbaas using kubernetes token with dbaas audience. If token is not available or the current dbaas version doesn't support kubernetes tokens then it falls back to old approach making request through dbaas-agent
 func NewDbaasRestClient() *M2MRestClient {
-	return newM2MRestClient(k8sAuthHeaderFunc(tokensource.AudienceDBaaS), keycloakAuthHeaderFunc(), DefaultDbaasAgentUrl)
+	dbaasAgentUrl := configloader.GetOrDefaultString(DbaasAgentUrlProperty, DefaultDbaasAgentUrl)
+	return newM2MRestClient(k8sAuthHeaderFunc(tokensource.AudienceDBaaS), keycloakAuthHeaderFunc(), dbaasAgentUrl)
 }
 
 // NewMaasRestClient returns a *M2MRestClient for making requests to maas using kubernetes token with maas audience. If token is not available or the current maas version doesn't support kubernetes tokens then it falls back to old approach making request through maas-agent
 func NewMaasRestClient() *M2MRestClient {
-	return newM2MRestClient(k8sAuthHeaderFunc(tokensource.AudienceMaaS), keycloakAuthHeaderFunc(), DefaultMaasAgentUrl)
+	maasAgentUrl := configloader.GetOrDefaultString(MaasAgentUrlProperty, DefaultMaasAgentUrl)
+	return newM2MRestClient(k8sAuthHeaderFunc(tokensource.AudienceMaaS), keycloakAuthHeaderFunc(), maasAgentUrl)
 }
 
 type authHeaderFunc func(ctx context.Context) (string, error)
@@ -115,7 +122,7 @@ func (m *M2MRestClient) DoRequest(ctx context.Context, httpMethod, url string, h
 func (m *M2MRestClient) doRequestFallback(ctx context.Context, cacheKey string, requestProducer *httpRequestProducer, reason *fallbackReason) (*http.Response, error) {
 	logger.Debugf("fallback: trying to send %s request to %s using fallback authentication method", requestProducer.httpMethod, requestProducer.url)
 
-	if m.k8sM2mEnabled && m.fallBackBaseUrl != "" {
+	if m.fallBackBaseUrl != "" {
 		rebasedUrl, err := rebaseUrl(requestProducer.url, m.fallBackBaseUrl)
 		if err != nil {
 			return nil, fmt.Errorf("failed to rebase url %q to fallback base url %q: %w", requestProducer.url, m.fallBackBaseUrl, err)
