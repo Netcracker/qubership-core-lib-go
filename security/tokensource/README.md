@@ -34,7 +34,7 @@ go get github.com/netcracker/qubership-core-lib-go/v3
 
 ### Local development (kubeconfig TokenRequest)
 
-When env `PROFILE=dev`, call `localdev.Bootstrap()` after `configloader.Init` (or use `git.netcracker.com/.../security/v3/localdev.Bootstrap()`). Required env:
+When env `PROFILE=dev`, `DefaultTokenFileProvider` delegates to kubeconfig TokenRequest automatically (no separate bootstrap call). Required env:
 
 | Env | Purpose |
 |---|---|

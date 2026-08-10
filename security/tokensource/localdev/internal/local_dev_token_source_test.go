@@ -1,7 +1,6 @@
 package internal
 
 import (
-	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -9,38 +8,11 @@ import (
 	"time"
 
 	"github.com/netcracker/qubership-core-lib-go/v3/configloader"
-	"github.com/netcracker/qubership-core-lib-go/v3/security/tokensource"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-type stubTokenSource struct {
-	audienceToken string
-	saToken       string
-}
-
-func (s *stubTokenSource) GetAudienceToken(_ context.Context, _ tokensource.TokenAudience) (string, error) {
-	return s.audienceToken, nil
-}
-
-func (s *stubTokenSource) GetServiceAccountToken(_ context.Context) (string, error) {
-	return s.saToken, nil
-}
-
-func TestLocalDevTokenSourceDelegatesWhenDisabled(t *testing.T) {
-	t.Setenv(ProfileEnv, "")
-
-	source := &LocalDevTokenSource{
-		fallback: &stubTokenSource{audienceToken: "file-token"},
-		cache:    make(map[string]cachedAudienceToken),
-	}
-	token, err := source.GetAudienceToken(context.Background(), tokensource.AudienceNetcracker)
-	require.NoError(t, err)
-	assert.Equal(t, "file-token", token)
-}
-
-func TestLocalDevTokenSourceMintsAndCachesWhenEnabled(t *testing.T) {
-	t.Setenv(ProfileEnv, "dev")
+func TestLocalDevTokenSourceMintsAndCaches(t *testing.T) {
 	t.Setenv("MICROSERVICE_NAME", "my-sa")
 	t.Setenv(NamespaceEnv, "my-ns")
 	configloader.Init(configloader.EnvPropertySource())
@@ -59,8 +31,7 @@ func TestLocalDevTokenSourceMintsAndCachesWhenEnabled(t *testing.T) {
 	defer server.Close()
 
 	source := &LocalDevTokenSource{
-		fallback: &stubTokenSource{},
-		cache:    make(map[string]cachedAudienceToken),
+		cache: make(map[string]cachedAudienceToken),
 		creds: &KubeConfigCredentials{
 			ServerURL: server.URL,
 			UserToken: "kube-user",
@@ -71,32 +42,29 @@ func TestLocalDevTokenSourceMintsAndCachesWhenEnabled(t *testing.T) {
 		}),
 	}
 
-	token, err := source.GetAudienceToken(context.Background(), tokensource.AudienceNetcracker)
+	token, err := source.GetToken("netcracker")
 	require.NoError(t, err)
 	assert.Equal(t, "minted-token", token)
 
-	token, err = source.GetAudienceToken(context.Background(), tokensource.AudienceNetcracker)
+	token, err = source.GetToken("netcracker")
 	require.NoError(t, err)
 	assert.Equal(t, "minted-token", token)
 	assert.Equal(t, 1, calls)
 }
 
 func TestLocalDevTokenSourceReturnsKubeUserTokenForSA(t *testing.T) {
-	t.Setenv(ProfileEnv, "dev")
 	source := &LocalDevTokenSource{
-		fallback: &stubTokenSource{saToken: "file-sa"},
 		creds: &KubeConfigCredentials{
 			ServerURL: "https://api.example",
 			UserToken: "kube-user",
 		},
 	}
-	token, err := source.GetServiceAccountToken(context.Background())
+	token, err := source.GetServiceAccountToken()
 	require.NoError(t, err)
 	assert.Equal(t, "kube-user", token)
 }
 
 func TestLocalDevTokenSourceLoadsFromKubeconfig(t *testing.T) {
-	t.Setenv(ProfileEnv, "dev")
 	t.Setenv("MICROSERVICE_NAME", "my-sa")
 	t.Setenv(NamespaceEnv, "my-ns")
 
@@ -112,25 +80,20 @@ func TestLocalDevTokenSourceLoadsFromKubeconfig(t *testing.T) {
 	defer ResetCache()
 
 	source := &LocalDevTokenSource{
-		fallback: &stubTokenSource{},
-		cache:    make(map[string]cachedAudienceToken),
+		cache: make(map[string]cachedAudienceToken),
 	}
 
-	token, err := source.GetServiceAccountToken(context.Background())
+	token, err := source.GetServiceAccountToken()
 	require.NoError(t, err)
 	assert.Equal(t, "kube-user-token", token)
 
-	audienceToken, err := source.GetAudienceToken(context.Background(), tokensource.AudienceNetcracker)
+	audienceToken, err := source.GetToken("netcracker")
 	require.NoError(t, err)
 	assert.Equal(t, "minted", audienceToken)
 }
 
-func TestLocalDevTokenSourceDelegatesServiceAccountWhenDisabled(t *testing.T) {
-	t.Setenv(ProfileEnv, "")
-	source := &LocalDevTokenSource{
-		fallback: &stubTokenSource{saToken: "file-sa"},
-	}
-	token, err := source.GetServiceAccountToken(context.Background())
-	require.NoError(t, err)
-	assert.Equal(t, "file-sa", token)
+func TestAudienceTokenRejectsEmptyAudience(t *testing.T) {
+	_, err := AudienceToken("")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "audience is empty")
 }
