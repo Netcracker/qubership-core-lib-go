@@ -22,7 +22,6 @@ const (
 	httpIdleConnTimeout       = 90 * time.Second
 	httpTLSHandshakeTimeout   = 10 * time.Second
 	httpExpectContinueTimeout = 1 * time.Second
-	kubeConfigExecTimeout     = 30 * time.Second
 	oidcExpirySkew            = 60 * time.Second
 	tokenCacheExpirySkew      = 5 * time.Minute
 
@@ -50,10 +49,6 @@ const (
 	kubeConfigInsecureSkipTLSVerify    = "insecure-skip-tls-verify"
 	kubeConfigAuthProvider             = "auth-provider"
 	kubeConfigExec                     = "exec"
-	kubeConfigCommand                  = "command"
-	kubeConfigArgs                     = "args"
-	kubeConfigEnv                      = "env"
-	kubeConfigValue                    = "value"
 	kubeConfigConfig                   = "config"
 	kubeConfigIDToken                  = "id-token"
 	kubeConfigAccessToken              = "access-token"

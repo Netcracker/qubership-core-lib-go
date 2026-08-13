@@ -3,7 +3,6 @@ package internal
 import (
 	"os"
 	"path/filepath"
-	"runtime"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -133,29 +132,34 @@ func TestResolveKubeConfigPathFromEnvList(t *testing.T) {
 	assert.Equal(t, firstPath, path)
 }
 
-func TestRunExecCredential(t *testing.T) {
-	dir := t.TempDir()
-	jsonPath := filepath.Join(dir, "token.json")
-	require.NoError(t, os.WriteFile(jsonPath, []byte(`{"status":{"token":"exec-token"}}`), 0o600))
+func TestLoadKubeConfigRejectsExecAuthentication(t *testing.T) {
+	path := writeKubeconfigFile(t, `apiVersion: v1
+kind: Config
+current-context: test
+contexts:
+- context:
+    cluster: test
+    user: test
+  name: test
+clusters:
+- cluster:
+    server: https://api.example
+  name: test
+users:
+- name: test
+  user:
+    exec:
+      command: kubectl
+      args:
+        - oidc-login
+        - get-token
+`)
+	t.Setenv("KUBECONFIG", path)
 
-	var command string
-	var args []any
-	if runtime.GOOS == "windows" {
-		command = "cmd"
-		args = []any{"/c", "type", jsonPath}
-	} else {
-		command = "cat"
-		args = []any{jsonPath}
-	}
-
-	execCfg := map[string]any{
-		kubeConfigCommand: command,
-		kubeConfigArgs:    args,
-	}
-
-	token, err := runExecCredential(execCfg)
-	require.NoError(t, err)
-	assert.Equal(t, "exec-token", token)
+	_, err := LoadKubeConfig()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "exec")
+	assert.Contains(t, err.Error(), "not supported")
 }
 
 func TestFindKubeConfigEntryByName(t *testing.T) {

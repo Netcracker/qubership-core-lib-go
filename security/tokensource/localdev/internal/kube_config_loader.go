@@ -1,12 +1,9 @@
 package internal
 
 import (
-	"context"
 	"encoding/base64"
-	"encoding/json"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 
@@ -36,7 +33,8 @@ type namedEntry struct {
 }
 
 // LoadKubeConfig reads the current kubeconfig context and resolves API credentials.
-// Supported user auth: static token, OIDC auth-provider (with refresh), id-token / access-token, exec.
+// Supported user auth: static token, OIDC auth-provider (with refresh), id-token / access-token.
+// Exec auth is not supported.
 func LoadKubeConfig() (*KubeConfigCredentials, error) {
 	path, err := resolveKubeConfigPath()
 	if err != nil {
@@ -162,11 +160,13 @@ func resolveUserToken(user map[string]any) (string, error) {
 	if accessToken := getStringField(user, kubeConfigAccessToken); accessToken != "" {
 		return accessToken, nil
 	}
-	if execCfg, ok := user[kubeConfigExec].(map[string]any); ok {
-		return runExecCredential(execCfg)
+	if _, ok := user[kubeConfigExec]; ok {
+		return "", fmt.Errorf(
+			"kubeconfig exec authentication is not supported for local-dev; use a static user token or OIDC auth-provider (id-token / refresh-token)",
+		)
 	}
 	return "", fmt.Errorf(
-		"kubeconfig user has neither token, OIDC auth-provider, nor exec; local-dev TokenRequest needs kube API credentials",
+		"kubeconfig user has neither token nor OIDC auth-provider; local-dev TokenRequest needs kube API credentials",
 	)
 }
 
@@ -183,83 +183,6 @@ func resolveAuthProviderToken(authProvider map[string]any) (string, error) {
 		return token, nil
 	}
 	return getStringField(config, kubeConfigAccessToken), nil
-}
-
-func runExecCredential(execCfg map[string]any) (string, error) {
-	command, args, err := buildExecCommand(execCfg)
-	if err != nil {
-		return "", err
-	}
-	kubeLogger.Debugf("resolving kubeconfig credentials via exec: %v", args)
-	output, err := executeExecCredential(command, args, execCfg)
-	if err != nil {
-		return "", err
-	}
-	return parseExecCredentialToken(output)
-}
-
-func buildExecCommand(execCfg map[string]any) (string, []string, error) {
-	command := getStringField(execCfg, kubeConfigCommand)
-	if command == "" {
-		return "", nil, fmt.Errorf("kubeconfig exec.command is empty")
-	}
-	args := []string{command}
-	if rawArgs, ok := execCfg[kubeConfigArgs].([]any); ok {
-		for _, arg := range rawArgs {
-			if s, ok := arg.(string); ok {
-				args = append(args, s)
-			}
-		}
-	}
-	return command, args, nil
-}
-
-func executeExecCredential(command string, args []string, execCfg map[string]any) ([]byte, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), kubeConfigExecTimeout)
-	defer cancel()
-	cmd := exec.CommandContext(ctx, args[0], args[1:]...)
-	applyExecEnvironment(cmd, execCfg)
-	output, err := cmd.CombinedOutput()
-	if ctx.Err() == context.DeadlineExceeded {
-		return nil, fmt.Errorf("kubeconfig exec timed out after %s: %s", kubeConfigExecTimeout, command)
-	}
-	if err != nil {
-		return nil, fmt.Errorf("kubeconfig exec failed: %s: %w", string(output), err)
-	}
-	return output, nil
-}
-
-func applyExecEnvironment(cmd *exec.Cmd, execCfg map[string]any) {
-	envVars, ok := execCfg[kubeConfigEnv].([]any)
-	if !ok {
-		return
-	}
-	for _, item := range envVars {
-		envMap, ok := item.(map[string]any)
-		if !ok {
-			continue
-		}
-		name := getStringField(envMap, kubeConfigName)
-		if name == "" {
-			continue
-		}
-		cmd.Env = append(cmd.Env, fmt.Sprintf("%s=%s", name, getStringField(envMap, kubeConfigValue)))
-	}
-}
-
-func parseExecCredentialToken(output []byte) (string, error) {
-	var credential struct {
-		Status struct {
-			Token string `json:"token"`
-		} `json:"status"`
-	}
-	if err := json.Unmarshal(output, &credential); err != nil {
-		return "", fmt.Errorf("kubeconfig exec returned invalid JSON: %w", err)
-	}
-	if credential.Status.Token == "" {
-		return "", fmt.Errorf("kubeconfig exec did not return status.token")
-	}
-	return credential.Status.Token, nil
 }
 
 func findKubeConfigEntryByName(entries []namedEntry, name string) (namedEntry, error) {

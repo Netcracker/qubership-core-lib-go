@@ -45,6 +45,8 @@ When env `PROFILE=dev`, `DefaultTokenFileProvider` delegates to kubeconfig Token
 
 Prod continues to use projected volume token files (`DefaultTokenFileProvider`).
 
+Kubeconfig user auth: static `token` or OIDC `auth-provider` (refresh via `idp-issuer-url`). `exec` auth is not supported.
+
 Inbound K8s JWT validation in local-dev uses OIDC discovery + reachable JWKS on the kube API (`tokenverifier` local-dev path); no projected SA file required.
 
 ## Quick Start
