@@ -1,6 +1,7 @@
 package internal
 
 import (
+	"cmp"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -16,9 +17,12 @@ import (
 
 var oidcLogger = logging.GetLogger("oidc-auth-provider")
 
+// resolveOidcAuthProviderToken refreshes OIDC tokens from kubeconfig auth-provider (Keycloak).
+// Local-dev only — must not be used outside the localdev code path.
+// Uses trust-all TLS to reach corporate IdPs with private CAs; not suitable for production.
 func resolveOidcAuthProviderToken(config map[string]any) (string, error) {
-	client := idpHTTPClient()
-	cached := firstNonBlank(
+	client := newInsecureIdpHTTPClient()
+	cached := cmp.Or(
 		getStringField(config, kubeConfigIDToken),
 		getStringField(config, kubeConfigAccessToken),
 	)
@@ -57,28 +61,24 @@ func resolveOidcAuthProviderToken(config map[string]any) (string, error) {
 	return token, nil
 }
 
-func idpHTTPClient() *http.Client {
-	if IsDevEnabled() {
-		return newInsecureIdpHTTPClient()
-	}
-	return &http.Client{Timeout: httpRequestTimeout}
-}
-
 func discoverTokenEndpoint(client *http.Client, issuerURL string) (string, error) {
 	discoveryURL, err := oidc.GetProviderUrl(issuerURL)
 	if err != nil {
 		return "", fmt.Errorf("oidc discovery URL invalid for %s: %w", issuerURL, err)
 	}
+
 	req, err := http.NewRequest(http.MethodGet, discoveryURL, nil)
 	if err != nil {
 		return "", err
 	}
+
 	req.Header.Set(acceptHeader, applicationJSON)
 	resp, err := client.Do(req)
 	if err != nil {
 		return "", fmt.Errorf("oidc discovery failed for %s: %w", discoveryURL, err)
 	}
 	defer resp.Body.Close()
+
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return "", err
@@ -87,6 +87,7 @@ func discoverTokenEndpoint(client *http.Client, issuerURL string) (string, error
 		return "", fmt.Errorf("oidc discovery failed (HTTP %d) for %s: %s",
 			resp.StatusCode, discoveryURL, truncateResponseBody(body))
 	}
+
 	var doc struct {
 		TokenEndpoint string `json:"token_endpoint"`
 	}
@@ -96,6 +97,7 @@ func discoverTokenEndpoint(client *http.Client, issuerURL string) (string, error
 	if doc.TokenEndpoint == "" {
 		return "", fmt.Errorf("oidc discovery response has no token_endpoint: %s", discoveryURL)
 	}
+
 	return doc.TokenEndpoint, nil
 }
 
@@ -104,13 +106,16 @@ func refreshIdToken(client *http.Client, tokenEndpoint, clientID, clientSecret, 
 	form.Set(oidcFormGrantType, oidcGrantRefreshToken)
 	form.Set(oidcGrantRefreshToken, refreshToken)
 	form.Set(oidcFormClientID, clientID)
+
 	if clientSecret != "" {
 		form.Set(oidcFormClientSecret, clientSecret)
 	}
+
 	req, err := http.NewRequest(http.MethodPost, tokenEndpoint, strings.NewReader(form.Encode()))
 	if err != nil {
 		return "", err
 	}
+
 	req.Header.Set(contentTypeHeader, applicationFormURLEncoded)
 	req.Header.Set(acceptHeader, applicationJSON)
 	resp, err := client.Do(req)
@@ -118,6 +123,7 @@ func refreshIdToken(client *http.Client, tokenEndpoint, clientID, clientSecret, 
 		return "", fmt.Errorf("oidc refresh_token grant failed for %s: %w", tokenEndpoint, err)
 	}
 	defer resp.Body.Close()
+
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return "", err
@@ -126,6 +132,7 @@ func refreshIdToken(client *http.Client, tokenEndpoint, clientID, clientSecret, 
 		return "", fmt.Errorf("oidc refresh_token grant failed (HTTP %d) for %s: %s",
 			resp.StatusCode, tokenEndpoint, truncateResponseBody(body))
 	}
+
 	var tokenResponse struct {
 		IDToken     string `json:"id_token"`
 		AccessToken string `json:"access_token"`
@@ -133,10 +140,11 @@ func refreshIdToken(client *http.Client, tokenEndpoint, clientID, clientSecret, 
 	if err = json.Unmarshal(body, &tokenResponse); err != nil {
 		return "", err
 	}
-	token := firstNonBlank(tokenResponse.IDToken, tokenResponse.AccessToken)
+	token := cmp.Or(strings.TrimSpace(tokenResponse.IDToken), strings.TrimSpace(tokenResponse.AccessToken))
 	if token == "" {
 		return "", fmt.Errorf("oidc token response has neither id_token nor access_token: %s", tokenEndpoint)
 	}
+
 	return token, nil
 }
 
@@ -145,15 +153,19 @@ func isJwtExpired(jwt string) bool {
 	if len(parts) < 2 {
 		return true
 	}
-	payload, err := base64.RawURLEncoding.DecodeString(padBase64Url(parts[1]))
+
+	payload, err := base64.RawURLEncoding.DecodeString(parts[1])
 	if err != nil {
 		return true
 	}
+
 	var claims struct {
 		Exp int64 `json:"exp"`
 	}
+
 	if err = json.Unmarshal(payload, &claims); err != nil || claims.Exp == 0 {
 		return true
 	}
+
 	return time.Now().Add(oidcExpirySkew).After(time.Unix(claims.Exp, 0))
 }

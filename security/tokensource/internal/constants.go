@@ -4,6 +4,7 @@ import "time"
 
 const (
 	applicationJSON           = "application/json"
+	applicationJWKSetJSON     = "application/jwk-set+json"
 	applicationFormURLEncoded = "application/x-www-form-urlencoded"
 	authorizationHeader       = "Authorization"
 	contentTypeHeader         = "Content-Type"
@@ -15,7 +16,6 @@ const (
 
 	tokenRequestExpirationSeconds = 28800 // 8 hours
 	maxErrorBodyLength            = 500
-	jwtBase64PadLength            = 4
 
 	httpRequestTimeout        = 30 * time.Second
 	httpMaxIdleConns          = 100
@@ -23,7 +23,6 @@ const (
 	httpTLSHandshakeTimeout   = 10 * time.Second
 	httpExpectContinueTimeout = 1 * time.Second
 	oidcExpirySkew            = 60 * time.Second
-	tokenCacheExpirySkew      = 5 * time.Minute
 
 	tokenRequestAPIVersion            = "authentication.k8s.io/v1"
 	tokenRequestKind                  = "TokenRequest"

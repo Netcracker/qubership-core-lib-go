@@ -3,35 +3,35 @@ package localdev
 import (
 	"net/http"
 
-	"github.com/netcracker/qubership-core-lib-go/v3/security/tokensource/localdev/internal"
+	"github.com/netcracker/qubership-core-lib-go/v3/security/tokensource/internal"
 )
 
-// UserToken returns the kubeconfig user token for Kubernetes API calls.
-func UserToken() (string, error) {
-	return internal.UserToken()
+// KubernetesOidc is the local-dev Kubernetes OIDC helper used by security consumers
+// (JWKS URL rewrite, issuer discovery). Analogous to Java LocalDevKubernetesOidc.
+type KubernetesOidc struct {
+	config *internal.KubeLocalDevConfig
 }
 
-// JwksURL returns the reachable JWKS URL on the kube API server.
-func JwksURL() (string, error) {
-	return internal.JwksURL()
+func NewKubernetesOidc() *KubernetesOidc {
+	return &KubernetesOidc{config: internal.NewKubeLocalDevConfig()}
 }
 
-// HTTPClient returns an HTTP client configured with kubeconfig TLS (cached).
-func HTTPClient() (*http.Client, error) {
-	return internal.HTTPClient()
+func (o *KubernetesOidc) UserToken() (string, error) {
+	return o.config.UserToken()
 }
 
-// IsPublicOidcEndpoint reports whether the URL is served without authentication on the kube API.
-func IsPublicOidcEndpoint(rawURL string) bool {
-	return internal.IsPublicOidcEndpoint(rawURL)
+func (o *KubernetesOidc) JwksURL() (string, error) {
+	return o.config.JwksURL()
 }
 
-// ResolveIssuerClaimFromDiscovery reads issuer from kube API OIDC discovery (no projected SA token required).
-func ResolveIssuerClaimFromDiscovery() (string, error) {
-	return internal.ResolveIssuerClaimFromDiscovery()
+func (o *KubernetesOidc) HTTPClient() (*http.Client, error) {
+	return o.config.HTTPClient()
 }
 
-// ResetCache clears cached kubeconfig credentials (tests).
-func ResetCache() {
-	internal.ResetCache()
+func (o *KubernetesOidc) IsPublicOidcEndpoint(rawURL string) bool {
+	return o.config.IsPublicOidcEndpoint(rawURL)
+}
+
+func (o *KubernetesOidc) ResolveIssuerClaimFromDiscovery() (string, error) {
+	return o.config.ResolveIssuerClaimFromDiscovery()
 }

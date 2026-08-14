@@ -35,7 +35,7 @@ func TestLocalDevTransportSkipsBearerOnPublicJwks(t *testing.T) {
 
 	transport := newLocalDevTransport(func() (string, error) {
 		return "kube-user", nil
-	}, http.DefaultTransport)
+	}, http.DefaultTransport, localdev.NewKubernetesOidc())
 
 	req, err := http.NewRequest(http.MethodGet, server.URL+localDevJwksPath, nil)
 	require.NoError(t, err)
@@ -55,7 +55,7 @@ func TestLocalDevTransportAddsBearerOnProtectedEndpoint(t *testing.T) {
 
 	transport := newLocalDevTransport(func() (string, error) {
 		return "kube-user", nil
-	}, http.DefaultTransport)
+	}, http.DefaultTransport, localdev.NewKubernetesOidc())
 
 	req, err := http.NewRequest(http.MethodGet, server.URL+"/api/v1/namespaces/default", nil)
 	require.NoError(t, err)
@@ -68,7 +68,7 @@ func TestLocalDevTransportAddsBearerOnProtectedEndpoint(t *testing.T) {
 func TestLocalDevTransportFailsWhenTokenMissing(t *testing.T) {
 	transport := newLocalDevTransport(func() (string, error) {
 		return "", assert.AnError
-	}, http.DefaultTransport)
+	}, http.DefaultTransport, localdev.NewKubernetesOidc())
 
 	req, err := http.NewRequest(http.MethodGet, "https://api.example/api/v1/pods", nil)
 	require.NoError(t, err)
@@ -103,8 +103,6 @@ func TestLocalDevKubernetesVerifierWithoutServiceAccountFile(t *testing.T) {
 
 	kubeconfigPath := writeLocalDevTestKubeconfig(t, server.URL)
 	t.Setenv("KUBECONFIG", kubeconfigPath)
-	localdev.ResetCache()
-	defer localdev.ResetCache()
 
 	ctx := context.Background()
 	verifier, err := NewKubernetesVerifierOverride(ctx, tokensource.AudienceNetcracker, Override{

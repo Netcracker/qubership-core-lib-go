@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 var (
@@ -17,15 +18,16 @@ var (
 )
 
 func beforeEach(t *testing.T) {
+	t.Setenv("PROFILE", "")
 	var err error
 
 	saTokenStorage, err = newServiceAccountTokenStorage(t.TempDir())
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	DefaultServiceAccountDir = saTokenStorage.serviceAccountTokenDir
 	logger.Infof("service account token dir is %s", saTokenStorage.serviceAccountTokenDir)
 
 	audTokensStorage, err = newAudienceTokensStorage(t.TempDir())
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	DefaultAudienceTokensDir = audTokensStorage.audienceTokensDir
 	logger.Infof("audience tokens dir is %s", audTokensStorage.audienceTokensDir)
 }

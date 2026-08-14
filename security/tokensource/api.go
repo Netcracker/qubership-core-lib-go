@@ -7,7 +7,7 @@ import (
 )
 
 func init() {
-	serviceloader.Register(0, &DefaultTokenFileProvider{})
+	serviceloader.Register(0, &selectableTokenSource{})
 }
 
 type TokenSource interface {

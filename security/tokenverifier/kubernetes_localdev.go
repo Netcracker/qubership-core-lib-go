@@ -12,23 +12,25 @@ import (
 func newLocalDevKubernetesVerifier(ctx context.Context, audience string, override Override, validations ...Validation) (Verifier, error) {
 	validations = append(validations, ValidateIssuedAt)
 
-	trustedIssuer, err := localdev.ResolveIssuerClaimFromDiscovery()
+	oidc := localdev.NewKubernetesOidc()
+	trustedIssuer, err := oidc.ResolveIssuerClaimFromDiscovery()
 	if err != nil {
 		return nil, fmt.Errorf("failed to resolve Kubernetes issuer in local-dev: %w", err)
 	}
-	jwksURL, err := localdev.JwksURL()
+
+	jwksURL, err := oidc.JwksURL()
 	if err != nil {
 		return nil, fmt.Errorf("failed to resolve JWKS URL in local-dev: %w", err)
 	}
 
-	baseTransport, err := localDevBaseTransport()
+	baseTransport, err := localDevBaseTransport(oidc)
 	if err != nil {
 		return nil, err
 	}
 	tokenFn := func() (string, error) {
-		return localdev.UserToken()
+		return oidc.UserToken()
 	}
-	httpClient := CreateHttpClient(newLocalDevTransport(tokenFn, baseTransport))
+	httpClient := CreateHttpClient(newLocalDevTransport(tokenFn, baseTransport, oidc))
 
 	refreshInterval := defaultRefreshInterval
 	if override.RefreshInterval > 0 {
@@ -55,8 +57,8 @@ func newLocalDevKubernetesVerifier(ctx context.Context, audience string, overrid
 	)
 }
 
-func localDevBaseTransport() (http.RoundTripper, error) {
-	client, err := localdev.HTTPClient()
+func localDevBaseTransport(oidc *localdev.KubernetesOidc) (http.RoundTripper, error) {
+	client, err := oidc.HTTPClient()
 	if err != nil {
 		return nil, fmt.Errorf("failed to create local-dev HTTP client from kubeconfig: %w", err)
 	}

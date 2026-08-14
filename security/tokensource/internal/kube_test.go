@@ -10,16 +10,11 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestIsKubernetesIssuer(t *testing.T) {
-	assert.True(t, IsKubernetesIssuer("https://kubernetes.default.svc"))
-	assert.True(t, IsKubernetesIssuer("https://kubernetes.default.svc.cluster.local"))
-	assert.False(t, IsKubernetesIssuer("https://accounts.google.com"))
-}
-
 func TestIsPublicOidcEndpointEdgeCases(t *testing.T) {
-	assert.False(t, IsPublicOidcEndpoint(""))
-	assert.False(t, IsPublicOidcEndpoint("not-a-url"))
-	assert.True(t, IsPublicOidcEndpoint("https://api.example/openid/v1/jwks/extra"))
+	cfg := NewKubeLocalDevConfig()
+	assert.False(t, cfg.IsPublicOidcEndpoint(""))
+	assert.False(t, cfg.IsPublicOidcEndpoint("not-a-url"))
+	assert.True(t, cfg.IsPublicOidcEndpoint("https://api.example/openid/v1/jwks/extra"))
 }
 
 func TestKubernetesOIDCHelpers(t *testing.T) {
@@ -30,22 +25,21 @@ func TestKubernetesOIDCHelpers(t *testing.T) {
 
 	path := writeTestKubeconfig(t, server.URL)
 	t.Setenv("KUBECONFIG", path)
-	ResetCache()
-	defer ResetCache()
 
-	apiURL, err := APIServerURL()
+	cfg := NewKubeLocalDevConfig()
+	apiURL, err := cfg.APIServerURL()
 	require.NoError(t, err)
 	assert.Equal(t, server.URL, apiURL)
 
-	userToken, err := UserToken()
+	userToken, err := cfg.UserToken()
 	require.NoError(t, err)
 	assert.Equal(t, "kube-user-token", userToken)
 
-	jwksURL, err := JwksURL()
+	jwksURL, err := cfg.JwksURL()
 	require.NoError(t, err)
 	assert.Equal(t, server.URL+jwksPath, jwksURL)
 
-	client, err := HTTPClient()
+	client, err := cfg.HTTPClient()
 	require.NoError(t, err)
 	require.NotNil(t, client)
 }
@@ -60,12 +54,10 @@ func TestResolveIssuerClaimFromDiscovery(t *testing.T) {
 	}))
 	defer server.Close()
 
-	kubeconfigPath := writeTestKubeconfig(t, server.URL)
-	t.Setenv("KUBECONFIG", kubeconfigPath)
-	ResetCache()
-	defer ResetCache()
+	t.Setenv("KUBECONFIG", writeTestKubeconfig(t, server.URL))
 
-	issuer, err := ResolveIssuerClaimFromDiscovery()
+	cfg := NewKubeLocalDevConfig()
+	issuer, err := cfg.ResolveIssuerClaimFromDiscovery()
 	require.NoError(t, err)
 	assert.Equal(t, "https://cluster.example", issuer)
 }
@@ -76,12 +68,32 @@ func TestResolveIssuerClaimFromDiscoveryFallback(t *testing.T) {
 	}))
 	defer server.Close()
 
-	kubeconfigPath := writeTestKubeconfig(t, server.URL)
-	t.Setenv("KUBECONFIG", kubeconfigPath)
-	ResetCache()
-	defer ResetCache()
+	t.Setenv("KUBECONFIG", writeTestKubeconfig(t, server.URL))
 
-	issuer, err := ResolveIssuerClaimFromDiscovery()
+	cfg := NewKubeLocalDevConfig()
+	issuer, err := cfg.ResolveIssuerClaimFromDiscovery()
 	require.NoError(t, err)
 	assert.Equal(t, defaultKubernetesIssuer, issuer)
+}
+
+func TestFetchJwks(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != jwksPath {
+			w.WriteHeader(http.StatusNotFound)
+			return
+		}
+		if r.Header.Get("Accept") != applicationJWKSetJSON {
+			w.WriteHeader(http.StatusNotAcceptable)
+			return
+		}
+		_, _ = w.Write([]byte(`{"keys":[{"kty":"RSA","kid":"test"}]}`))
+	}))
+	defer server.Close()
+
+	t.Setenv("KUBECONFIG", writeTestKubeconfig(t, server.URL))
+
+	cfg := NewKubeLocalDevConfig()
+	jwks, err := cfg.FetchJwks()
+	require.NoError(t, err)
+	assert.Contains(t, jwks, `"keys"`)
 }

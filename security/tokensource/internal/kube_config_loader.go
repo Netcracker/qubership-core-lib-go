@@ -55,46 +55,46 @@ func LoadKubeConfig() (*KubeConfigCredentials, error) {
 }
 
 func readAndParseKubeConfig(path string) (kubeConfig, error) {
+	var root kubeConfig
 	data, err := os.ReadFile(path)
 	if err != nil {
-		return kubeConfig{}, fmt.Errorf("kubeconfig not found at %s: %w", path, err)
+		return root, fmt.Errorf("kubeconfig not found at %s: %w", path, err)
 	}
 
-	var root kubeConfig
 	if err = yaml.Unmarshal(data, &root); err != nil {
-		return kubeConfig{}, fmt.Errorf("failed to parse kubeconfig %s: %w", path, err)
+		return root, fmt.Errorf("failed to parse kubeconfig %s: %w", path, err)
 	}
 	if strings.TrimSpace(root.CurrentContext) == "" {
-		return kubeConfig{}, fmt.Errorf("kubeconfig has no current-context: %s", path)
+		return root, fmt.Errorf("kubeconfig has no current-context: %s", path)
 	}
 	return root, nil
 }
 
 func resolveActiveKubeConfigEntries(root kubeConfig, path string) (namedEntry, namedEntry, error) {
+	var clusterEntry, userEntry namedEntry
 	contextEntry, err := findKubeConfigEntryByName(root.Contexts, root.CurrentContext)
 	if err != nil {
-		return namedEntry{}, namedEntry{}, err
+		return clusterEntry, userEntry, err
 	}
 
 	clusterName := getStringField(contextEntry.Context, kubeConfigCluster)
 	userName := getStringField(contextEntry.Context, kubeConfigUser)
 	if clusterName == "" || userName == "" {
-		return namedEntry{}, namedEntry{}, fmt.Errorf(
+		return clusterEntry, userEntry, fmt.Errorf(
 			"context %q must define cluster and user in %s",
 			root.CurrentContext,
 			path,
 		)
 	}
 
-	var clusterEntry, userEntry namedEntry
 	clusterEntry, err = findKubeConfigEntryByName(root.Clusters, clusterName)
 	if err != nil {
-		return namedEntry{}, namedEntry{}, err
+		return clusterEntry, userEntry, err
 	}
 
 	userEntry, err = findKubeConfigEntryByName(root.Users, userName)
 	if err != nil {
-		return namedEntry{}, namedEntry{}, err
+		return clusterEntry, userEntry, err
 	}
 
 	return clusterEntry, userEntry, nil
@@ -127,10 +127,13 @@ func credentialsFromKubeConfigEntries(clusterEntry, userEntry namedEntry) (*Kube
 }
 
 func resolveKubeConfigPath() (string, error) {
-	if kubeConfig := os.Getenv("KUBECONFIG"); kubeConfig != "" {
+	if kubeConfig, isPresent := os.LookupEnv("KUBECONFIG"); isPresent {
 		parts := strings.Split(kubeConfig, string(os.PathListSeparator))
 		first := strings.TrimSpace(parts[0])
 		if first != "" {
+			if len(parts) > 1 {
+				kubeLogger.Warnf("local-dev takes only the first kubeconfig: %s", first)
+			}
 			return first, nil
 		}
 	}
@@ -186,20 +189,21 @@ func resolveAuthProviderToken(authProvider map[string]any) (string, error) {
 }
 
 func findKubeConfigEntryByName(entries []namedEntry, name string) (namedEntry, error) {
+	var found namedEntry
 	for _, entry := range entries {
 		if entry.Name == name {
 			return entry, nil
 		}
 	}
-	return namedEntry{}, fmt.Errorf("kubeconfig entry not found: %s", name)
+	return found, fmt.Errorf("kubeconfig entry not found: %s", name)
 }
 
 func decodeOptionalBase64(value string) ([]byte, error) {
-	if strings.TrimSpace(value) == "" {
+	value = strings.Join(strings.Fields(value), "")
+	if value == "" {
 		return nil, nil
 	}
-	clean := strings.ReplaceAll(strings.ReplaceAll(value, "\n", ""), "\r", "")
-	decoded, err := base64.StdEncoding.DecodeString(clean)
+	decoded, err := base64.StdEncoding.DecodeString(value)
 	if err != nil {
 		return nil, fmt.Errorf("invalid certificate-authority-data in kubeconfig: %w", err)
 	}

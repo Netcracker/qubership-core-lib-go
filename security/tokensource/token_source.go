@@ -11,7 +11,6 @@ import (
 
 	"github.com/fsnotify/fsnotify"
 	"github.com/netcracker/qubership-core-lib-go/v3/logging"
-	"github.com/netcracker/qubership-core-lib-go/v3/security/tokensource/localdev"
 	"github.com/netcracker/qubership-core-lib-go/v3/utils"
 )
 
@@ -50,9 +49,6 @@ type DefaultTokenFileProvider struct {
 
 // GetAudienceToken gets token by audience. Do not store the token. Always call GetAudienceToken again to get a fresh token. Default tokens directory can be overridden using global variable DefaultAudienceTokensDir
 func (dtfp *DefaultTokenFileProvider) GetAudienceToken(ctx context.Context, audience TokenAudience) (string, error) {
-	if localdev.IsEnabled() {
-		return localdev.GetAudienceToken(string(audience))
-	}
 	if audience == "" {
 		return "", fmt.Errorf("audience is empty")
 	}
@@ -76,9 +72,6 @@ func (dtfp *DefaultTokenFileProvider) GetAudienceToken(ctx context.Context, audi
 
 // GetServiceAccountToken gets the default service account token located at /var/run/secrets/kubernetes.io/serviceaccount. Do not store the token. Always call GetServiceAccountToken again to get a fresh token. Default service account token directory can be overridden using global variable DefaultServiceAccountDir
 func (dtfp *DefaultTokenFileProvider) GetServiceAccountToken(ctx context.Context) (string, error) {
-	if localdev.IsEnabled() {
-		return localdev.GetServiceAccountToken()
-	}
 	serviceAccountTokenWatcher.CompareAndSwap(nil, utils.NewLazy(func() (*tokenWatcher, error) {
 		return newTokenWatcher(ctx, DefaultServiceAccountDir, dtfp.refreshServiceAccountTokenCache, dtfp.onCloseServiceAccountTokenWatcher)
 	}))

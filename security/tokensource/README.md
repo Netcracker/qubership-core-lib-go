@@ -34,7 +34,7 @@ go get github.com/netcracker/qubership-core-lib-go/v3
 
 ### Local development (kubeconfig TokenRequest)
 
-When env `PROFILE=dev`, `DefaultTokenFileProvider` delegates to kubeconfig TokenRequest automatically (no separate bootstrap call). Required env:
+When env `PROFILE=dev`, `selectableTokenSource` (registered in `init`, like Java `SelectableTokenSource`) chooses kubeconfig TokenRequest instead of `DefaultTokenFileProvider`. Required env:
 
 | Env | Purpose |
 |---|---|

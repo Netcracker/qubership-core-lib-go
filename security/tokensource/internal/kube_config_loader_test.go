@@ -181,6 +181,10 @@ func TestDecodeOptionalBase64(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, []byte("hello"), decoded)
 
+	decoded, err = decodeOptionalBase64("aGVs\nbG8=")
+	require.NoError(t, err)
+	assert.Equal(t, []byte("hello"), decoded)
+
 	_, err = decodeOptionalBase64("!!!")
 	assert.Error(t, err)
 }

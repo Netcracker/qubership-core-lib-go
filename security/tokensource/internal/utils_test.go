@@ -37,12 +37,6 @@ func TestGetBoolField(t *testing.T) {
 	assert.False(t, present)
 }
 
-func TestFirstNonBlank(t *testing.T) {
-	assert.Equal(t, "first", firstNonBlank("first", "second"))
-	assert.Equal(t, "second", firstNonBlank("", "second"))
-	assert.Equal(t, "second", firstNonBlank("  ", "second"))
-}
-
 func TestTruncateResponseBody(t *testing.T) {
 	short := []byte("short body")
 	assert.Equal(t, "short body", truncateResponseBody(short))
@@ -51,9 +45,4 @@ func TestTruncateResponseBody(t *testing.T) {
 	truncated := truncateResponseBody(long)
 	assert.True(t, strings.HasSuffix(truncated, "..."))
 	assert.LessOrEqual(t, len(truncated), maxErrorBodyLength+3)
-}
-
-func TestPadBase64Url(t *testing.T) {
-	assert.Equal(t, "abcd", padBase64Url("abcd"))
-	assert.Equal(t, "abc=", padBase64Url("abc"))
 }

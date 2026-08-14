@@ -8,6 +8,7 @@ import (
 	"crypto/x509/pkix"
 	"encoding/pem"
 	"math/big"
+	"net/http"
 	"testing"
 	"time"
 
@@ -58,6 +59,9 @@ func TestNewHTTPClientVariants(t *testing.T) {
 	client := newHTTPClient(creds)
 	require.NotNil(t, client)
 	assert.Equal(t, httpRequestTimeout, client.Timeout)
+	transport, ok := client.Transport.(*http.Transport)
+	require.True(t, ok)
+	assert.False(t, transport.ForceAttemptHTTP2)
 
 	insecureClient := newInsecureIdpHTTPClient()
 	require.NotNil(t, insecureClient)
