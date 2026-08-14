@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/netcracker/qubership-core-lib-go/v3/security/oidc"
-	"github.com/netcracker/qubership-core-lib-go/v3/security/tokensource/localdev"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -100,7 +99,6 @@ func TestRefreshIdTokenErrors(t *testing.T) {
 }
 
 func TestResolveOidcAuthProviderTokenUsesCachedNonExpired(t *testing.T) {
-	t.Setenv(localdev.ProfileEnv, "")
 	token := buildTestJWT(time.Now().Add(2 * time.Hour))
 	got, err := resolveOidcAuthProviderToken(map[string]any{
 		kubeConfigIDToken: token,
@@ -110,8 +108,6 @@ func TestResolveOidcAuthProviderTokenUsesCachedNonExpired(t *testing.T) {
 }
 
 func TestResolveOidcAuthProviderTokenRefresh(t *testing.T) {
-	t.Setenv(localdev.ProfileEnv, "dev")
-
 	var tokenCalls int
 	var tokenURL string
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -144,7 +140,6 @@ func TestResolveOidcAuthProviderTokenRefresh(t *testing.T) {
 }
 
 func TestResolveOidcAuthProviderTokenFallbackToCachedOnRefreshFailure(t *testing.T) {
-	t.Setenv(localdev.ProfileEnv, "")
 	expired := buildTestJWT(time.Now().Add(-2 * time.Hour))
 	got, err := resolveOidcAuthProviderToken(map[string]any{
 		kubeConfigIDToken:      expired,
@@ -170,7 +165,6 @@ func TestResolveOidcAuthProviderTokenMissingRefreshFields(t *testing.T) {
 }
 
 func TestIdpHTTPClientWhenLocalDevEnabled(t *testing.T) {
-	t.Setenv(localdev.ProfileEnv, "dev")
 	client := newInsecureIdpHTTPClient()
 	require.NotNil(t, client)
 	transport, ok := client.Transport.(*http.Transport)
