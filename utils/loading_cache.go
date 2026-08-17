@@ -1,11 +1,12 @@
 package utils
 
 import (
+	"context"
 	"sync"
 	"time"
 )
 
-type loaderFunc[K comparable, V any] func(key K) (V, time.Time, error)
+type loaderFunc[K comparable, V any] func(ctx context.Context, key K) (V, time.Time, error)
 
 type cacheEntity[V any] struct {
 	value V
@@ -26,7 +27,7 @@ func NewLoadingCache[K comparable, V any](loader loaderFunc[K, V]) *LoadingCache
 	}
 }
 
-func (c *LoadingCache[K, V]) Get(key K) (V, error) {
+func (c *LoadingCache[K, V]) Get(ctx context.Context, key K) (V, error) {
 	var zero V
 
 	c.mu.RLock()
@@ -42,7 +43,7 @@ func (c *LoadingCache[K, V]) Get(key K) (V, error) {
 		return ent.value, nil
 	}
 
-	value, exp, err := c.loader(key)
+	value, exp, err := c.loader(ctx, key)
 	if err != nil {
 		return zero, err
 	}

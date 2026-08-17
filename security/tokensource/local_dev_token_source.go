@@ -22,12 +22,13 @@ const tokenCacheExpirySkew = 5 * time.Minute
 // localDevTokenSource mints Kubernetes tokens via TokenRequest in local-dev mode.
 type localDevTokenSource struct {
 	tokens *utils.LoadingCache[TokenAudience, string]
-	client *internal.TokenRequestClient
+	client *utils.Lazy[*internal.TokenRequestClient]
 }
 
 func newLocalDevTokenSource() *localDevTokenSource {
 	source := &localDevTokenSource{}
 	source.tokens = utils.NewLoadingCache(source.requestToken)
+	source.client = utils.NewLazy(source.loadClient)
 	return source
 }
 
@@ -35,14 +36,14 @@ func (s *localDevTokenSource) GetAudienceToken(ctx context.Context, audience Tok
 	if audience == "" {
 		return "", fmt.Errorf("audience is empty")
 	}
-	return s.tokens.Get(audience)
+	return s.tokens.Get(ctx, audience)
 }
 
 func (s *localDevTokenSource) GetServiceAccountToken(ctx context.Context) (string, error) {
 	return s.GetAudienceToken(ctx, internal.DefaultKubernetesIssuer)
 }
 
-func (s *localDevTokenSource) requestToken(audience TokenAudience) (string, time.Time, error) {
+func (s *localDevTokenSource) requestToken(_ context.Context, audience TokenAudience) (string, time.Time, error) {
 	namespace, err := requireNamespace()
 	if err != nil {
 		return "", time.Time{}, err
@@ -67,15 +68,11 @@ func (s *localDevTokenSource) requestToken(audience TokenAudience) (string, time
 }
 
 func (s *localDevTokenSource) loadClient() (*internal.TokenRequestClient, error) {
-	if s.client != nil {
-		return s.client, nil
-	}
 	creds, err := internal.LoadKubeConfig()
 	if err != nil {
 		return nil, err
 	}
-	s.client = internal.NewTokenRequestClient(creds)
-	return s.client, nil
+	return internal.NewTokenRequestClient(creds), nil
 }
 
 func requireServiceName() (string, error) {
