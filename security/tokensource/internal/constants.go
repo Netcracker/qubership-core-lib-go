@@ -11,7 +11,7 @@ const (
 	acceptHeader              = "Accept"
 	bearerPrefix              = "Bearer "
 
-	defaultKubernetesIssuer = "https://kubernetes.default.svc"
+	DefaultKubernetesIssuer = "https://kubernetes.default.svc"
 	jwksPath                = "/openid/v1/jwks"
 
 	tokenRequestExpirationSeconds = 28800 // 8 hours

@@ -49,6 +49,8 @@ Kubeconfig user auth: static `token` or OIDC `auth-provider` (refresh via `idp-i
 
 Inbound K8s JWT validation in local-dev uses OIDC discovery + reachable JWKS on the kube API (`tokenverifier` local-dev path); no projected SA file required.
 
+`GetServiceAccountToken` in local-dev does not return the kubeconfig user token. It mints the default projected SA token analog (`/var/run/secrets/kubernetes.io/serviceaccount/token`) via TokenRequest with audience `https://kubernetes.default.svc`. Audience tokens (`GetAudienceToken`) use the same TTL cache.
+
 ## Quick Start
 
 ### Default Service Account Token

@@ -73,7 +73,7 @@ func TestResolveIssuerClaimFromDiscoveryFallback(t *testing.T) {
 	cfg := NewKubeLocalDevConfig()
 	issuer, err := cfg.ResolveIssuerClaimFromDiscovery()
 	require.NoError(t, err)
-	assert.Equal(t, defaultKubernetesIssuer, issuer)
+	assert.Equal(t, DefaultKubernetesIssuer, issuer)
 }
 
 func TestFetchJwks(t *testing.T) {

@@ -101,27 +101,27 @@ func (c *KubeLocalDevConfig) DiscoveryURL() (string, error) {
 func (c *KubeLocalDevConfig) ResolveIssuerClaimFromDiscovery() (string, error) {
 	discoveryURL, err := c.DiscoveryURL()
 	if err != nil {
-		return defaultKubernetesIssuer, err
+		return DefaultKubernetesIssuer, err
 	}
 	body, err := c.getPublicJSON(discoveryURL)
 	if err != nil {
 		kubeLogger.Warnf("failed to resolve Kubernetes issuer from discovery at %s in local-dev, using default %s: %v",
-			discoveryURL, defaultKubernetesIssuer, err)
-		return defaultKubernetesIssuer, nil
+			discoveryURL, DefaultKubernetesIssuer, err)
+		return DefaultKubernetesIssuer, nil
 	}
 	var discovery struct {
 		Issuer string `json:"issuer"`
 	}
 	if err = json.Unmarshal(body, &discovery); err != nil {
 		kubeLogger.Warnf("failed to parse OIDC discovery at %s in local-dev, using default %s: %v",
-			discoveryURL, defaultKubernetesIssuer, err)
-		return defaultKubernetesIssuer, nil
+			discoveryURL, DefaultKubernetesIssuer, err)
+		return DefaultKubernetesIssuer, nil
 	}
 	if strings.TrimSpace(discovery.Issuer) != "" {
 		return discovery.Issuer, nil
 	}
-	kubeLogger.Warnf("oidc discovery at %s has no issuer in local-dev, using default %s", discoveryURL, defaultKubernetesIssuer)
-	return defaultKubernetesIssuer, nil
+	kubeLogger.Warnf("oidc discovery at %s has no issuer in local-dev, using default %s", discoveryURL, DefaultKubernetesIssuer)
+	return DefaultKubernetesIssuer, nil
 }
 
 func (c *KubeLocalDevConfig) loadCredentials() (*KubeConfigCredentials, error) {
