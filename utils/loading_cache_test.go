@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"context"
 	"fmt"
 	"sync"
 	"sync/atomic"
@@ -13,16 +14,16 @@ import (
 
 func TestLoadingCacheGetLoadsAndHits(t *testing.T) {
 	var loads atomic.Int32
-	c := NewLoadingCache(func(key string) (string, time.Time, error) {
+	c := NewLoadingCache(func(_ context.Context, key string) (string, time.Time, error) {
 		loads.Add(1)
 		return "value-" + key, time.Now().Add(time.Hour), nil
 	})
 
-	got, err := c.Get("a")
+	got, err := c.Get(t.Context(), "a")
 	require.NoError(t, err)
 	assert.Equal(t, "value-a", got)
 
-	got, err = c.Get("a")
+	got, err = c.Get(t.Context(), "a")
 	require.NoError(t, err)
 	assert.Equal(t, "value-a", got)
 	assert.Equal(t, int32(1), loads.Load())
@@ -30,16 +31,16 @@ func TestLoadingCacheGetLoadsAndHits(t *testing.T) {
 
 func TestLoadingCacheGetReloadsExpired(t *testing.T) {
 	var loads atomic.Int32
-	c := NewLoadingCache(func(_ string) (string, time.Time, error) {
+	c := NewLoadingCache(func(_ context.Context, _ string) (string, time.Time, error) {
 		n := loads.Add(1)
 		return fmt.Sprintf("value-%d", n), time.Now().Add(-time.Second), nil
 	})
 
-	got, err := c.Get("a")
+	got, err := c.Get(t.Context(), "a")
 	require.NoError(t, err)
 	assert.Equal(t, "value-1", got)
 
-	got, err = c.Get("a")
+	got, err = c.Get(t.Context(), "a")
 	require.NoError(t, err)
 	assert.Equal(t, "value-2", got)
 	assert.Equal(t, int32(2), loads.Load())
@@ -47,21 +48,21 @@ func TestLoadingCacheGetReloadsExpired(t *testing.T) {
 
 func TestLoadingCacheGetDoesNotStoreOnError(t *testing.T) {
 	var loads atomic.Int32
-	c := NewLoadingCache(func(_ string) (string, time.Time, error) {
+	c := NewLoadingCache(func(_ context.Context, _ string) (string, time.Time, error) {
 		loads.Add(1)
 		return "", time.Time{}, fmt.Errorf("boom")
 	})
 
-	_, err := c.Get("a")
+	_, err := c.Get(t.Context(), "a")
 	require.Error(t, err)
-	_, err = c.Get("a")
+	_, err = c.Get(t.Context(), "a")
 	require.Error(t, err)
 	assert.Equal(t, int32(2), loads.Load())
 }
 
 func TestLoadingCacheGetConcurrentMissLoadsOnce(t *testing.T) {
 	var loads atomic.Int32
-	c := NewLoadingCache(func(key string) (string, time.Time, error) {
+	c := NewLoadingCache(func(_ context.Context, key string) (string, time.Time, error) {
 		loads.Add(1)
 		time.Sleep(50 * time.Millisecond)
 		return "value-" + key, time.Now().Add(time.Hour), nil
@@ -74,7 +75,7 @@ func TestLoadingCacheGetConcurrentMissLoadsOnce(t *testing.T) {
 	for i := 0; i < goroutines; i++ {
 		go func() {
 			defer wg.Done()
-			got, err := c.Get("a")
+			got, err := c.Get(t.Context(), "a")
 			if err != nil {
 				errCh <- err
 				return

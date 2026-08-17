@@ -43,7 +43,11 @@ func (s *localDevTokenSource) GetServiceAccountToken(ctx context.Context) (strin
 	return s.GetAudienceToken(ctx, internal.DefaultKubernetesIssuer)
 }
 
-func (s *localDevTokenSource) requestToken(_ context.Context, audience TokenAudience) (string, time.Time, error) {
+func (s *localDevTokenSource) requestToken(ctx context.Context, audience TokenAudience) (string, time.Time, error) {
+	client, err := s.client.Get()
+	if err != nil {
+		return "", time.Time{}, err
+	}
 	namespace, err := requireNamespace()
 	if err != nil {
 		return "", time.Time{}, err
@@ -52,15 +56,11 @@ func (s *localDevTokenSource) requestToken(_ context.Context, audience TokenAudi
 	if err != nil {
 		return "", time.Time{}, err
 	}
-	client, err := s.loadClient()
-	if err != nil {
-		return "", time.Time{}, err
-	}
 	localDevTokenLogger.Infof(
 		"local-dev token source active: requesting token for audience=%s, sa=%s, namespace=%s",
 		audience, serviceAccount, namespace,
 	)
-	result, err := client.RequestToken(namespace, serviceAccount, string(audience))
+	result, err := client.RequestToken(ctx, namespace, serviceAccount, string(audience))
 	if err != nil {
 		return "", time.Time{}, err
 	}

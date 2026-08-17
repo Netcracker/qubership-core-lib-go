@@ -33,9 +33,11 @@ func (s *selectableTokenSource) ensureDelegate() {
 }
 
 func (s *selectableTokenSource) GetAudienceToken(ctx context.Context, audience TokenAudience) (string, error) {
+	s.ensureDelegate()
 	return s.delegate.GetAudienceToken(ctx, audience)
 }
 
 func (s *selectableTokenSource) GetServiceAccountToken(ctx context.Context) (string, error) {
+	s.ensureDelegate()
 	return s.delegate.GetServiceAccountToken(ctx)
 }

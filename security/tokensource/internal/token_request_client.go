@@ -2,6 +2,7 @@ package internal
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -33,11 +34,11 @@ func NewTokenRequestClient(credentials *KubeConfigCredentials) *TokenRequestClie
 	}
 }
 
-func (c *TokenRequestClient) RequestToken(namespace, serviceAccountName, audience string) (*TokenRequestResult, error) {
-	return c.requestToken(namespace, serviceAccountName, audience, tokenRequestExpirationSeconds)
+func (c *TokenRequestClient) RequestToken(ctx context.Context, namespace, serviceAccountName, audience string) (*TokenRequestResult, error) {
+	return c.requestToken(ctx, namespace, serviceAccountName, audience, tokenRequestExpirationSeconds)
 }
 
-func (c *TokenRequestClient) requestToken(namespace, serviceAccountName, audience string, expirationSeconds int64) (*TokenRequestResult, error) {
+func (c *TokenRequestClient) requestToken(ctx context.Context, namespace, serviceAccountName, audience string, expirationSeconds int64) (*TokenRequestResult, error) {
 	url := fmt.Sprintf("%s/api/v1/namespaces/%s/serviceaccounts/%s/token",
 		c.serverURL, namespace, serviceAccountName)
 	body, err := buildTokenRequestBody(audience, expirationSeconds)
@@ -48,7 +49,7 @@ func (c *TokenRequestClient) requestToken(namespace, serviceAccountName, audienc
 		"requesting local-dev SA token: namespace=%s, sa=%s, audience=%s, ttl=%ds",
 		namespace, serviceAccountName, audience, expirationSeconds,
 	)
-	req, err := http.NewRequest(http.MethodPost, url, bytes.NewReader(body))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(body))
 	if err != nil {
 		return nil, err
 	}

@@ -182,7 +182,9 @@ func newTestLocalDevSource(t *testing.T, serverURL string) *localDevTokenSource 
 		UserToken: "kube-user",
 	}
 	source := &localDevTokenSource{
-		client: internal.NewTokenRequestClient(creds),
+		client: utils.NewLazy(func() (*internal.TokenRequestClient, error) {
+			return internal.NewTokenRequestClient(creds), nil
+		}),
 	}
 	source.tokens = utils.NewLoadingCache(source.requestToken)
 	return source
