@@ -39,14 +39,16 @@ func (s *localDevTokenSource) GetAudienceToken(ctx context.Context, audience Tok
 	return s.tokens.Get(ctx, audience)
 }
 
+// GetServiceAccountToken mints the default projected SA token via TokenRequest
+// with audience DefaultKubernetesAudience (see internal/constants.go).
 func (s *localDevTokenSource) GetServiceAccountToken(ctx context.Context) (string, error) {
-	return s.GetAudienceToken(ctx, internal.DefaultKubernetesIssuer)
+	return s.GetAudienceToken(ctx, internal.DefaultKubernetesAudience)
 }
 
 func (s *localDevTokenSource) requestToken(ctx context.Context, audience TokenAudience) (string, time.Time, error) {
 	client, err := s.client.Get()
 	if err != nil {
-		return "", time.Time{}, err
+		return "", time.Time{}, fmt.Errorf("local-dev kube client: %w", err)
 	}
 	namespace, err := requireNamespace()
 	if err != nil {

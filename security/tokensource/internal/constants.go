@@ -11,8 +11,9 @@ const (
 	acceptHeader              = "Accept"
 	bearerPrefix              = "Bearer "
 
-	DefaultKubernetesIssuer = "https://kubernetes.default.svc"
-	jwksPath                = "/openid/v1/jwks"
+	DefaultKubernetesIssuer   = "https://kubernetes.default.svc"
+	DefaultKubernetesAudience = "https://kubernetes.default.svc.cluster.local"
+	jwksPath                  = "/openid/v1/jwks"
 
 	tokenRequestExpirationSeconds = 28800 // 8 hours
 	maxErrorBodyLength            = 500

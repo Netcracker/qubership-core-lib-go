@@ -83,7 +83,7 @@ func TestLocalDevTokenSourceMintsServiceAccountToken(t *testing.T) {
 	token, err := source.GetServiceAccountToken(context.Background())
 	require.NoError(t, err)
 	assert.Equal(t, "sa-minted-token", token)
-	assert.Equal(t, internal.DefaultKubernetesIssuer, requestedAudience)
+	assert.Equal(t, internal.DefaultKubernetesAudience, requestedAudience)
 }
 
 func TestLocalDevTokenSourceLoadsFromKubeconfig(t *testing.T) {
@@ -113,12 +113,12 @@ func TestLocalDevTokenSourceLoadsFromKubeconfig(t *testing.T) {
 	source := newLocalDevTokenSource()
 	token, err := source.GetServiceAccountToken(context.Background())
 	require.NoError(t, err)
-	assert.Equal(t, "minted-"+string(internal.DefaultKubernetesIssuer), token)
+	assert.Equal(t, "minted-"+string(internal.DefaultKubernetesAudience), token)
 
 	audienceToken, err := source.GetAudienceToken(context.Background(), AudienceNetcracker)
 	require.NoError(t, err)
 	assert.Equal(t, "minted-netcracker", audienceToken)
-	assert.Equal(t, []string{internal.DefaultKubernetesIssuer, string(AudienceNetcracker)}, audiences)
+	assert.Equal(t, []string{internal.DefaultKubernetesAudience, string(AudienceNetcracker)}, audiences)
 }
 
 func TestLocalDevTokenSourceConcurrentCacheHits(t *testing.T) {
