@@ -21,5 +21,17 @@ func TestNewKubernetesOidcDoesNotPanicWhenLocalDevDisabled(t *testing.T) {
 }
 
 func TestNamespaceEnvIsExported(t *testing.T) {
+	assert.Equal(t, "SECURITY_LOCALDEV", EnabledEnv)
 	assert.Equal(t, "CLOUD_NAMESPACE", NamespaceEnv)
+}
+
+func TestIsEnabled(t *testing.T) {
+	t.Setenv(EnabledEnv, "")
+	assert.False(t, IsEnabled())
+
+	t.Setenv(EnabledEnv, "false")
+	assert.False(t, IsEnabled())
+
+	t.Setenv(EnabledEnv, "true")
+	assert.True(t, IsEnabled())
 }

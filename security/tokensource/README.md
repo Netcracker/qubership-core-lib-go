@@ -34,11 +34,11 @@ go get github.com/netcracker/qubership-core-lib-go/v3
 
 ### Local development (kubeconfig TokenRequest)
 
-When env `PROFILE=dev`, `selectableTokenSource` (registered in `init`, like Java `SelectableTokenSource`) chooses kubeconfig TokenRequest instead of `DefaultTokenFileProvider`. Required env:
+When env `SECURITY_LOCALDEV=true`, `selectableTokenSource` (registered in `init`, like Java `SelectableTokenSource`) chooses kubeconfig TokenRequest instead of `DefaultTokenFileProvider`. Required env:
 
 | Env | Purpose |
 |---|---|
-| `PROFILE=dev` | Enables local-dev TokenRequest |
+| `SECURITY_LOCALDEV=true` | Enables local-dev TokenRequest |
 | `microservice.name` | Kubernetes service account name (`application.yaml` or env `MICROSERVICE_NAME`) |
 | `CLOUD_NAMESPACE` | Namespace for TokenRequest |
 | `KUBERNETES_M2M_ENABLED=true` | K8s M2M path in security |

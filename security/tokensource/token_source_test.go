@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/netcracker/qubership-core-lib-go/v3/security/tokensource/localdev"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -18,7 +19,7 @@ var (
 )
 
 func beforeEach(t *testing.T) {
-	t.Setenv("PROFILE", "")
+	t.Setenv(localdev.EnabledEnv, "")
 	var err error
 
 	saTokenStorage, err = newServiceAccountTokenStorage(t.TempDir())

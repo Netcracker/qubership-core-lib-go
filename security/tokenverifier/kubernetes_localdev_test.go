@@ -77,7 +77,7 @@ func TestLocalDevTransportFailsWhenTokenMissing(t *testing.T) {
 }
 
 func TestLocalDevKubernetesVerifierWithoutServiceAccountFile(t *testing.T) {
-	t.Setenv("PROFILE", "dev")
+	t.Setenv(localdev.EnabledEnv, "true")
 	qubetest.MustInitDefaultTestKeys()
 
 	issuer := "https://cluster.example"

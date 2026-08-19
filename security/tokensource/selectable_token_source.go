@@ -8,7 +8,7 @@ import (
 )
 
 // selectableTokenSource picks a TokenSource once, like Java SelectableTokenSource:
-// kubeconfig TokenRequest when PROFILE=dev, otherwise projected-volume files.
+// kubeconfig TokenRequest when SECURITY_LOCALDEV=true, otherwise projected-volume files.
 // Selection is deferred to first use (Go package init runs earlier than Java ServiceLoader).
 type selectableTokenSource struct {
 	once     sync.Once
