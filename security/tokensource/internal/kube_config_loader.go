@@ -51,7 +51,7 @@ func LoadKubeConfig() (*KubeConfigCredentials, error) {
 		return nil, err
 	}
 
-	return credentialsFromKubeConfigEntries(clusterEntry, userEntry)
+	return credentialsFromKubeConfigEntries(clusterEntry, userEntry, path)
 }
 
 func readAndParseKubeConfig(path string) (kubeConfig, error) {
@@ -100,14 +100,14 @@ func resolveActiveKubeConfigEntries(root kubeConfig, path string) (namedEntry, n
 	return clusterEntry, userEntry, nil
 }
 
-func credentialsFromKubeConfigEntries(clusterEntry, userEntry namedEntry) (*KubeConfigCredentials, error) {
+func credentialsFromKubeConfigEntries(clusterEntry, userEntry namedEntry, kubeConfigPath string) (*KubeConfigCredentials, error) {
 	clusterName := clusterEntry.Name
 	server := getStringField(clusterEntry.Cluster, kubeConfigServer)
 	if server == "" {
 		return nil, fmt.Errorf("cluster %q has no server URL", clusterName)
 	}
 
-	caData, err := decodeOptionalBase64(getStringField(clusterEntry.Cluster, kubeConfigCertificateAuthorityData))
+	caData, err := loadClusterCertificateAuthority(clusterEntry.Cluster, kubeConfigPath)
 	if err != nil {
 		return nil, err
 	}
@@ -196,6 +196,29 @@ func findKubeConfigEntryByName(entries []namedEntry, name string) (namedEntry, e
 		}
 	}
 	return found, fmt.Errorf("kubeconfig entry not found: %s", name)
+}
+
+func loadClusterCertificateAuthority(cluster map[string]any, kubeConfigPath string) ([]byte, error) {
+	caData, err := decodeOptionalBase64(getStringField(cluster, kubeConfigCertificateAuthorityData))
+	if err != nil {
+		return nil, err
+	}
+	if len(caData) > 0 {
+		return caData, nil
+	}
+
+	caPath := strings.TrimSpace(getStringField(cluster, kubeConfigCertificateAuthority))
+	if caPath == "" {
+		return nil, nil
+	}
+	if !filepath.IsAbs(caPath) {
+		caPath = filepath.Join(filepath.Dir(kubeConfigPath), caPath)
+	}
+	data, err := os.ReadFile(caPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read kubeconfig certificate-authority %q: %w", caPath, err)
+	}
+	return data, nil
 }
 
 func decodeOptionalBase64(value string) ([]byte, error) {

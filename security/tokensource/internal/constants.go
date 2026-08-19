@@ -45,6 +45,7 @@ const (
 	kubeConfigName                     = "name"
 	kubeConfigServer                   = "server"
 	kubeConfigToken                    = "token"
+	kubeConfigCertificateAuthority     = "certificate-authority"
 	kubeConfigCertificateAuthorityData = "certificate-authority-data"
 	kubeConfigInsecureSkipTLSVerify    = "insecure-skip-tls-verify"
 	kubeConfigAuthProvider             = "auth-provider"

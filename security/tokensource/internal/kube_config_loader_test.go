@@ -1,6 +1,7 @@
 package internal
 
 import (
+	"encoding/base64"
 	"os"
 	"path/filepath"
 	"testing"
@@ -8,6 +9,96 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func TestLoadKubeConfigFromCertificateAuthorityFile(t *testing.T) {
+	dir := t.TempDir()
+	caContent := []byte("-----BEGIN CERTIFICATE-----\ndummy-ca\n-----END CERTIFICATE-----")
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "cluster-ca.crt"), caContent, 0o600))
+
+	configPath := filepath.Join(dir, "config")
+	require.NoError(t, os.WriteFile(configPath, []byte(`apiVersion: v1
+kind: Config
+current-context: test
+contexts:
+- context:
+    cluster: test
+    user: test
+  name: test
+clusters:
+- cluster:
+    server: https://api.example
+    certificate-authority: cluster-ca.crt
+  name: test
+users:
+- name: test
+  user:
+    token: kube-user-token
+`), 0o600))
+	t.Setenv("KUBECONFIG", configPath)
+
+	creds, err := LoadKubeConfig()
+	require.NoError(t, err)
+	assert.Equal(t, caContent, creds.CertificateAuthorityData)
+}
+
+func TestLoadKubeConfigPrefersCertificateAuthorityDataOverFile(t *testing.T) {
+	dir := t.TempDir()
+	caFile := filepath.Join(dir, "cluster-ca.crt")
+	require.NoError(t, os.WriteFile(caFile, []byte("from-file"), 0o600))
+
+	fromData := base64.StdEncoding.EncodeToString([]byte("from-data"))
+	configPath := filepath.Join(dir, "config")
+	require.NoError(t, os.WriteFile(configPath, []byte(`apiVersion: v1
+kind: Config
+current-context: test
+contexts:
+- context:
+    cluster: test
+    user: test
+  name: test
+clusters:
+- cluster:
+    server: https://api.example
+    certificate-authority: cluster-ca.crt
+    certificate-authority-data: `+fromData+`
+  name: test
+users:
+- name: test
+  user:
+    token: kube-user-token
+`), 0o600))
+	t.Setenv("KUBECONFIG", configPath)
+
+	creds, err := LoadKubeConfig()
+	require.NoError(t, err)
+	assert.Equal(t, []byte("from-data"), creds.CertificateAuthorityData)
+}
+
+func TestLoadKubeConfigMissingCertificateAuthorityFile(t *testing.T) {
+	path := writeKubeconfigFile(t, `apiVersion: v1
+kind: Config
+current-context: test
+contexts:
+- context:
+    cluster: test
+    user: test
+  name: test
+clusters:
+- cluster:
+    server: https://api.example
+    certificate-authority: missing-ca.crt
+  name: test
+users:
+- name: test
+  user:
+    token: kube-user-token
+`)
+	t.Setenv("KUBECONFIG", path)
+
+	_, err := LoadKubeConfig()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "certificate-authority")
+}
 
 func TestLoadKubeConfigFromTokenUser(t *testing.T) {
 	path := writeTestKubeconfig(t, "https://api.example/")
