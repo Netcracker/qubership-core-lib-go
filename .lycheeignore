@@ -1,0 +1,2 @@
+# ignore internal service urls 
+^https?://[^/.:]+(:\d+)?(/|$)
