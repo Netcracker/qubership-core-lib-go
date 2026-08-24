@@ -9,6 +9,7 @@ import (
 	"github.com/netcracker/qubership-core-lib-go/v3/cloudprovidergetter"
 	qubetoken "github.com/netcracker/qubership-core-lib-go/v3/security/token"
 	"github.com/netcracker/qubership-core-lib-go/v3/security/tokensource"
+	"github.com/netcracker/qubership-core-lib-go/v3/security/tokensource/localdev"
 	"golang.org/x/time/rate"
 )
 
@@ -36,6 +37,9 @@ func NewKubernetesVerifier(ctx context.Context, audience string, validations ...
 		validations...)
 }
 func newKubernetesVerifier(ctx context.Context, audience string, kubernetesApiToken tokenFunction, override Override, validations ...Validation) (Verifier, error) {
+	if localdev.IsEnabled() {
+		return newLocalDevKubernetesVerifier(ctx, audience, override, validations...)
+	}
 	trustedIssuer, err := getTrustedIssuer(kubernetesApiToken)
 	if err != nil {
 		return nil, err

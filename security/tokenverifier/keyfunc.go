@@ -29,6 +29,14 @@ type KeyFuncOptions struct {
 	RefreshUnknownKID *rate.Limiter
 }
 
+func CreateKeyFunctionFromJwksURL(ctx context.Context, jwksURL string, options KeyFuncOptions) (keyfunc.Keyfunc, error) {
+	return keyfunc.NewDefaultOverrideCtx(
+		ctx,
+		[]string{jwksURL},
+		keyfunc.Override{Client: options.HttpClient, RefreshInterval: options.RefreshInterval, RefreshUnknownKID: options.RefreshUnknownKID},
+	)
+}
+
 func CreateKeyFunction(ctx context.Context, options KeyFuncOptions) (keyfunc.Keyfunc, error) {
 	issuerUrl, err := oidc.GetProviderUrl(options.TrustedIssuer)
 	if err != nil {

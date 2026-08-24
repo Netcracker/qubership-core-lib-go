@@ -32,6 +32,25 @@
 go get github.com/netcracker/qubership-core-lib-go/v3
 ```
 
+### Local development (kubeconfig TokenRequest)
+
+When env `SECURITY_LOCALDEV=true`, `selectableTokenSource` (registered in `init`, like Java `SelectableTokenSource`) chooses kubeconfig TokenRequest instead of `DefaultTokenFileProvider`. Required env:
+
+| Env | Purpose |
+|---|---|
+| `SECURITY_LOCALDEV=true` | Enables local-dev TokenRequest |
+| `microservice.name` | Kubernetes service account name (`application.yaml` or env `MICROSERVICE_NAME`) |
+| `CLOUD_NAMESPACE` | Namespace for TokenRequest |
+| `KUBERNETES_M2M_ENABLED=true` | K8s M2M path in security |
+
+Prod continues to use projected volume token files (`DefaultTokenFileProvider`).
+
+Kubeconfig user auth: static `token` or OIDC `auth-provider` (refresh via `idp-issuer-url`). `exec` auth is not supported.
+
+Inbound K8s JWT validation in local-dev uses OIDC discovery + reachable JWKS on the kube API (`tokenverifier` local-dev path); no projected SA file required.
+
+`GetServiceAccountToken` in local-dev does not return the kubeconfig user token. It mints the default projected SA token analog (`/var/run/secrets/kubernetes.io/serviceaccount/token`) via TokenRequest with audience `https://kubernetes.default.svc.cluster.local`. Audience tokens (`GetAudienceToken`) use the same TTL cache.
+
 ## Quick Start
 
 ### Default Service Account Token
