@@ -280,6 +280,29 @@ func TestHttpRequestProducer_Produce(t *testing.T) {
 	}
 }
 
+func TestHttpRequestProducer_Produce_SkipsCallerAuthorization(t *testing.T) {
+	producer := &httpRequestProducer{
+		httpMethod: "POST",
+		url:        "https://example.com/api",
+		headers: map[string][]string{
+			"Authorization": {"Bearer caller-token"},
+			"X-Request-Id":  {"trace-123"},
+		},
+		bodyBytes: nil,
+		authHeader: func(ctx context.Context) (string, error) {
+			return "Bearer supplier-token", nil
+		},
+	}
+
+	req, err := producer.produce(context.Background())
+	require.NoError(t, err)
+
+	authValues := req.Header.Values("Authorization")
+	assert.Len(t, authValues, 1, "exactly one Authorization header expected")
+	assert.Equal(t, "Bearer supplier-token", authValues[0])
+	assert.Contains(t, req.Header.Values("X-Request-Id"), "trace-123")
+}
+
 func TestHttpRequestProducer_ProduceReusability(t *testing.T) {
 	// Test that producer can produce multiple requests with the same body
 	bodyContent := []byte("test body content")
