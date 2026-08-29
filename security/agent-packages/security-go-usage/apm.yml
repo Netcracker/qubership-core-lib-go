@@ -1,0 +1,4 @@
+name: security-go-usage
+version: 1.0.0
+description: Service-account tokens and JWT verification for Qubership Go microservices.
+author: Qubership
