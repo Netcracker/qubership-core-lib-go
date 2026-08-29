@@ -20,27 +20,94 @@ const (
 
 var (
 	DefaultFormat = defaultFormat{}
+
+	// customFieldsPattern matches one %{name} placeholder. Compiled once at package init: it used
+	// to be compiled inside assembleCustomLogFields, i.e. on every single log record, which
+	// accounted for roughly 30 of the ~33 allocations of a log line even when no template was
+	// configured at all.
+	customFieldsPattern = regexp.MustCompile(`%\{.[^}]+}`)
+
+	// globalCustomFields holds the parsed template installed via DefaultFormat.SetCustomLogFields.
+	// It is package-global rather than per-instance because the formatter has always resolved
+	// custom fields from DefaultFormat regardless of which defaultFormat instance was rendering;
+	// keeping it global preserves that behaviour for per-logger message formats.
+	globalCustomFields atomic.Pointer[customFieldsSpec]
 )
 
 type (
 	messageFmt func(r *Record, b *bytes.Buffer, color int, lvl string) (int, error)
 )
 
+// customFieldsSpec is a %{...} template parsed ahead of time. raw drives text rendering, which
+// substitutes values back into the template; names drives JSON rendering, which emits each field
+// as a top-level key. Parsing once at Set time keeps both paths off the regexp on the hot path.
+type customFieldsSpec struct {
+	raw   string
+	names []string
+}
+
 type defaultFormat struct {
-	messageFormat   messageFmt
-	customLogFields atomic.Value
+	messageFormat messageFmt
 }
 
 type ContextObjectLogValueGetter interface {
 	GetLogValue() string
 }
 
+// SetCustomLogFields installs a template of %{context-key} placeholders that is rendered with
+// every log record.
+//
+// In text format the template is substituted and prefixed to the message, e.g.
+//
+//	SetCustomLogFields("[bp=%{business_process_id}]")
+//	    -> "... [x_channel_request_id=-] [bp=bp-1] the message"
+//
+// In JSON format the placeholder names become top-level keys instead, e.g.
+//
+//	{"time":..., "message":"the message", ..., "business_process_id":"bp-1"}
+//
+// Values are resolved from the record's context.Context by key, exactly as the built-in fields are;
+// a key that is absent renders as the "-" placeholder.
+//
+// The template is stored globally, not on the receiver. It always was in effect -- the formatter
+// read it from DefaultFormat no matter which defaultFormat instance was rendering -- so a
+// per-logger message format installed via SetMessageFormat still sees the configured custom
+// fields.
 func (format *defaultFormat) SetCustomLogFields(lineWithCustomFields string) {
-	format.customLogFields.Store(lineWithCustomFields)
+	globalCustomFields.Store(parseCustomFieldsSpec(lineWithCustomFields))
 }
 
 func (format *defaultFormat) SetMessageFormat(fn messageFmt) {
 	format.messageFormat = fn
+}
+
+func parseCustomFieldsSpec(template string) *customFieldsSpec {
+	spec := &customFieldsSpec{raw: template}
+	if template == "" {
+		return spec
+	}
+	for _, placeholder := range customFieldsPattern.FindAllString(template, -1) {
+		spec.names = append(spec.names, customFieldName(placeholder))
+	}
+	return spec
+}
+
+// customFieldName extracts "foo" from "%{foo}".
+//
+// This used to be strings.TrimRight(strings.TrimLeft(placeholder, "%{"), "}"), which treats its
+// argument as a cutset rather than a prefix: a field named "%weird" or "{weird" had its leading
+// characters eaten. TrimPrefix/TrimSuffix strip exactly the delimiters.
+func customFieldName(placeholder string) string {
+	return strings.TrimSuffix(strings.TrimPrefix(placeholder, "%{"), "}")
+}
+
+// customFieldNames returns the placeholder names of the installed template, for formatters that
+// emit them as discrete keys.
+func customFieldNames() []string {
+	if spec := globalCustomFields.Load(); spec != nil {
+		return spec.names
+	}
+	return nil
 }
 
 func (format *defaultFormat) format(r *Record) []byte {
@@ -64,7 +131,10 @@ func (format *defaultFormat) logFormat(r *Record, b *bytes.Buffer, color int, lv
 		GetValueOrPlaceholder(r.Ctx, TenantContextName),
 		ConstructCallerValueByRecord(r),
 		GetValueOrPlaceholder(r.Ctx, ChannelRequestIdContextName),
-		JoinStringsWithSpace(AssembleDefaultCustomLogFields(r.Ctx), r.Message),
+		// JoinStringsWithSpace drops empty segments, so a record with no custom template and no
+		// structured fields produces exactly the bytes this formatter produced before either
+		// feature existed.
+		JoinStringsWithSpace(AssembleDefaultCustomLogFields(r.Ctx), r.Message, renderFieldsAsText(r.Fields)),
 	)
 }
 
@@ -103,29 +173,25 @@ func ConstructCallerValueByRecord(r *Record) string {
 }
 
 func assembleCustomLogFields(customLogFields string, ctx context.Context) string {
-	regex, er := regexp.Compile("%\\{.[^}]+}")
-	if er != nil {
-		fmt.Printf("Cannot compile expression: %v", er)
-		return ""
-	}
-
-	fields := regex.FindAllString(customLogFields, -1)
+	fields := customFieldsPattern.FindAllString(customLogFields, -1)
 	if len(fields) == 0 {
 		return ""
 	}
 
 	finalString := customLogFields
 	for _, field := range fields {
-		fieldName := strings.TrimRight(strings.TrimLeft(field, "%{"), "}")
-		fieldValue := GetValueOrPlaceholder(ctx, fieldName)
+		fieldValue := GetValueOrPlaceholder(ctx, customFieldName(field))
 		finalString = strings.ReplaceAll(finalString, field, fieldValue)
 	}
 	return finalString
 }
 
 func AssembleDefaultCustomLogFields(ctx context.Context) string {
-	customFields, _ := DefaultFormat.customLogFields.Load().(string)
-	return assembleCustomLogFields(customFields, ctx)
+	spec := globalCustomFields.Load()
+	if spec == nil || spec.raw == "" {
+		return ""
+	}
+	return assembleCustomLogFields(spec.raw, ctx)
 }
 
 func JoinStringsWithSpace(elem ...string) string {
