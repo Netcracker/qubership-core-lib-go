@@ -3,7 +3,7 @@ module github.com/netcracker/qubership-core-lib-go/v3
 go 1.26.5
 
 require (
-	github.com/KimMachineGun/automemlimit v0.7.5
+	github.com/KimMachineGun/automemlimit v1.0.0
 	github.com/MicahParks/jwkset v0.11.3
 	github.com/MicahParks/keyfunc/v3 v3.8.1
 	github.com/failsafe-go/failsafe-go v0.9.7
