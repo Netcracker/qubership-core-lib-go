@@ -3,14 +3,12 @@ package logging
 import (
 	"bytes"
 	"fmt"
-	"os"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/netcracker/qubership-core-lib-go/v3/configloader"
 	"github.com/stretchr/testify/assert"
-	"github.com/viney-shih/go-lock"
 )
 
 func TestLogger_SetLevel(t *testing.T) {
@@ -20,67 +18,70 @@ func TestLogger_SetLevel(t *testing.T) {
 }
 
 func TestGetLogger_DefaultLevel(t *testing.T) {
-	actualLogger := createTestLogger(3, "test")
-	testLogger := GetLogger("test")
-	loggersEqual(t, &actualLogger, testLogger)
+	actualLogger := newTestLogger(t, 3, "test")
+	testLogger := registerTestLogger(t, "test")
+	loggersEqual(t, actualLogger, testLogger)
 }
 
 func TestGetLogger_ReadFromEnv_PackageLvl(t *testing.T) {
-	os.Setenv("LOG_LEVEL_PACKAGE_TEST_ENV_PACKAGE", "error")
-	actualLogger := createTestLogger(1, "test_env_package")
-	testLogger := GetLogger("test_env_package")
-	loggersEqual(t, &actualLogger, testLogger)
-	os.Clearenv()
+	requireBootstrapConfigPath(t)
+	t.Setenv("LOG_LEVEL_PACKAGE_TEST_ENV_PACKAGE", "error")
+	actualLogger := newTestLogger(t, 1, "test_env_package")
+	testLogger := registerTestLogger(t, "test_env_package")
+	loggersEqual(t, actualLogger, testLogger)
 }
 
 func TestGetLogger_ReadFromEnv_GlobalLvl(t *testing.T) {
-	os.Setenv("LOG_LEVEL", "error")
-	actualLogger := createTestLogger(1, "test_env_global")
-	testLogger := GetLogger("test_env_global")
-	loggersEqual(t, &actualLogger, testLogger)
-	os.Clearenv()
+	requireBootstrapConfigPath(t)
+	t.Setenv("LOG_LEVEL", "error")
+	actualLogger := newTestLogger(t, 1, "test_env_global")
+	testLogger := registerTestLogger(t, "test_env_global")
+	loggersEqual(t, actualLogger, testLogger)
 }
 
 func TestGetLogger_WrongLogLevel(t *testing.T) {
-	os.Setenv("LOG_LEVEL_PACKAGE_WRONG_LVL", "unknown")
-	actualLogger := createTestLogger(3, "wrong_lvl")
-	testLogger := GetLogger("wrong_lvl")
-	loggersEqual(t, &actualLogger, testLogger)
-	os.Clearenv()
+	requireBootstrapConfigPath(t)
+	t.Setenv("LOG_LEVEL_PACKAGE_WRONG_LVL", "unknown")
+	actualLogger := newTestLogger(t, 3, "wrong_lvl")
+	testLogger := registerTestLogger(t, "wrong_lvl")
+	loggersEqual(t, actualLogger, testLogger)
 }
 
 func TestGetLogLevels_Env(t *testing.T) {
-	os.Setenv("LOG_LEVEL", "error")
-	os.Setenv("LOG_LEVEL_PACKAGE_LOGGER_2", "debug")
-	GetLogger("logger.1")
-	GetLogger("logger.2")
+	requireBootstrapConfigPath(t)
+	t.Setenv("LOG_LEVEL", "error")
+	t.Setenv("LOG_LEVEL_PACKAGE_LOGGER_2", "debug")
+	registerTestLogger(t, "logger.1")
+	registerTestLogger(t, "logger.2")
 	logLevels := GetLogLevels()
 	assert.Equal(t, strings.ToUpper(LvlError.String()), logLevels["ROOT"])
 	assert.Equal(t, strings.ToUpper(LvlError.String()), logLevels["logger.1"])
 	assert.Equal(t, strings.ToUpper(LvlDebug.String()), logLevels["logger.2"])
-	os.Clearenv()
 }
 
 func TestGetLogLevels_EnvNew(t *testing.T) {
-	os.Setenv("LOG_LEVEL", "info")
-	os.Setenv("LOGGING_LEVEL_ROOT", "error")
-	os.Setenv("LOG_LEVEL_PACKAGE_LOGGER_2", "fatal")
-	os.Setenv("LOGGING_LEVEL_LOGGER_2", "debug")
-	GetLogger("logger.1")
-	GetLogger("logger.2")
+	requireBootstrapConfigPath(t)
+	t.Setenv("LOG_LEVEL", "info")
+	t.Setenv("LOGGING_LEVEL_ROOT", "error")
+	t.Setenv("LOG_LEVEL_PACKAGE_LOGGER_2", "fatal")
+	t.Setenv("LOGGING_LEVEL_LOGGER_2", "debug")
+	registerTestLogger(t, "logger.1")
+	registerTestLogger(t, "logger.2")
 	logLevels := GetLogLevels()
 	assert.Equal(t, strings.ToUpper(LvlError.String()), logLevels["ROOT"])
 	assert.Equal(t, strings.ToUpper(LvlError.String()), logLevels["logger.1"])
 	assert.Equal(t, strings.ToUpper(LvlDebug.String()), logLevels["logger.2"])
-	os.Clearenv()
 }
 
+// NOTE: this test initialises the process-global configloader and cannot undo it. Every test that
+// runs after it resolves configuration through configloader rather than through the os.LookupEnv
+// bootstrap path, so tests exercising the env fallback must be declared above it.
 func TestGetLogger_InitedConfigLoader(t *testing.T) {
 	testYamlParams := configloader.YamlPropertySourceParams{ConfigFilePath: "./testdata/application.yaml"}
 	configloader.InitWithSourcesArray(configloader.BasePropertySources(testYamlParams))
-	testLogger := GetLogger("one")
-	actualLogger := createTestLogger(0, "one")
-	loggersEqual(t, &actualLogger, testLogger)
+	testLogger := registerTestLogger(t, "one")
+	actualLogger := newTestLogger(t, 0, "one")
+	loggersEqual(t, actualLogger, testLogger)
 }
 
 func TestLvl_String(t *testing.T) {
@@ -89,11 +90,12 @@ func TestLvl_String(t *testing.T) {
 	assert.Equal(t, "warn", Lvl(2).String())
 	assert.Equal(t, "info", Lvl(3).String())
 	assert.Equal(t, "debug", Lvl(4).String())
-	assert.Panics(t, func() { Lvl(-1).String() }, "bad level")
+	assert.Panics(t, func() { _ = Lvl(-1).String() }, "bad level")
 }
 
 func TestFormat(t *testing.T) {
-	logger := createTestLogger(3, "test")
+	withCleanLoggingState(t)
+	logger := newTestLogger(t, 3, "test")
 	message := "This is test record"
 	r := Record{
 		PackageName: "test",
@@ -108,7 +110,8 @@ func TestFormat(t *testing.T) {
 }
 
 func TestLogger_SetLogFormat(t *testing.T) {
-	logger := createTestLogger(3, "test")
+	withCleanLoggingState(t)
+	logger := newTestLogger(t, 3, "test")
 	message := "This is test record"
 	r := Record{
 		PackageName: "test",
@@ -124,7 +127,8 @@ func TestLogger_SetLogFormat(t *testing.T) {
 }
 
 func TestLogger_SetMessageFormat(t *testing.T) {
-	logger := createTestLogger(3, "test")
+	withCleanLoggingState(t)
+	logger := newTestLogger(t, 3, "test")
 	message := "This is test record"
 	r := Record{
 		PackageName: "test",
@@ -140,7 +144,8 @@ func TestLogger_SetMessageFormat(t *testing.T) {
 }
 
 func TestSetLogFormat(t *testing.T) {
-	logger := createTestLogger(3, "test")
+	withCleanLoggingState(t)
+	logger := newTestLogger(t, 3, "test")
 	message := "This is test record"
 	r := Record{
 		PackageName: "test",
@@ -153,14 +158,6 @@ func TestSetLogFormat(t *testing.T) {
 	SetLogFormat(customLogFormat)
 	newLogFormat := logger.format(&r)
 	assert.NotEqual(t, initialLogFormat, newLogFormat)
-}
-
-func createTestLogger(lvl int, name string) logger {
-	var logger logger
-	logger.maxLvl = Lvl(lvl)
-	logger.name = name
-	logger.mu = lock.NewChanMutex()
-	return logger
 }
 
 func customLogFormat(r *Record) []byte {
