@@ -35,6 +35,8 @@ The library offers three factory functions to create REST clients for different 
 func (m *M2MRestClient) DoRequest(ctx context.Context, httpMethod, url string, headers map[string][]string, bodyReader io.Reader) (*http.Response, error)
 ```
 
+`DoRequest` always authenticates with the client's Kubernetes or Keycloak token. Caller `Authorization` headers are ignored, regardless of casing (`Authorization`, `authorization`, `AUTHORIZATION`). That keeps outbound requests at exactly one auth header: Istio ambient concatenates duplicate `Authorization` values into a single invalid Bearer token and the downstream service returns 401.
+
 ## Examples
 
 ### Making Requests to Internal Services
@@ -227,7 +229,8 @@ import (
 func fetchWithCustomHeaders(ctx context.Context) error {
     client := rest.NewM2MRestClient()
     
-    // Add multiple custom headers
+    // Add multiple custom headers. Do not pass Authorization: the client
+    // injects its own M2M token and drops any caller Authorization value.
     headers := map[string][]string{
         "Content-Type":     {"application/json"},
         "Accept":           {"application/json"},

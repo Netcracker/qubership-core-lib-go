@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 
 	"github.com/netcracker/qubership-core-lib-go/v3/context-propagation/ctxhelper"
 )
@@ -60,11 +61,16 @@ func (producer *httpRequestProducer) produce(ctx context.Context) (*http.Request
 	if err != nil {
 		return nil, &TokenAcquisitionError{Err: err}
 	}
-	httpRequest.Header.Add("Authorization", authHeader)
 	for header, values := range producer.headers {
+		if strings.EqualFold(header, "Authorization") {
+			continue
+		}
 		for _, value := range values {
 			httpRequest.Header.Add(header, value)
 		}
 	}
+	// Set last so the client token is the only Authorization value, even if
+	// context propagation or caller headers already wrote one.
+	httpRequest.Header.Set("Authorization", authHeader)
 	return httpRequest, nil
 }
