@@ -264,8 +264,12 @@ func TestHttpRequestProducer_Produce(t *testing.T) {
 		assert.Equal(t, tt.url, req.URL.String())
 		assert.Equal(t, tt.expectedAuthHeader, req.Header.Get("Authorization"))
 
-		// Verify custom headers were added
+		// Verify custom headers were added. Authorization is owned by the
+		// client token supplier, so caller values must not be copied.
 		for key, values := range tt.headers {
+			if strings.EqualFold(key, "Authorization") {
+				continue
+			}
 			for _, value := range values {
 				assert.Contains(t, req.Header.Values(key), value)
 			}
@@ -277,6 +281,76 @@ func TestHttpRequestProducer_Produce(t *testing.T) {
 			assert.NoError(t, err)
 			assert.Equal(t, tt.bodyBytes, bodyBytes)
 		}
+	}
+}
+
+func TestHttpRequestProducer_Produce_SkipsCallerAuthorization(t *testing.T) {
+	tests := []struct {
+		name      string
+		headers   map[string][]string
+		wantOther map[string]string
+	}{
+		{
+			name: "canonical Authorization",
+			headers: map[string][]string{
+				"Authorization": {"Bearer caller-token"},
+				"X-Request-Id":  {"trace-123"},
+			},
+			wantOther: map[string]string{"X-Request-Id": "trace-123"},
+		},
+		{
+			name: "lowercase authorization",
+			headers: map[string][]string{
+				"authorization": {"Bearer caller-token"},
+				"X-Request-Id":  {"trace-123"},
+			},
+			wantOther: map[string]string{"X-Request-Id": "trace-123"},
+		},
+		{
+			name: "uppercase AUTHORIZATION",
+			headers: map[string][]string{
+				"AUTHORIZATION": {"Bearer caller-token"},
+				"X-Request-Id":  {"trace-123"},
+			},
+			wantOther: map[string]string{"X-Request-Id": "trace-123"},
+		},
+		{
+			name: "does not skip similarly named headers",
+			headers: map[string][]string{
+				"Authorization":      {"Bearer caller-token"},
+				"X-Authorization":    {"forward-me"},
+				"Authorization-Info": {"not-auth"},
+			},
+			wantOther: map[string]string{
+				"X-Authorization":    "forward-me",
+				"Authorization-Info": "not-auth",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			producer := &httpRequestProducer{
+				httpMethod: "POST",
+				url:        "https://example.com/api",
+				headers:    tt.headers,
+				bodyBytes:  nil,
+				authHeader: func(ctx context.Context) (string, error) {
+					return "Bearer supplier-token", nil
+				},
+			}
+
+			req, err := producer.produce(context.Background())
+			require.NoError(t, err)
+
+			authValues := req.Header.Values("Authorization")
+			assert.Len(t, authValues, 1, "exactly one Authorization header expected")
+			assert.Equal(t, "Bearer supplier-token", authValues[0])
+
+			for key, value := range tt.wantOther {
+				assert.Contains(t, req.Header.Values(key), value)
+			}
+		})
 	}
 }
 
