@@ -10,11 +10,22 @@ To install the rest client, use:
 go get github.com/netcracker/qubership-core-lib-go/v3
 ```
 
+## Authentication mode
+
+The environment variable `M2M_AUTH_MODE` selects the token that every client in this package sends. It takes one of three values, matched case-insensitively; an unset or empty variable means `legacy`.
+
+| Mode | Token | DBaaS and MaaS requests |
+| --- | --- | --- |
+| `legacy` (default) | The legacy M2M token of the registered `security.TokenProvider` | Go through dbaas-agent and maas-agent |
+| `hybrid` | The Kubernetes token, with the legacy M2M token as the fallback described in [Authentication Fallback](#authentication-fallback) | Go to the requested address, or through the agent after a fallback |
+| `k8s` | The Kubernetes token only; no `security.TokenProvider` is needed | Go to the requested address; a 401 response is returned to the caller |
+
+Any other value, `true` and `false` included, makes the client constructors panic with `M2M_AUTH_MODE has unsupported value "<value>": set it to legacy, hybrid, or k8s`, so the service does not start. `KUBERNETES_M2M_ENABLED` is no longer read: when it is set, the clients log a warning and ignore its value.
+
 ## Override properties
 
 | Configuration Property | Default Value | Description |
 | --- | --- | --- |
-| `security.m2m.kubernetes.enabled` | false | Enable k8s tokens authentication |
 | `security.m2m.kubernetes.url-cache.internal-gateway-hostname` | internal-gateway-service | Hostname of the internal-gateway |
 | `dbaas.agent` | http://dbaas-agent:8080 | Address of the dbaas-agent used as fallback by `NewDbaasRestClient()` |
 | `maas.agent.url` | http://maas-agent:8080 | Address of the maas-agent used as fallback by `NewMaasRestClient()` |
@@ -25,9 +36,11 @@ The library offers three factory functions to create REST clients for different 
 
 ### Factory Functions
 
-* `NewM2MRestClient()` – returns a `*M2MRestClient` for internal service-to-service communication using Kubernetes tokens with Netcracker audience, with automatic fallback to Keycloak M2M tokens
-* `NewDbaasRestClient()` – returns a `*M2MRestClient` for DBaaS communication using Kubernetes tokens with DBaaS audience, with automatic fallback to dbaas-agent
-* `NewMaasRestClient()` – returns a `*M2MRestClient` for MaaS communication using Kubernetes tokens with MaaS audience, with automatic fallback to maas-agent
+* `NewM2MRestClient()` – returns a `*M2MRestClient` for internal service-to-service communication; its Kubernetes token has the netcracker audience
+* `NewDbaasRestClient()` – returns a `*M2MRestClient` for DBaaS communication; its Kubernetes token has the dbaas audience, and legacy requests go through dbaas-agent
+* `NewMaasRestClient()` – returns a `*M2MRestClient` for MaaS communication; its Kubernetes token has the maas audience, and legacy requests go through maas-agent
+
+Which token a client sends depends on `M2M_AUTH_MODE`; see [Authentication mode](#authentication-mode).
 
 ### Client Methods
 
@@ -256,13 +269,21 @@ func fetchWithCustomHeaders(ctx context.Context) error {
 
 ## Authentication Fallback
 
-The REST client automatically handles authentication method selection:
+In `hybrid` mode the REST client handles authentication method selection:
 
 1. **Primary Method**: On the first request to a service, the client attempts to use Kubernetes tokens with the appropriate audience
 2. **Automatic Fallback**: If Kubernetes token authentication fails (token unavailable, acquisition error, or 401 Unauthorized response), the client automatically falls back to the legacy authentication method
 3. **Caching**: Once a fallback is triggered for a service, subsequent requests to that service will directly use the fallback method to avoid unnecessary retries
 
 This ensures backward compatibility with services that haven't been upgraded to support Kubernetes token authentication while providing seamless migration path for services that do support it.
+
+### Clients other than M2MRestClient
+
+A service that sends requests through another HTTP client, such as fasthttp, gets the same token selection from `rest.NewM2MTokens()`:
+
+1. `Token(ctx, url)` returns the token to send and reports whether a 401 response may be retried. The retry is allowed only in `hybrid` mode, when the token is the Kubernetes token.
+2. On a 401 response to such a request, resend it with the token from `LegacyToken(ctx)`.
+3. When the resent request succeeds, call `UseLegacyToken(url)`. `Token` then returns the legacy M2M token for that service for the next 5 hours.
 
 ## Testing
 Override rest.DefaultDbaasAgentUrl and rest.DefaultMaasAgentUrl for testing.
