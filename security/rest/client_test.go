@@ -21,6 +21,7 @@ import (
 	"github.com/knadh/koanf/providers/confmap"
 	"github.com/netcracker/qubership-core-lib-go/v3/configloader"
 	"github.com/netcracker/qubership-core-lib-go/v3/security"
+	securitytest "github.com/netcracker/qubership-core-lib-go/v3/security/test"
 	"github.com/netcracker/qubership-core-lib-go/v3/security/tokenverifier"
 	"github.com/netcracker/qubership-core-lib-go/v3/serviceloader"
 	"github.com/stretchr/testify/assert"
@@ -783,4 +784,154 @@ func TestNewMaasRestClient_AgentUrlDefaultWhenPropertyNotFound(t *testing.T) {
 	m2mClient := NewMaasRestClient()
 
 	assert.Equal(t, DefaultMaasAgentUrl, m2mClient.fallBackBaseUrl)
+}
+
+// recordingServer answers every request with the status that status returns for its Authorization header, and
+// records the header of each request in arrival order.
+type recordingServer struct {
+	*httptest.Server
+	mu          sync.Mutex
+	authHeaders []string
+}
+
+func newRecordingServer(t *testing.T, status func(authHeader string) int) *recordingServer {
+	t.Helper()
+	s := &recordingServer{}
+	s.Server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		authHeader := r.Header.Get("Authorization")
+		s.mu.Lock()
+		s.authHeaders = append(s.authHeaders, authHeader)
+		s.mu.Unlock()
+		w.WriteHeader(status(authHeader))
+	}))
+	t.Cleanup(s.Close)
+	return s
+}
+
+func (s *recordingServer) received() []string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.authHeaders
+}
+
+func alwaysStatus(code int) func(string) int {
+	return func(string) int { return code }
+}
+
+func TestM2MRestClient_DoRequest_K8sM2mDisabled_SendsLegacyTokenToTargetWithoutAgent(t *testing.T) {
+	target := newRecordingServer(t, alwaysStatus(http.StatusOK))
+	client := &M2MRestClient{
+		client:                  target.Client(),
+		urlCache:                newUrlCache(),
+		k8sAuthHeader:           mockAuthHeaderFunc("Bearer new-token", nil),
+		fallbackAuthHeader:      mockAuthHeaderFunc("Bearer fallback-token", nil),
+		internalGatewayHostname: "internal-gateway-service",
+		k8sM2mEnabled:           false,
+	}
+
+	resp, err := client.DoRequest(context.Background(), "GET", target.URL+"/api/v1/resource", nil, nil)
+	require.NoError(t, err)
+	resp.Body.Close()
+
+	assert.Equal(t, []string{"Bearer fallback-token"}, target.received())
+}
+
+func TestM2MRestClient_DoRequest_K8sTokenAccepted_TargetIsNotRebasedToAgent(t *testing.T) {
+	agent := newRecordingServer(t, alwaysStatus(http.StatusOK))
+	target := newRecordingServer(t, alwaysStatus(http.StatusOK))
+	client := &M2MRestClient{
+		client:                  target.Client(),
+		urlCache:                newUrlCache(),
+		k8sAuthHeader:           mockAuthHeaderFunc("Bearer new-token", nil),
+		fallbackAuthHeader:      mockAuthHeaderFunc("Bearer fallback-token", nil),
+		fallBackBaseUrl:         agent.URL,
+		internalGatewayHostname: "internal-gateway-service",
+		k8sM2mEnabled:           true,
+	}
+
+	resp, err := client.DoRequest(context.Background(), "GET", target.URL+"/api/v1/resource", nil, nil)
+	require.NoError(t, err)
+	resp.Body.Close()
+
+	assert.Equal(t, []string{"Bearer new-token"}, target.received())
+	assert.Empty(t, agent.received())
+}
+
+func TestM2MRestClient_DoRequest_FailedFallback_TargetIsNotCached(t *testing.T) {
+	target := newRecordingServer(t, alwaysStatus(http.StatusUnauthorized))
+	client := &M2MRestClient{
+		client:                  target.Client(),
+		urlCache:                newUrlCache(),
+		k8sAuthHeader:           mockAuthHeaderFunc("Bearer new-token", nil),
+		fallbackAuthHeader:      mockAuthHeaderFunc("Bearer fallback-token", nil),
+		internalGatewayHostname: "internal-gateway-service",
+		k8sM2mEnabled:           true,
+	}
+	url := target.URL + "/api/v1/resource"
+
+	for range 2 {
+		resp, err := client.DoRequest(context.Background(), "GET", url, nil, nil)
+		require.NoError(t, err)
+		resp.Body.Close()
+	}
+
+	assert.Equal(t, []string{"Bearer new-token", "Bearer fallback-token", "Bearer new-token", "Bearer fallback-token"}, target.received())
+}
+
+type stubTokenProvider struct {
+	security.DummyToken
+	token string
+}
+
+func (p *stubTokenProvider) GetToken(context.Context) (string, error) {
+	return p.token, nil
+}
+
+// registerStubTokens makes the constructors pick up "k8s-token" as the Kubernetes token and "legacy-token" as the
+// legacy M2M token; the priority outranks the DummyToken the other tests register.
+func registerStubTokens() {
+	serviceloader.Register(100, &securitytest.MockTokenSource{AudienceToken: "k8s-token"})
+	serviceloader.Register(100, &stubTokenProvider{token: "legacy-token"})
+}
+
+func TestNewDbaasRestClient_K8sM2mEnvNotSet_SendsLegacyTokenThroughAgent(t *testing.T) {
+	registerStubTokens()
+	t.Setenv("KUBERNETES_M2M_ENABLED", "")
+	agent := newRecordingServer(t, alwaysStatus(http.StatusOK))
+	dbaas := newRecordingServer(t, alwaysStatus(http.StatusOK))
+	initConfigWith(t, map[string]any{DbaasAgentUrlProperty: agent.URL})
+
+	resp, err := NewDbaasRestClient().DoRequest(context.Background(), "GET", dbaas.URL+"/api/v3/dbaas/databases", nil, nil)
+	require.NoError(t, err)
+	resp.Body.Close()
+
+	assert.Equal(t, []string{"Bearer legacy-token"}, agent.received())
+	assert.Empty(t, dbaas.received())
+}
+
+func TestNewDbaasRestClient_K8sM2mEnabled_SendsK8sTokenToDbaas(t *testing.T) {
+	registerStubTokens()
+	t.Setenv("KUBERNETES_M2M_ENABLED", "true")
+	agent := newRecordingServer(t, alwaysStatus(http.StatusOK))
+	dbaas := newRecordingServer(t, alwaysStatus(http.StatusOK))
+	initConfigWith(t, map[string]any{DbaasAgentUrlProperty: agent.URL})
+
+	resp, err := NewDbaasRestClient().DoRequest(context.Background(), "GET", dbaas.URL+"/api/v3/dbaas/databases", nil, nil)
+	require.NoError(t, err)
+	resp.Body.Close()
+
+	assert.Equal(t, []string{"Bearer k8s-token"}, dbaas.received())
+	assert.Empty(t, agent.received())
+}
+
+func TestNewM2MRestClient_K8sM2mEnvNotSet_SendsLegacyTokenToTarget(t *testing.T) {
+	registerStubTokens()
+	t.Setenv("KUBERNETES_M2M_ENABLED", "")
+	target := newRecordingServer(t, alwaysStatus(http.StatusOK))
+
+	resp, err := NewM2MRestClient().DoRequest(context.Background(), "GET", target.URL+"/api/v1/resource", nil, nil)
+	require.NoError(t, err)
+	resp.Body.Close()
+
+	assert.Equal(t, []string{"Bearer legacy-token"}, target.received())
 }
