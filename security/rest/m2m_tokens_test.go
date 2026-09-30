@@ -18,7 +18,7 @@ func stubToken(token string, err error) func(context.Context) (string, error) {
 
 func newTestM2MTokens(mode security.M2MAuthMode, k8sErr error) *M2MTokens {
 	tokens := &M2MTokens{
-		mode:                    mode,
+		m2mAuthMode:             mode,
 		k8sToken:                stubToken("k8s-token", k8sErr),
 		legacyTargets:           newUrlCache(),
 		internalGatewayHostname: "internal-gateway-service",

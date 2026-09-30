@@ -20,7 +20,7 @@ The environment variable `M2M_AUTH_MODE` selects the token that every client in 
 | `hybrid` | The Kubernetes token, with the legacy M2M token as the fallback described in [Authentication Fallback](#authentication-fallback) | Go to the requested address, or through the agent after a fallback |
 | `k8s` | The Kubernetes token only; no `security.TokenProvider` is needed | Go to the requested address; a 401 response is returned to the caller |
 
-Any other value, `true` and `false` included, makes the client constructors panic with `M2M_AUTH_MODE has unsupported value "<value>": set it to legacy, hybrid, or k8s`, so the service does not start. `KUBERNETES_M2M_ENABLED` is no longer read: when it is set, the clients log a warning and ignore its value.
+Any other value, `true` and `false` included, makes the client constructors panic with `M2M_AUTH_MODE has unsupported value "<value>": set it to legacy, hybrid, or k8s`, so the service does not start.
 
 ## Override properties
 

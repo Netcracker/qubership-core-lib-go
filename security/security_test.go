@@ -42,7 +42,6 @@ func init() {
 	serviceloader.Register(10, keycloakToken)
 }
 
-// failK8sToken makes the registered token source fail until the test ends.
 func failK8sToken(t *testing.T, err error) {
 	t.Helper()
 	k8sToken.AudienceTokenError = err
