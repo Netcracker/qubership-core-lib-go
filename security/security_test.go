@@ -2,13 +2,14 @@ package security
 
 import (
 	"context"
-	"os"
+	"errors"
 	"testing"
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/netcracker/qubership-core-lib-go/v3/security/test"
 	"github.com/netcracker/qubership-core-lib-go/v3/serviceloader"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 type mockKeycloakToken struct {
@@ -31,54 +32,68 @@ func (s *mockKeycloakToken) GetTokenAttribute(ctx context.Context, claim string)
 	return "", nil
 }
 
-func TestGetTokenFunc(t *testing.T) {
-	keycloakToken := &mockKeycloakToken{token: "keycloakToken"}
-	k8sToken := &test.MockTokenSource{AudienceToken: "k8sToken"}
+var (
+	keycloakToken = &mockKeycloakToken{token: "keycloakToken"}
+	k8sToken      = &test.MockTokenSource{AudienceToken: "k8sToken"}
+)
+
+func init() {
 	serviceloader.Register(10, k8sToken)
 	serviceloader.Register(10, keycloakToken)
+}
 
+// failK8sToken makes the registered token source fail until the test ends.
+func failK8sToken(t *testing.T, err error) {
+	t.Helper()
+	k8sToken.AudienceTokenError = err
+	t.Cleanup(func() { k8sToken.AudienceTokenError = nil })
+}
+
+func TestGetTokenFunc(t *testing.T) {
 	tests := []struct {
-		name          string
-		envValue      string
-		k8sM2mEnabled bool
+		name      string
+		mode      string
+		wantToken string
 	}{
-		{
-			name:          "K8s M2M Enabled",
-			envValue:      "true",
-			k8sM2mEnabled: true,
-		},
-		{
-			name:          "K8s M2M Disabled",
-			envValue:      "false",
-			k8sM2mEnabled: false,
-		},
-		{
-			name:          "Invalid Env Value defaults to Keycloak",
-			envValue:      "invalid-boolean",
-			k8sM2mEnabled: false,
-		},
-		{
-			name:          "Empty Env Value defaults to Keycloak",
-			envValue:      "",
-			k8sM2mEnabled: false,
-		},
+		{name: "legacy mode returns the keycloak token", mode: "legacy", wantToken: "keycloakToken"},
+		{name: "unset mode returns the keycloak token", mode: "", wantToken: "keycloakToken"},
+		{name: "hybrid mode returns the k8s token", mode: "hybrid", wantToken: "k8sToken"},
+		{name: "k8s mode returns the k8s token", mode: "k8s", wantToken: "k8sToken"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if tt.envValue != "" {
-				os.Setenv("KUBERNETES_M2M_ENABLED", tt.envValue)
-			}
-			defer os.Unsetenv("KUBERNETES_M2M_ENABLED")
+			t.Setenv(M2MAuthModeEnv, tt.mode)
 
-			tokenFunc := GetTokenFunc()
-			token, err := tokenFunc(t.Context())
-			assert.NoError(t, err)
+			token, err := GetTokenFunc()(t.Context())
 
-			if tt.k8sM2mEnabled {
-				assert.Equal(t, k8sToken.AudienceToken, token)
-			} else {
-				assert.Equal(t, keycloakToken.token, token)
-			}
+			require.NoError(t, err)
+			assert.Equal(t, tt.wantToken, token)
 		})
 	}
+}
+
+func TestGetTokenFunc_HybridModeFallsBackToKeycloakTokenWhenK8sTokenIsUnreadable(t *testing.T) {
+	t.Setenv(M2MAuthModeEnv, "hybrid")
+	failK8sToken(t, errors.New("token file is missing"))
+
+	token, err := GetTokenFunc()(t.Context())
+
+	require.NoError(t, err)
+	assert.Equal(t, "keycloakToken", token)
+}
+
+func TestGetTokenFunc_K8sModeReturnsK8sTokenError(t *testing.T) {
+	t.Setenv(M2MAuthModeEnv, "k8s")
+	k8sErr := errors.New("token file is missing")
+	failK8sToken(t, k8sErr)
+
+	_, err := GetTokenFunc()(t.Context())
+
+	assert.ErrorIs(t, err, k8sErr)
+}
+
+func TestGetTokenFunc_UnsupportedModePanics(t *testing.T) {
+	t.Setenv(M2MAuthModeEnv, "true")
+
+	assert.Panics(t, func() { GetTokenFunc() })
 }

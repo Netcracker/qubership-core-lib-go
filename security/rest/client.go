@@ -7,8 +7,6 @@ import (
 	"io"
 	"net/http"
 	"net/url"
-	"os"
-	"strconv"
 
 	cache "github.com/go-pkgz/expirable-cache/v3"
 	"github.com/netcracker/qubership-core-lib-go/v3/configloader"
@@ -36,21 +34,27 @@ func init() {
 	logger = logging.GetLogger("rest-client")
 }
 
-// NewM2MRestClient returns a *M2MRestClient for making requests to internal services using kubernetes token with netcracker audience. If token is not available or a service doesn't support kubernetes tokens then it falls back to old m2m tokens
+// NewM2MRestClient returns a *M2MRestClient for making requests to internal services in the mode that
+// [security.MustM2MAuthModeFromEnv] reads. The Kubernetes token has the netcracker audience; in hybrid mode the client
+// falls back to the legacy M2M token when the Kubernetes token is not available or a service rejects it.
 func NewM2MRestClient() *M2MRestClient {
-	return newM2MRestClient(k8sAuthHeaderFunc(tokensource.AudienceNetcracker), keycloakAuthHeaderFunc(), "")
+	return newM2MRestClient(security.MustM2MAuthModeFromEnv(), tokensource.AudienceNetcracker, "")
 }
 
-// NewDbaasRestClient returns a *M2MRestClient for making requests to dbaas using kubernetes token with dbaas audience. If token is not available or the current dbaas version doesn't support kubernetes tokens then it falls back to old approach making request through dbaas-agent
+// NewDbaasRestClient returns a *M2MRestClient for making requests to dbaas in the mode that
+// [security.MustM2MAuthModeFromEnv] reads. The Kubernetes token has the dbaas audience. In legacy mode, and in hybrid
+// mode when the Kubernetes token is not available or dbaas rejects it, the request goes through dbaas-agent instead.
 func NewDbaasRestClient() *M2MRestClient {
 	dbaasAgentUrl := configloader.GetOrDefaultString(DbaasAgentUrlProperty, DefaultDbaasAgentUrl)
-	return newM2MRestClient(k8sAuthHeaderFunc(tokensource.AudienceDBaaS), keycloakAuthHeaderFunc(), dbaasAgentUrl)
+	return newM2MRestClient(security.MustM2MAuthModeFromEnv(), tokensource.AudienceDBaaS, dbaasAgentUrl)
 }
 
-// NewMaasRestClient returns a *M2MRestClient for making requests to maas using kubernetes token with maas audience. If token is not available or the current maas version doesn't support kubernetes tokens then it falls back to old approach making request through maas-agent
+// NewMaasRestClient returns a *M2MRestClient for making requests to maas in the mode that
+// [security.MustM2MAuthModeFromEnv] reads. The Kubernetes token has the maas audience. In legacy mode, and in hybrid
+// mode when the Kubernetes token is not available or maas rejects it, the request goes through maas-agent instead.
 func NewMaasRestClient() *M2MRestClient {
 	maasAgentUrl := configloader.GetOrDefaultString(MaasAgentUrlProperty, DefaultMaasAgentUrl)
-	return newM2MRestClient(k8sAuthHeaderFunc(tokensource.AudienceMaaS), keycloakAuthHeaderFunc(), maasAgentUrl)
+	return newM2MRestClient(security.MustM2MAuthModeFromEnv(), tokensource.AudienceMaaS, maasAgentUrl)
 }
 
 type authHeaderFunc func(ctx context.Context) (string, error)
@@ -62,23 +66,22 @@ type M2MRestClient struct {
 	fallbackAuthHeader      authHeaderFunc
 	fallBackBaseUrl         string
 	internalGatewayHostname string
-	k8sM2mEnabled           bool
+	mode                    security.M2MAuthMode
 }
 
-func newM2MRestClient(k8sAuthHeader, fallbackAuthHeader authHeaderFunc, fallBackBaseUrl string) *M2MRestClient {
-	k8sM2mEnabled, err := strconv.ParseBool(os.Getenv("KUBERNETES_M2M_ENABLED"))
-	if err != nil {
-		k8sM2mEnabled = false
-	}
-	return &M2MRestClient{
+func newM2MRestClient(mode security.M2MAuthMode, audience tokensource.TokenAudience, fallBackBaseUrl string) *M2MRestClient {
+	client := &M2MRestClient{
 		client:                  utils.GetClient(),
 		urlCache:                newUrlCache(),
-		k8sAuthHeader:           k8sAuthHeader,
-		fallbackAuthHeader:      fallbackAuthHeader,
+		k8sAuthHeader:           k8sAuthHeaderFunc(audience),
 		fallBackBaseUrl:         fallBackBaseUrl,
-		internalGatewayHostname: configloader.GetOrDefaultString("security.m2m.kubernetes.url-cache.internal-gateway-hostname", "internal-gateway-service"),
-		k8sM2mEnabled:           k8sM2mEnabled,
+		internalGatewayHostname: internalGatewayHostname(),
+		mode:                    mode,
 	}
+	if mode.UsesLegacyToken() {
+		client.fallbackAuthHeader = keycloakAuthHeaderFunc()
+	}
+	return client
 }
 
 // DoRequest performs an HTTP request with automatic authentication handling and fallback.
@@ -91,8 +94,15 @@ func (m *M2MRestClient) DoRequest(ctx context.Context, httpMethod, url string, h
 	if err != nil {
 		return nil, err
 	}
+	if !m.mode.UsesK8sToken() {
+		return m.doRequestFallback(ctx, cacheKey, requestProducer, nil)
+	}
+	if !m.mode.UsesLegacyToken() {
+		requestProducer.authHeader = m.k8sAuthHeader
+		return m.doRequest(ctx, requestProducer)
+	}
 	_, ok := m.urlCache.Get(cacheKey)
-	if m.k8sM2mEnabled && !ok {
+	if !ok {
 		logger.Debugf("trying to send %s request to %s using new authentication method", httpMethod, url)
 		//first call (no information) / new authentication method is applicable
 		requestProducer.authHeader = m.k8sAuthHeader
@@ -136,7 +146,7 @@ func (m *M2MRestClient) doRequestFallback(ctx context.Context, cacheKey string, 
 		m.urlCache.Add(cacheKey, empty{})
 	}
 	if reason != nil {
-		if reason.desc == kubernetesTokenAcquisitionError && m.k8sM2mEnabled {
+		if reason.desc == kubernetesTokenAcquisitionError {
 			logger.WarnC(ctx, "%s", reason.Message())
 		} else {
 			logger.DebugC(ctx, "%s", reason.Message())
@@ -158,6 +168,10 @@ func (m *M2MRestClient) doRequest(ctx context.Context, requestProducer *httpRequ
 	}
 
 	return httpResponse, nil
+}
+
+func internalGatewayHostname() string {
+	return configloader.GetOrDefaultString("security.m2m.kubernetes.url-cache.internal-gateway-hostname", "internal-gateway-service")
 }
 
 func k8sAuthHeaderFunc(audience tokensource.TokenAudience) authHeaderFunc {

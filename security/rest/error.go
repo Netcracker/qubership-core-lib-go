@@ -7,7 +7,7 @@ import (
 const (
 	kubernetesTokenAcquisitionError = "error acquiring kubernetes token for m2m communication.\n" +
 		"the current version of the security library expects a kubernetes token with the required audience to be mounted in the deployment.\n" +
-		"if you do not intend to use a kubernetes token at this time, please roll back to a previous version of the library.\n" +
+		"if you do not intend to use a kubernetes token, set M2M_AUTH_MODE to legacy.\n" +
 		"otherwise, make sure that a kubernetes token with the required audience is properly mounted.\n" +
 		"the previous authentication method will be used as a fallback."
 	kubernetesTokenUnauthorizedError = "unauthorized access (http 401).\n" +
