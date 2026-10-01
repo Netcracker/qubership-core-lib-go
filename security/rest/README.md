@@ -279,11 +279,22 @@ This ensures backward compatibility with services that haven't been upgraded to 
 
 ### Clients other than M2MRestClient
 
-A service that sends requests through another HTTP client, such as fasthttp, gets the same token selection from `rest.NewM2MTokens()`:
+A service that sends requests through another HTTP or websocket client, such as fasthttp or gorilla/websocket, uses `rest.NewM2MRequestSender()`. `Send` calls the given function with the token for the target, and in `hybrid` mode calls it again with the legacy M2M token after a 401, the same fallback and cache as `M2MRestClient`. The function returns the response status code; the caller keeps the response of the last call:
 
-1. `Token(ctx, url)` returns the token to send and reports whether a 401 response may be retried. The retry is allowed only in `hybrid` mode, when the token is the Kubernetes token.
-2. On a 401 response to such a request, resend it with the token from `LegacyToken(ctx)`.
-3. When the resent request succeeds, call `UseLegacyToken(url)`. `Token` then returns the legacy M2M token for that service for the next 5 hours.
+```go
+var response *fasthttp.Response
+err := sender.Send(ctx, url, func(token string) (int, error) {
+	if response != nil {
+		fasthttp.ReleaseResponse(response) // the 401 that is resent
+	}
+	var err error
+	response, err = doRequest(ctx, url, token)
+	if err != nil {
+		return 0, err
+	}
+	return response.StatusCode(), nil
+})
+```
 
 ## Testing
 Override rest.DefaultDbaasAgentUrl and rest.DefaultMaasAgentUrl for testing.
