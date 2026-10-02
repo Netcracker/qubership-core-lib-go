@@ -1,0 +1,4 @@
+name: logging-go-usage
+version: 1.0.0
+description: Logging conventions for Qubership Go microservices.
+author: Qubership

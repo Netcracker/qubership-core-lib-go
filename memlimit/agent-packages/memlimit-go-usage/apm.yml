@@ -1,0 +1,4 @@
+name: memlimit-go-usage
+version: 1.0.0
+description: GOMEMLIMIT auto-configuration for Qubership Go microservices.
+author: Qubership
