@@ -7,8 +7,6 @@ import (
 	"io"
 	"net/http"
 	"net/url"
-	"os"
-	"strconv"
 
 	cache "github.com/go-pkgz/expirable-cache/v3"
 	"github.com/netcracker/qubership-core-lib-go/v3/configloader"
@@ -36,21 +34,23 @@ func init() {
 	logger = logging.GetLogger("rest-client")
 }
 
-// NewM2MRestClient returns a *M2MRestClient for making requests to internal services using kubernetes token with netcracker audience. If token is not available or a service doesn't support kubernetes tokens then it falls back to old m2m tokens
+// NewM2MRestClient returns a client for internal services whose Kubernetes token has the netcracker audience.
 func NewM2MRestClient() *M2MRestClient {
-	return newM2MRestClient(k8sAuthHeaderFunc(tokensource.AudienceNetcracker), keycloakAuthHeaderFunc(), "")
+	return newM2MRestClient(security.MustReadM2MAuthMode(), tokensource.AudienceNetcracker, "")
 }
 
-// NewDbaasRestClient returns a *M2MRestClient for making requests to dbaas using kubernetes token with dbaas audience. If token is not available or the current dbaas version doesn't support kubernetes tokens then it falls back to old approach making request through dbaas-agent
+// NewDbaasRestClient returns a client for dbaas whose Kubernetes token has the dbaas audience. In legacy mode, and
+// after a fallback in hybrid mode, requests go through dbaas-agent.
 func NewDbaasRestClient() *M2MRestClient {
 	dbaasAgentUrl := configloader.GetOrDefaultString(DbaasAgentUrlProperty, DefaultDbaasAgentUrl)
-	return newM2MRestClient(k8sAuthHeaderFunc(tokensource.AudienceDBaaS), keycloakAuthHeaderFunc(), dbaasAgentUrl)
+	return newM2MRestClient(security.MustReadM2MAuthMode(), tokensource.AudienceDBaaS, dbaasAgentUrl)
 }
 
-// NewMaasRestClient returns a *M2MRestClient for making requests to maas using kubernetes token with maas audience. If token is not available or the current maas version doesn't support kubernetes tokens then it falls back to old approach making request through maas-agent
+// NewMaasRestClient returns a client for maas whose Kubernetes token has the maas audience. In legacy mode, and
+// after a fallback in hybrid mode, requests go through maas-agent.
 func NewMaasRestClient() *M2MRestClient {
 	maasAgentUrl := configloader.GetOrDefaultString(MaasAgentUrlProperty, DefaultMaasAgentUrl)
-	return newM2MRestClient(k8sAuthHeaderFunc(tokensource.AudienceMaaS), keycloakAuthHeaderFunc(), maasAgentUrl)
+	return newM2MRestClient(security.MustReadM2MAuthMode(), tokensource.AudienceMaaS, maasAgentUrl)
 }
 
 type authHeaderFunc func(ctx context.Context) (string, error)
@@ -62,23 +62,22 @@ type M2MRestClient struct {
 	fallbackAuthHeader      authHeaderFunc
 	fallBackBaseUrl         string
 	internalGatewayHostname string
-	k8sM2mEnabled           bool
+	m2mAuthMode             security.M2MAuthMode
 }
 
-func newM2MRestClient(k8sAuthHeader, fallbackAuthHeader authHeaderFunc, fallBackBaseUrl string) *M2MRestClient {
-	k8sM2mEnabled, err := strconv.ParseBool(os.Getenv("KUBERNETES_M2M_ENABLED"))
-	if err != nil {
-		k8sM2mEnabled = false
-	}
-	return &M2MRestClient{
+func newM2MRestClient(mode security.M2MAuthMode, audience tokensource.TokenAudience, fallBackBaseUrl string) *M2MRestClient {
+	client := &M2MRestClient{
 		client:                  utils.GetClient(),
 		urlCache:                newUrlCache(),
-		k8sAuthHeader:           k8sAuthHeader,
-		fallbackAuthHeader:      fallbackAuthHeader,
+		k8sAuthHeader:           k8sAuthHeaderFunc(audience),
 		fallBackBaseUrl:         fallBackBaseUrl,
-		internalGatewayHostname: configloader.GetOrDefaultString("security.m2m.kubernetes.url-cache.internal-gateway-hostname", "internal-gateway-service"),
-		k8sM2mEnabled:           k8sM2mEnabled,
+		internalGatewayHostname: internalGatewayHostname(),
+		m2mAuthMode:             mode,
 	}
+	if mode.UsesLegacyToken() {
+		client.fallbackAuthHeader = keycloakAuthHeaderFunc()
+	}
+	return client
 }
 
 // DoRequest performs an HTTP request with automatic authentication handling and fallback.
@@ -91,35 +90,46 @@ func (m *M2MRestClient) DoRequest(ctx context.Context, httpMethod, url string, h
 	if err != nil {
 		return nil, err
 	}
-	_, ok := m.urlCache.Get(cacheKey)
-	if m.k8sM2mEnabled && !ok {
-		logger.Debugf("trying to send %s request to %s using new authentication method", httpMethod, url)
-		//first call (no information) / new authentication method is applicable
+	switch m.m2mAuthMode {
+	case security.M2MAuthModeK8s:
 		requestProducer.authHeader = m.k8sAuthHeader
-		response, requestError := m.doRequest(ctx, requestProducer)
-		if requestError != nil {
-			tae := &TokenAcquisitionError{}
-			if errors.As(requestError, &tae) {
-				return m.doRequestFallback(ctx, cacheKey, requestProducer, &fallbackReason{desc: kubernetesTokenAcquisitionError, url: url, err: tae})
-			}
-			return nil, requestError
-		}
-
-		if response.StatusCode == http.StatusUnauthorized {
-			//authentication failed, need to use fallback approach
-			if response.Body != nil {
-				response.Body.Close()
-			}
-			return m.doRequestFallback(ctx, cacheKey, requestProducer, &fallbackReason{desc: kubernetesTokenUnauthorizedError, url: url})
-		}
-		return response, nil
+		return m.doRequest(ctx, requestProducer)
+	case security.M2MAuthModeHybrid:
+		return m.doHybridRequest(ctx, cacheKey, requestProducer)
+	default:
+		return m.doLegacyRequest(ctx, cacheKey, requestProducer, nil)
 	}
-
-	//new authentication method is not applicable (we already know it from cache), need to use fallback approach
-	return m.doRequestFallback(ctx, cacheKey, requestProducer, nil)
 }
 
-func (m *M2MRestClient) doRequestFallback(ctx context.Context, cacheKey string, requestProducer *httpRequestProducer, reason *fallbackReason) (*http.Response, error) {
+func (m *M2MRestClient) doHybridRequest(ctx context.Context, cacheKey string, requestProducer *httpRequestProducer) (*http.Response, error) {
+	url := requestProducer.url
+	if _, ok := m.urlCache.Get(cacheKey); ok {
+		//new authentication method is not applicable (we already know it from cache), need to use fallback approach
+		return m.doLegacyRequest(ctx, cacheKey, requestProducer, nil)
+	}
+	logger.Debugf("trying to send %s request to %s using new authentication method", requestProducer.httpMethod, url)
+	//first call (no information) / new authentication method is applicable
+	requestProducer.authHeader = m.k8sAuthHeader
+	response, requestError := m.doRequest(ctx, requestProducer)
+	if requestError != nil {
+		tae := &TokenAcquisitionError{}
+		if errors.As(requestError, &tae) {
+			return m.doLegacyRequest(ctx, cacheKey, requestProducer, &fallbackReason{desc: kubernetesTokenAcquisitionError, url: url, err: tae})
+		}
+		return nil, requestError
+	}
+
+	if response.StatusCode == http.StatusUnauthorized {
+		//authentication failed, need to use fallback approach
+		if response.Body != nil {
+			response.Body.Close()
+		}
+		return m.doLegacyRequest(ctx, cacheKey, requestProducer, &fallbackReason{desc: kubernetesTokenUnauthorizedError, url: url})
+	}
+	return response, nil
+}
+
+func (m *M2MRestClient) doLegacyRequest(ctx context.Context, cacheKey string, requestProducer *httpRequestProducer, reason *fallbackReason) (*http.Response, error) {
 	logger.Debugf("fallback: trying to send %s request to %s using fallback authentication method", requestProducer.httpMethod, requestProducer.url)
 
 	if m.fallBackBaseUrl != "" {
@@ -136,7 +146,7 @@ func (m *M2MRestClient) doRequestFallback(ctx context.Context, cacheKey string, 
 		m.urlCache.Add(cacheKey, empty{})
 	}
 	if reason != nil {
-		if reason.desc == kubernetesTokenAcquisitionError && m.k8sM2mEnabled {
+		if reason.desc == kubernetesTokenAcquisitionError {
 			logger.WarnC(ctx, "%s", reason.Message())
 		} else {
 			logger.DebugC(ctx, "%s", reason.Message())
@@ -158,6 +168,10 @@ func (m *M2MRestClient) doRequest(ctx context.Context, requestProducer *httpRequ
 	}
 
 	return httpResponse, nil
+}
+
+func internalGatewayHostname() string {
+	return configloader.GetOrDefaultString("security.m2m.kubernetes.url-cache.internal-gateway-hostname", "internal-gateway-service")
 }
 
 func k8sAuthHeaderFunc(audience tokensource.TokenAudience) authHeaderFunc {

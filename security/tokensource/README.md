@@ -41,7 +41,7 @@ When env `SECURITY_LOCALDEV=true`, `selectableTokenSource` (registered in `init`
 | `SECURITY_LOCALDEV=true` | Enables local-dev TokenRequest |
 | `microservice.name` | Kubernetes service account name (`application.yaml` or env `MICROSERVICE_NAME`) |
 | `CLOUD_NAMESPACE` | Namespace for TokenRequest |
-| `KUBERNETES_M2M_ENABLED=true` | K8s M2M path in security |
+| `M2M_AUTH_MODE=hybrid` or `M2M_AUTH_MODE=k8s` | Makes the M2M clients in security send the Kubernetes token |
 
 Prod continues to use projected volume token files (`DefaultTokenFileProvider`).
 
