@@ -125,6 +125,17 @@ func TestM2MRequestSender_Send_HybridModeSendsLegacyTokenWhenK8sTokenIsUnreadabl
 	assert.Equal(t, []string{"legacy-token"}, r.tokens)
 }
 
+func TestM2MRequestSender_Send_HybridModeKeepsLegacyTokenForTargetAfterUnreadableK8sToken(t *testing.T) {
+	sender := newTestSender(security.M2MAuthModeHybrid, errors.New("token file is missing"))
+	r := respondInTurn(ok, ok)
+
+	require.NoError(t, sender.Send(context.Background(), tenantManagerUrl, r.send))
+	sender.k8sToken = stubToken("k8s-token", nil)
+	require.NoError(t, sender.Send(context.Background(), tenantManagerUrl, r.send))
+
+	assert.Equal(t, []string{"legacy-token", "legacy-token"}, r.tokens)
+}
+
 func TestM2MRequestSender_Send_HybridModeReturnsLegacyTokenErrorAfter401(t *testing.T) {
 	legacyErr := errors.New("keycloak is down")
 	sender := newTestSender(security.M2MAuthModeHybrid, nil)
@@ -203,4 +214,10 @@ func TestNewM2MRequestSender_UnsupportedModePanics(t *testing.T) {
 	t.Setenv(security.M2MAuthModeEnv, "false")
 
 	assert.Panics(t, func() { NewM2MRequestSender() })
+}
+
+func TestNewM2MRequestSender_K8sModeDoesNotLoadTokenProvider(t *testing.T) {
+	t.Setenv(security.M2MAuthModeEnv, "k8s")
+
+	assert.Nil(t, NewM2MRequestSender().legacyToken)
 }
