@@ -279,7 +279,7 @@ This ensures backward compatibility with services that haven't been upgraded to 
 
 ### Clients other than M2MRestClient
 
-A service that sends requests through another HTTP or websocket client, such as fasthttp or gorilla/websocket, uses `rest.NewM2MRequestSender()`. `Send` calls the given function with the token for the target, and in `hybrid` mode calls it again with the legacy M2M token after a 401, the same fallback and cache as `M2MRestClient`. The function returns the response status code; the caller keeps the response of the last call:
+A service that sends requests through another HTTP or websocket client, such as fasthttp or gorilla/websocket, uses `rest.NewM2MRequestSender()`. `Send` calls the given function with the token for the target. In `hybrid` mode it has the same fallback and cache as `M2MRestClient`: it sends the legacy M2M token when the Kubernetes token cannot be read, and calls the function again with the legacy token after a 401. The function returns the response status code; the caller keeps the response of the last call:
 
 ```go
 var response *fasthttp.Response

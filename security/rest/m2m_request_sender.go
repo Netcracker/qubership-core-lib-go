@@ -15,9 +15,9 @@ import (
 type SendFunc func(token string) (statusCode int, err error)
 
 // M2MRequestSender sends requests of HTTP and websocket clients other than [M2MRestClient] with the M2M token of the
-// mode set by M2M_AUTH_MODE. In hybrid mode it resends a request with the legacy M2M token when the Kubernetes token
-// cannot be read or the receiver answers 401, and then keeps sending the legacy token to that target, as
-// [M2MRestClient] does.
+// mode set by M2M_AUTH_MODE. In hybrid mode it sends the legacy M2M token when the Kubernetes token cannot be read, and
+// resends a request with the legacy token when the receiver answers 401 to the Kubernetes token. Once a target answers
+// the legacy token with a status below 400, the sender keeps sending the legacy token to it, as [M2MRestClient] does.
 type M2MRequestSender struct {
 	m2mAuthMode             security.M2MAuthMode
 	k8sToken                func(ctx context.Context) (string, error)
@@ -44,9 +44,10 @@ func NewM2MRequestSender() *M2MRequestSender {
 	return sender
 }
 
-// Send calls send with the M2M token for targetUrl and returns the error of its last call. When a token cannot be read,
-// Send returns that error instead of calling send with it. In hybrid mode send is called a second time, with the legacy
-// M2M token, after a 401 to the Kubernetes token, even when the first call also returned an error.
+// Send calls send with the M2M token for targetUrl and returns the error of its last call. In hybrid mode an unreadable
+// Kubernetes token is replaced with the legacy M2M token, and send is called a second time, with the legacy M2M token,
+// after a 401 to the Kubernetes token, even when the first call also returned an error. When any other token cannot be
+// read, Send returns that error without calling send.
 func (s *M2MRequestSender) Send(ctx context.Context, targetUrl string, send SendFunc) error {
 	switch s.m2mAuthMode {
 	case security.M2MAuthModeK8s:

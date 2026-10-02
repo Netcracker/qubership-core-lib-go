@@ -14,7 +14,7 @@ const (
 	// M2MAuthModeLegacy sends the legacy M2M token; DBaaS and MaaS requests go through their agents.
 	M2MAuthModeLegacy M2MAuthMode = "legacy"
 	// M2MAuthModeHybrid sends the Kubernetes token and falls back to the legacy M2M token when the Kubernetes token
-	// cannot be read or the receiver rejects it.
+	// cannot be read or the receiver answers 401.
 	M2MAuthModeHybrid M2MAuthMode = "hybrid"
 	// M2MAuthModeK8s sends only the Kubernetes token, without a fallback.
 	M2MAuthModeK8s M2MAuthMode = "k8s"
