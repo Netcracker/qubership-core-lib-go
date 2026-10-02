@@ -95,10 +95,12 @@ func GetTlsConfig() *tls.Config {
 	return getConfig().tlsConfig.Clone()
 }
 
+// GetTransport returns a clone of the standard library's default transport carrying the TLS
+// configuration of this package.
 func GetTransport() *http.Transport {
-	return &http.Transport{
-		TLSClientConfig: GetTlsConfig(),
-	}
+	transport := http.DefaultTransport.(*http.Transport).Clone()
+	transport.TLSClientConfig = GetTlsConfig()
+	return transport
 }
 
 func GetClient() *http.Client {
