@@ -18,6 +18,7 @@ const (
 )
 
 func TestSetMessageFormat_CustomFormat(t *testing.T) {
+	withCleanLoggingState(t)
 	message := "New test message logFormat"
 	testLogMessageFormat := func(r *Record, b *bytes.Buffer, color int, lvl string) (int, error) {
 		return fmt.Fprintf(b, "%s", message)
@@ -25,11 +26,10 @@ func TestSetMessageFormat_CustomFormat(t *testing.T) {
 	DefaultFormat.SetMessageFormat(testLogMessageFormat)
 	formatBuffer := DefaultFormat.format(&Record{})
 	assert.True(t, strings.Contains(string(formatBuffer), message))
-	// have to clear message logFormat or other test won't pass
-	DefaultFormat.messageFormat = nil
 }
 
 func TestDefaultFormat(t *testing.T) {
+	withCleanLoggingState(t)
 	message := "test message"
 	packageName := "test"
 	timeValue := time.Time{}
@@ -89,6 +89,52 @@ type testObjectWithLogValueMethod struct {
 
 func (object *testObjectWithLogValueMethod) GetLogValue() string {
 	return object.testObjectValue
+}
+
+// TestCustomFieldName_LeadingPercentOrBrace covers a bug in the previous implementation, which
+// used strings.TrimLeft(placeholder, "%{"). TrimLeft takes a cutset, not a prefix, so it kept
+// eating '%' and '{' characters past the delimiter and mangled any field name starting with one.
+func TestCustomFieldName_LeadingPercentOrBrace(t *testing.T) {
+	assert.Equal(t, "plain", customFieldName("%{plain}"))
+	assert.Equal(t, "%weird", customFieldName("%{%weird}"))
+	assert.Equal(t, "{weird", customFieldName("%{{weird}"))
+	assert.Equal(t, "%%double", customFieldName("%{%%double}"))
+}
+
+func TestAssembleCustomLogFields_NameWithLeadingPercent(t *testing.T) {
+	ctx := context.WithValue(context.Background(), "%weird", "resolved")
+	assert.Equal(t, "[k=resolved]", assembleCustomLogFields("[k=%{%weird}]", ctx))
+}
+
+func TestSetCustomLogFields_ParsedOnce_NamesMatchTemplate(t *testing.T) {
+	withCleanLoggingState(t)
+
+	DefaultFormat.SetCustomLogFields("[a=%{alpha}] [b=%{beta}]")
+	assert.Equal(t, []string{"alpha", "beta"}, customFieldNames())
+
+	DefaultFormat.SetCustomLogFields("")
+	assert.Empty(t, customFieldNames())
+}
+
+// TestLoggerSetMessageFormat_SeesGlobalCustomFields pins the contract that the custom-fields
+// template is global: a per-logger message format installed through SetMessageFormat must still be
+// able to resolve it, since AssembleDefaultCustomLogFields is the only way for a custom formatter
+// to reach the template.
+func TestLoggerSetMessageFormat_SeesGlobalCustomFields(t *testing.T) {
+	withCleanLoggingState(t)
+	DefaultFormat.SetCustomLogFields("[bp=%{business_process_id}]")
+
+	var seen string
+	l := newTestLogger(t, LvlInfo, "test")
+	l.SetMessageFormat(func(r *Record, b *bytes.Buffer, color int, lvl string) (int, error) {
+		seen = AssembleDefaultCustomLogFields(r.Ctx)
+		return b.WriteString(seen)
+	})
+
+	ctx := context.WithValue(context.Background(), "business_process_id", "bp-7")
+	l.format(&Record{PackageName: "test", Ctx: ctx})
+
+	assert.Equal(t, "[bp=bp-7]", seen)
 }
 
 func TestGetLoggerCaller(t *testing.T) {
