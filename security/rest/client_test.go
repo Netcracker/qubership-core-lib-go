@@ -33,9 +33,7 @@ func init() {
 
 func initTestConfig() {
 	configloader.Init(&configloader.PropertySource{
-		Provider: configloader.AsPropertyProvider(confmap.Provider(map[string]interface{}{
-			"security.m2m.kubernetes.enabled": true,
-		}, ".")),
+		Provider: configloader.AsPropertyProvider(confmap.Provider(map[string]interface{}{}, ".")),
 	})
 }
 
@@ -732,8 +730,7 @@ func initConfigWith(t *testing.T, properties map[string]any) {
 func TestNewDbaasRestClient_AgentUrlFromProperty(t *testing.T) {
 	serviceloader.Register(1, &security.DummyToken{})
 	initConfigWith(t, map[string]any{
-		"security.m2m.kubernetes.enabled": true,
-		DbaasAgentUrlProperty:             "http://custom-dbaas-agent:8081",
+		DbaasAgentUrlProperty: "http://custom-dbaas-agent:8081",
 	})
 
 	m2mClient := NewDbaasRestClient()
@@ -743,9 +740,7 @@ func TestNewDbaasRestClient_AgentUrlFromProperty(t *testing.T) {
 
 func TestNewDbaasRestClient_AgentUrlDefaultWhenPropertyNotFound(t *testing.T) {
 	serviceloader.Register(1, &security.DummyToken{})
-	initConfigWith(t, map[string]any{
-		"security.m2m.kubernetes.enabled": true,
-	})
+	initConfigWith(t, map[string]any{})
 
 	m2mClient := NewDbaasRestClient()
 
@@ -755,8 +750,7 @@ func TestNewDbaasRestClient_AgentUrlDefaultWhenPropertyNotFound(t *testing.T) {
 func TestNewMaasRestClient_AgentUrlFromProperty(t *testing.T) {
 	serviceloader.Register(1, &security.DummyToken{})
 	initConfigWith(t, map[string]any{
-		"security.m2m.kubernetes.enabled": true,
-		MaasAgentUrlProperty:              "http://custom-maas-agent:8082",
+		MaasAgentUrlProperty: "http://custom-maas-agent:8082",
 	})
 
 	m2mClient := NewMaasRestClient()
@@ -766,9 +760,7 @@ func TestNewMaasRestClient_AgentUrlFromProperty(t *testing.T) {
 
 func TestNewMaasRestClient_AgentUrlDefaultWhenPropertyNotFound(t *testing.T) {
 	serviceloader.Register(1, &security.DummyToken{})
-	initConfigWith(t, map[string]any{
-		"security.m2m.kubernetes.enabled": true,
-	})
+	initConfigWith(t, map[string]any{})
 
 	m2mClient := NewMaasRestClient()
 
