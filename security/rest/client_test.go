@@ -9,7 +9,6 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
-	"os"
 	"strings"
 	"sync"
 	"testing"
@@ -21,6 +20,7 @@ import (
 	"github.com/knadh/koanf/providers/confmap"
 	"github.com/netcracker/qubership-core-lib-go/v3/configloader"
 	"github.com/netcracker/qubership-core-lib-go/v3/security"
+	securitytest "github.com/netcracker/qubership-core-lib-go/v3/security/test"
 	"github.com/netcracker/qubership-core-lib-go/v3/security/tokenverifier"
 	"github.com/netcracker/qubership-core-lib-go/v3/serviceloader"
 	"github.com/stretchr/testify/assert"
@@ -33,9 +33,7 @@ func init() {
 
 func initTestConfig() {
 	configloader.Init(&configloader.PropertySource{
-		Provider: configloader.AsPropertyProvider(confmap.Provider(map[string]interface{}{
-			"security.m2m.kubernetes.enabled": true,
-		}, ".")),
+		Provider: configloader.AsPropertyProvider(confmap.Provider(map[string]interface{}{}, ".")),
 	})
 }
 
@@ -112,7 +110,7 @@ func TestM2MRestClient_DoRequest_FirstCallSuccess(t *testing.T) {
 		k8sAuthHeader:           mockAuthHeaderFunc("Bearer "+tokenString, nil),
 		fallbackAuthHeader:      mockAuthHeaderFunc("Bearer fallback-token", nil),
 		internalGatewayHostname: "internal-gateway-service",
-		k8sM2mEnabled:           true,
+		m2mAuthMode:             security.M2MAuthModeHybrid,
 	}
 
 	ctx := context.Background()
@@ -151,7 +149,7 @@ func TestM2MRestClient_DoRequest_FirstCallUnauthorized_FallbackSuccess(t *testin
 		k8sAuthHeader:           mockAuthHeaderFunc("Bearer new-token", nil),
 		fallbackAuthHeader:      mockAuthHeaderFunc("Bearer fallback-token", nil),
 		internalGatewayHostname: "internal-gateway-service",
-		k8sM2mEnabled:           true,
+		m2mAuthMode:             security.M2MAuthModeHybrid,
 	}
 
 	ctx := context.Background()
@@ -184,7 +182,7 @@ func TestM2MRestClient_DoRequest_TokenAcquisitionError_Fallback(t *testing.T) {
 		k8sAuthHeader:           mockAuthHeaderFunc("", errors.New("token acquisition failed")),
 		fallbackAuthHeader:      mockAuthHeaderFunc("Bearer fallback-token", nil),
 		internalGatewayHostname: "internal-gateway-service",
-		k8sM2mEnabled:           true,
+		m2mAuthMode:             security.M2MAuthModeHybrid,
 	}
 
 	ctx := context.Background()
@@ -218,7 +216,7 @@ func TestM2MRestClient_DoRequest_CachedUrl_UsesFallback(t *testing.T) {
 		k8sAuthHeader:           mockAuthHeaderFunc("Bearer new-token", nil),
 		fallbackAuthHeader:      mockAuthHeaderFunc("Bearer fallback-token", nil),
 		internalGatewayHostname: "internal-gateway-service",
-		k8sM2mEnabled:           true,
+		m2mAuthMode:             security.M2MAuthModeHybrid,
 	}
 
 	ctx := context.Background()
@@ -256,7 +254,7 @@ func TestM2MRestClient_DoRequest_WithBody(t *testing.T) {
 		client:                  server.Client(),
 		urlCache:                newUrlCache(),
 		k8sAuthHeader:           mockAuthHeaderFunc("Bearer token", nil),
-		k8sM2mEnabled:           true,
+		m2mAuthMode:             security.M2MAuthModeHybrid,
 		fallbackAuthHeader:      mockAuthHeaderFunc("Bearer fallback", nil),
 		internalGatewayHostname: "internal-gateway-service",
 	}
@@ -288,7 +286,7 @@ func TestM2MRestClient_DoRequest_WithHeaders(t *testing.T) {
 		k8sAuthHeader:           mockAuthHeaderFunc("Bearer token", nil),
 		fallbackAuthHeader:      mockAuthHeaderFunc("Bearer fallback", nil),
 		internalGatewayHostname: "internal-gateway-service",
-		k8sM2mEnabled:           true,
+		m2mAuthMode:             security.M2MAuthModeHybrid,
 	}
 
 	ctx := context.Background()
@@ -316,7 +314,7 @@ func TestM2MRestClient_DoRequest_InvalidUrl(t *testing.T) {
 		k8sAuthHeader:           mockAuthHeaderFunc("Bearer token", nil),
 		fallbackAuthHeader:      mockAuthHeaderFunc("Bearer fallback", nil),
 		internalGatewayHostname: "internal-gateway-service",
-		k8sM2mEnabled:           true,
+		m2mAuthMode:             security.M2MAuthModeHybrid,
 	}
 
 	ctx := context.Background()
@@ -338,7 +336,7 @@ func TestM2MRestClient_DoRequest_BothAuthMethodsFail(t *testing.T) {
 		k8sAuthHeader:           mockAuthHeaderFunc("", errors.New("new auth failed")),
 		fallbackAuthHeader:      mockAuthHeaderFunc("", errors.New("fallback auth failed")),
 		internalGatewayHostname: "internal-gateway-service",
-		k8sM2mEnabled:           true,
+		m2mAuthMode:             security.M2MAuthModeHybrid,
 	}
 
 	ctx := context.Background()
@@ -362,7 +360,7 @@ func TestM2MRestClient_DoRequest_ServerError(t *testing.T) {
 		k8sAuthHeader:           mockAuthHeaderFunc("Bearer token", nil),
 		fallbackAuthHeader:      mockAuthHeaderFunc("Bearer fallback", nil),
 		internalGatewayHostname: "internal-gateway-service",
-		k8sM2mEnabled:           true,
+		m2mAuthMode:             security.M2MAuthModeHybrid,
 	}
 
 	ctx := context.Background()
@@ -393,7 +391,7 @@ func TestM2MRestClient_DoRequest_ConcurrentRequests(t *testing.T) {
 		k8sAuthHeader:           mockAuthHeaderFunc("Bearer token", nil),
 		fallbackAuthHeader:      mockAuthHeaderFunc("Bearer fallback", nil),
 		internalGatewayHostname: "internal-gateway-service",
-		k8sM2mEnabled:           true,
+		m2mAuthMode:             security.M2MAuthModeHybrid,
 	}
 
 	ctx := context.Background()
@@ -434,7 +432,7 @@ func TestM2MRestClient_DoRequest_DifferentHttpMethods(t *testing.T) {
 				k8sAuthHeader:           mockAuthHeaderFunc("Bearer token", nil),
 				fallbackAuthHeader:      mockAuthHeaderFunc("Bearer fallback", nil),
 				internalGatewayHostname: "internal-gateway-service",
-				k8sM2mEnabled:           true,
+				m2mAuthMode:             security.M2MAuthModeHybrid,
 			}
 
 			ctx := context.Background()
@@ -467,7 +465,7 @@ func TestM2MRestClient_DoRequest_FallbackCachesUrl(t *testing.T) {
 		k8sAuthHeader:           mockAuthHeaderFunc("Bearer new-token", nil),
 		fallbackAuthHeader:      mockAuthHeaderFunc("Bearer fallback-token", nil),
 		internalGatewayHostname: "internal-gateway-service",
-		k8sM2mEnabled:           true,
+		m2mAuthMode:             security.M2MAuthModeHybrid,
 	}
 
 	ctx := context.Background()
@@ -496,7 +494,7 @@ func TestM2MRestClient_DoRequest_BodyReaderError(t *testing.T) {
 		k8sAuthHeader:           mockAuthHeaderFunc("Bearer token", nil),
 		fallbackAuthHeader:      mockAuthHeaderFunc("Bearer fallback", nil),
 		internalGatewayHostname: "internal-gateway-service",
-		k8sM2mEnabled:           true,
+		m2mAuthMode:             security.M2MAuthModeHybrid,
 	}
 
 	// Create an error reader
@@ -519,10 +517,8 @@ func (e *errorReader) Read(p []byte) (n int, err error) {
 }
 
 func TestNewM2MRestClient(t *testing.T) {
-	newAuth := mockAuthHeaderFunc("Bearer new", nil)
-	fallbackAuth := mockAuthHeaderFunc("Bearer fallback", nil)
-
-	m2mClient := newM2MRestClient(newAuth, fallbackAuth, "")
+	serviceloader.Register(1, &security.DummyToken{})
+	m2mClient := newM2MRestClient(security.M2MAuthModeHybrid, "test-audience", "")
 
 	assert.NotNil(t, m2mClient)
 	assert.NotNil(t, m2mClient.client)
@@ -551,7 +547,7 @@ func TestM2MRestClient_DoRequest_InternalGatewayUrlCaching(t *testing.T) {
 		k8sAuthHeader:           mockAuthHeaderFunc("Bearer new-token", nil),
 		fallbackAuthHeader:      mockAuthHeaderFunc("Bearer fallback-token", nil),
 		internalGatewayHostname: "internal-gateway-service",
-		k8sM2mEnabled:           true,
+		m2mAuthMode:             security.M2MAuthModeHybrid,
 	}
 
 	ctx := context.Background()
@@ -589,7 +585,7 @@ func TestM2MRestClient_DoRequestFallback(t *testing.T) {
 		k8sAuthHeader:           mockAuthHeaderFunc("Bearer new", nil),
 		fallbackAuthHeader:      mockAuthHeaderFunc("Bearer fallback", nil),
 		internalGatewayHostname: "internal-gateway-service",
-		k8sM2mEnabled:           true,
+		m2mAuthMode:             security.M2MAuthModeHybrid,
 	}
 
 	ctx := context.Background()
@@ -606,7 +602,7 @@ func TestM2MRestClient_DoRequestFallback(t *testing.T) {
 		err:  errors.New("test error"),
 	}
 
-	resp, err := client.doRequestFallback(ctx, cacheKey, producer, reason)
+	resp, err := client.doLegacyRequest(ctx, cacheKey, producer, reason)
 
 	require.NoError(t, err)
 	assert.NotNil(t, resp)
@@ -631,7 +627,7 @@ func TestM2MRestClient_DoRequest_MultipleBodyReads(t *testing.T) {
 		k8sAuthHeader:           mockAuthHeaderFunc("Bearer new", nil),
 		fallbackAuthHeader:      mockAuthHeaderFunc("Bearer fallback", nil),
 		internalGatewayHostname: "internal-gateway-service",
-		k8sM2mEnabled:           true,
+		m2mAuthMode:             security.M2MAuthModeHybrid,
 	}
 
 	ctx := context.Background()
@@ -661,7 +657,7 @@ func TestM2MRestClient_DoRequest_FallbackRebasesUrl(t *testing.T) {
 		fallbackAuthHeader:      mockAuthHeaderFunc("Bearer fallback-token", nil),
 		fallBackBaseUrl:         agentServer.URL,
 		internalGatewayHostname: "internal-gateway-service",
-		k8sM2mEnabled:           true,
+		m2mAuthMode:             security.M2MAuthModeHybrid,
 	}
 
 	ctx := context.Background()
@@ -686,7 +682,7 @@ func TestM2MRestClient_DoRequest_FallbackRebasesUrl(t *testing.T) {
 	})
 }
 
-func TestM2MRestClient_DoRequest_RebasesUrlWhenK8sM2mDisabled(t *testing.T) {
+func TestM2MRestClient_DoRequest_LegacyMode_RebasesUrlToAgent(t *testing.T) {
 	agentCalls := 0
 	agentServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		agentCalls++
@@ -710,7 +706,7 @@ func TestM2MRestClient_DoRequest_RebasesUrlWhenK8sM2mDisabled(t *testing.T) {
 		fallbackAuthHeader:      mockAuthHeaderFunc("Bearer fallback-token", nil),
 		fallBackBaseUrl:         agentServer.URL,
 		internalGatewayHostname: "internal-gateway-service",
-		k8sM2mEnabled:           false,
+		m2mAuthMode:             security.M2MAuthModeLegacy,
 	}
 
 	resp, err := client.DoRequest(context.Background(), "GET", originalServer.URL+"/api/v1/resource", nil, nil)
@@ -720,14 +716,6 @@ func TestM2MRestClient_DoRequest_RebasesUrlWhenK8sM2mDisabled(t *testing.T) {
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 	assert.Equal(t, 1, agentCalls, "request must be rebased onto the agent")
 	assert.Equal(t, 0, originalCalls, "directly addressed service must not be contacted")
-}
-
-func TestNewM2MRestClient_K8sM2mDisabledWhenEnvNotSet(t *testing.T) {
-	os.Unsetenv("KUBERNETES_M2M_ENABLED")
-
-	m2mClient := newM2MRestClient(mockAuthHeaderFunc("Bearer new", nil), mockAuthHeaderFunc("Bearer fallback", nil), DefaultDbaasAgentUrl)
-
-	assert.False(t, m2mClient.k8sM2mEnabled)
 }
 
 // initConfigWith re-initializes configloader with the given properties and restores the default test configuration afterwards
@@ -742,8 +730,7 @@ func initConfigWith(t *testing.T, properties map[string]any) {
 func TestNewDbaasRestClient_AgentUrlFromProperty(t *testing.T) {
 	serviceloader.Register(1, &security.DummyToken{})
 	initConfigWith(t, map[string]any{
-		"security.m2m.kubernetes.enabled": true,
-		DbaasAgentUrlProperty:             "http://custom-dbaas-agent:8081",
+		DbaasAgentUrlProperty: "http://custom-dbaas-agent:8081",
 	})
 
 	m2mClient := NewDbaasRestClient()
@@ -753,9 +740,7 @@ func TestNewDbaasRestClient_AgentUrlFromProperty(t *testing.T) {
 
 func TestNewDbaasRestClient_AgentUrlDefaultWhenPropertyNotFound(t *testing.T) {
 	serviceloader.Register(1, &security.DummyToken{})
-	initConfigWith(t, map[string]any{
-		"security.m2m.kubernetes.enabled": true,
-	})
+	initConfigWith(t, map[string]any{})
 
 	m2mClient := NewDbaasRestClient()
 
@@ -765,8 +750,7 @@ func TestNewDbaasRestClient_AgentUrlDefaultWhenPropertyNotFound(t *testing.T) {
 func TestNewMaasRestClient_AgentUrlFromProperty(t *testing.T) {
 	serviceloader.Register(1, &security.DummyToken{})
 	initConfigWith(t, map[string]any{
-		"security.m2m.kubernetes.enabled": true,
-		MaasAgentUrlProperty:              "http://custom-maas-agent:8082",
+		MaasAgentUrlProperty: "http://custom-maas-agent:8082",
 	})
 
 	m2mClient := NewMaasRestClient()
@@ -776,11 +760,224 @@ func TestNewMaasRestClient_AgentUrlFromProperty(t *testing.T) {
 
 func TestNewMaasRestClient_AgentUrlDefaultWhenPropertyNotFound(t *testing.T) {
 	serviceloader.Register(1, &security.DummyToken{})
-	initConfigWith(t, map[string]any{
-		"security.m2m.kubernetes.enabled": true,
-	})
+	initConfigWith(t, map[string]any{})
 
 	m2mClient := NewMaasRestClient()
 
 	assert.Equal(t, DefaultMaasAgentUrl, m2mClient.fallBackBaseUrl)
+}
+
+type recordingServer struct {
+	*httptest.Server
+	mu          sync.Mutex
+	authHeaders []string
+}
+
+func newRecordingServer(t *testing.T, status func(authHeader string) int) *recordingServer {
+	t.Helper()
+	s := &recordingServer{}
+	s.Server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		authHeader := r.Header.Get("Authorization")
+		s.mu.Lock()
+		s.authHeaders = append(s.authHeaders, authHeader)
+		s.mu.Unlock()
+		w.WriteHeader(status(authHeader))
+	}))
+	t.Cleanup(s.Close)
+	return s
+}
+
+func (s *recordingServer) received() []string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.authHeaders
+}
+
+func alwaysStatus(code int) func(string) int {
+	return func(string) int { return code }
+}
+
+func TestM2MRestClient_DoRequest_LegacyMode_SendsLegacyTokenToTargetWithoutAgent(t *testing.T) {
+	target := newRecordingServer(t, alwaysStatus(http.StatusOK))
+	client := &M2MRestClient{
+		client:                  target.Client(),
+		urlCache:                newUrlCache(),
+		k8sAuthHeader:           mockAuthHeaderFunc("Bearer new-token", nil),
+		fallbackAuthHeader:      mockAuthHeaderFunc("Bearer fallback-token", nil),
+		internalGatewayHostname: "internal-gateway-service",
+		m2mAuthMode:             security.M2MAuthModeLegacy,
+	}
+
+	resp, err := client.DoRequest(context.Background(), "GET", target.URL+"/api/v1/resource", nil, nil)
+	require.NoError(t, err)
+	resp.Body.Close()
+
+	assert.Equal(t, []string{"Bearer fallback-token"}, target.received())
+}
+
+func TestM2MRestClient_DoRequest_K8sTokenAccepted_TargetIsNotRebasedToAgent(t *testing.T) {
+	agent := newRecordingServer(t, alwaysStatus(http.StatusOK))
+	target := newRecordingServer(t, alwaysStatus(http.StatusOK))
+	client := &M2MRestClient{
+		client:                  target.Client(),
+		urlCache:                newUrlCache(),
+		k8sAuthHeader:           mockAuthHeaderFunc("Bearer new-token", nil),
+		fallbackAuthHeader:      mockAuthHeaderFunc("Bearer fallback-token", nil),
+		fallBackBaseUrl:         agent.URL,
+		internalGatewayHostname: "internal-gateway-service",
+		m2mAuthMode:             security.M2MAuthModeHybrid,
+	}
+
+	resp, err := client.DoRequest(context.Background(), "GET", target.URL+"/api/v1/resource", nil, nil)
+	require.NoError(t, err)
+	resp.Body.Close()
+
+	assert.Equal(t, []string{"Bearer new-token"}, target.received())
+	assert.Empty(t, agent.received())
+}
+
+func TestM2MRestClient_DoRequest_FailedFallback_TargetIsNotCached(t *testing.T) {
+	target := newRecordingServer(t, alwaysStatus(http.StatusUnauthorized))
+	client := &M2MRestClient{
+		client:                  target.Client(),
+		urlCache:                newUrlCache(),
+		k8sAuthHeader:           mockAuthHeaderFunc("Bearer new-token", nil),
+		fallbackAuthHeader:      mockAuthHeaderFunc("Bearer fallback-token", nil),
+		internalGatewayHostname: "internal-gateway-service",
+		m2mAuthMode:             security.M2MAuthModeHybrid,
+	}
+	url := target.URL + "/api/v1/resource"
+
+	for range 2 {
+		resp, err := client.DoRequest(context.Background(), "GET", url, nil, nil)
+		require.NoError(t, err)
+		resp.Body.Close()
+	}
+
+	assert.Equal(t, []string{"Bearer new-token", "Bearer fallback-token", "Bearer new-token", "Bearer fallback-token"}, target.received())
+}
+
+type stubTokenProvider struct {
+	security.DummyToken
+	token string
+}
+
+func (p *stubTokenProvider) GetToken(context.Context) (string, error) {
+	return p.token, nil
+}
+
+// The priority outranks the DummyToken the other tests register.
+func registerStubTokens() {
+	serviceloader.Register(100, &securitytest.MockTokenSource{AudienceToken: "k8s-token"})
+	serviceloader.Register(100, &stubTokenProvider{token: "legacy-token"})
+}
+
+func TestNewDbaasRestClient_ModeNotSet_SendsLegacyTokenThroughAgent(t *testing.T) {
+	registerStubTokens()
+	t.Setenv(security.M2MAuthModeEnv, "")
+	agent := newRecordingServer(t, alwaysStatus(http.StatusOK))
+	dbaas := newRecordingServer(t, alwaysStatus(http.StatusOK))
+	initConfigWith(t, map[string]any{DbaasAgentUrlProperty: agent.URL})
+
+	resp, err := NewDbaasRestClient().DoRequest(context.Background(), "GET", dbaas.URL+"/api/v3/dbaas/databases", nil, nil)
+	require.NoError(t, err)
+	resp.Body.Close()
+
+	assert.Equal(t, []string{"Bearer legacy-token"}, agent.received())
+	assert.Empty(t, dbaas.received())
+}
+
+func TestNewDbaasRestClient_HybridMode_SendsK8sTokenToDbaas(t *testing.T) {
+	registerStubTokens()
+	t.Setenv(security.M2MAuthModeEnv, "hybrid")
+	agent := newRecordingServer(t, alwaysStatus(http.StatusOK))
+	dbaas := newRecordingServer(t, alwaysStatus(http.StatusOK))
+	initConfigWith(t, map[string]any{DbaasAgentUrlProperty: agent.URL})
+
+	resp, err := NewDbaasRestClient().DoRequest(context.Background(), "GET", dbaas.URL+"/api/v3/dbaas/databases", nil, nil)
+	require.NoError(t, err)
+	resp.Body.Close()
+
+	assert.Equal(t, []string{"Bearer k8s-token"}, dbaas.received())
+	assert.Empty(t, agent.received())
+}
+
+func TestNewM2MRestClient_ModeNotSet_SendsLegacyTokenToTarget(t *testing.T) {
+	registerStubTokens()
+	t.Setenv(security.M2MAuthModeEnv, "")
+	target := newRecordingServer(t, alwaysStatus(http.StatusOK))
+
+	resp, err := NewM2MRestClient().DoRequest(context.Background(), "GET", target.URL+"/api/v1/resource", nil, nil)
+	require.NoError(t, err)
+	resp.Body.Close()
+
+	assert.Equal(t, []string{"Bearer legacy-token"}, target.received())
+}
+
+func TestM2MRestClient_DoRequest_K8sMode_ReturnsUnauthorizedWithoutFallback(t *testing.T) {
+	agent := newRecordingServer(t, alwaysStatus(http.StatusOK))
+	target := newRecordingServer(t, alwaysStatus(http.StatusUnauthorized))
+	client := &M2MRestClient{
+		client:                  target.Client(),
+		urlCache:                newUrlCache(),
+		k8sAuthHeader:           mockAuthHeaderFunc("Bearer new-token", nil),
+		fallBackBaseUrl:         agent.URL,
+		internalGatewayHostname: "internal-gateway-service",
+		m2mAuthMode:             security.M2MAuthModeK8s,
+	}
+
+	resp, err := client.DoRequest(context.Background(), "GET", target.URL+"/api/v1/resource", nil, nil)
+	require.NoError(t, err)
+	resp.Body.Close()
+
+	assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
+	assert.Equal(t, []string{"Bearer new-token"}, target.received())
+	assert.Empty(t, agent.received())
+}
+
+func TestM2MRestClient_DoRequest_K8sMode_TokenAcquisitionErrorIsReturned(t *testing.T) {
+	target := newRecordingServer(t, alwaysStatus(http.StatusOK))
+	client := &M2MRestClient{
+		client:                  target.Client(),
+		urlCache:                newUrlCache(),
+		k8sAuthHeader:           mockAuthHeaderFunc("", errors.New("token file is missing")),
+		internalGatewayHostname: "internal-gateway-service",
+		m2mAuthMode:             security.M2MAuthModeK8s,
+	}
+
+	_, err := client.DoRequest(context.Background(), "GET", target.URL+"/api/v1/resource", nil, nil)
+
+	var tae *TokenAcquisitionError
+	assert.ErrorAs(t, err, &tae)
+	assert.Empty(t, target.received())
+}
+
+func TestNewDbaasRestClient_K8sMode_SendsOnlyK8sTokenToDbaas(t *testing.T) {
+	registerStubTokens()
+	t.Setenv(security.M2MAuthModeEnv, "k8s")
+	agent := newRecordingServer(t, alwaysStatus(http.StatusOK))
+	dbaas := newRecordingServer(t, alwaysStatus(http.StatusUnauthorized))
+	initConfigWith(t, map[string]any{DbaasAgentUrlProperty: agent.URL})
+
+	resp, err := NewDbaasRestClient().DoRequest(context.Background(), "GET", dbaas.URL+"/api/v3/dbaas/databases", nil, nil)
+	require.NoError(t, err)
+	resp.Body.Close()
+
+	assert.Equal(t, []string{"Bearer k8s-token"}, dbaas.received())
+	assert.Empty(t, agent.received())
+}
+
+// A TokenProvider is registered by the other tests, so the test checks that the client holds no legacy token source.
+func TestNewM2MRestClient_K8sMode_DoesNotLoadTokenProvider(t *testing.T) {
+	t.Setenv(security.M2MAuthModeEnv, "k8s")
+
+	client := NewM2MRestClient()
+
+	assert.Nil(t, client.fallbackAuthHeader)
+}
+
+func TestNewM2MRestClient_UnsupportedMode_Panics(t *testing.T) {
+	t.Setenv(security.M2MAuthModeEnv, "true")
+
+	assert.Panics(t, func() { NewM2MRestClient() })
 }
