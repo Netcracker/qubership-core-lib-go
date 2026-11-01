@@ -4,7 +4,7 @@ go 1.26.5
 
 require (
 	github.com/KimMachineGun/automemlimit v0.7.5
-	github.com/MicahParks/jwkset v0.11.3
+	github.com/MicahParks/jwkset v0.11.4
 	github.com/MicahParks/keyfunc/v3 v3.8.2
 	github.com/failsafe-go/failsafe-go v0.9.8
 	github.com/fsnotify/fsnotify v1.10.1
