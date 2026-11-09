@@ -1,0 +1,22 @@
+# Caller of the dependency gate. No `with` and no .github/dependency-gate.json:
+# mode report, both checks. Dependency gate: pins and the Go API. Consumers: the
+# reference list in infra defaults.json. detect skips a run whose go.mod and go.sum
+# did not change; do not add a paths filter, or Renovate has no check to wait for.
+
+name: Dependency gate
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: read
+  pull-requests: write
+
+jobs:
+  dependency-gate:
+    uses: Netcracker/qubership-core-infra/.github/workflows/dependency-gate.yml@feature/dependency-pins-check
