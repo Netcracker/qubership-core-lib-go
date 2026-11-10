@@ -39,7 +39,7 @@ func (xRequestIdContextObject xRequestIdContextObject) Propagate() (map[string]s
 }
 
 func (xRequestIdContextObject xRequestIdContextObject) GetRequestId() string {
-	return xRequestIdContextObject.requestId
+	return ""
 }
 
 func (xRequestIdContextObject xRequestIdContextObject) GetLogValue() string {
