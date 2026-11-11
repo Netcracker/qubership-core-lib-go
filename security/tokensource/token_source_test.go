@@ -399,3 +399,36 @@ func (s *audienceTokensStorage) refreshSymlink() error {
 	time.Sleep(time.Millisecond * 50)
 	return nil
 }
+
+func TestAudienceTokensSeparateMounts(t *testing.T) {
+	ctx, cancelCtx := context.WithCancel(t.Context())
+	defer func() { cancelCtx(); time.Sleep(time.Millisecond * 10) }()
+	t.Setenv(localdev.EnabledEnv, "")
+
+	tokensDir := t.TempDir()
+	DefaultAudienceTokensDir = tokensDir
+	audienceDir := filepath.Join(tokensDir, AudienceNetcracker)
+	require.NoError(t, os.Mkdir(audienceDir, 0775))
+
+	rotate := func(value string) {
+		dataDir, err := os.MkdirTemp(audienceDir, "..tmp")
+		require.NoError(t, err)
+		require.NoError(t, os.WriteFile(filepath.Join(dataDir, "token"), []byte(value), 0644))
+		tmpLink := filepath.Join(audienceDir, "..data_tmp")
+		require.NoError(t, os.Symlink(dataDir, tmpLink))
+		require.NoError(t, os.Rename(tmpLink, filepath.Join(audienceDir, "..data")))
+		time.Sleep(time.Millisecond * 50)
+	}
+	rotate("initial")
+	require.NoError(t, os.Symlink(filepath.Join("..data", "token"), filepath.Join(audienceDir, "token")))
+
+	token, err := GetAudienceToken(ctx, AudienceNetcracker)
+	assert.NoError(t, err)
+	assert.Equal(t, "initial", token)
+
+	rotate("second")
+	assert.Eventually(t, func() bool {
+		token, err := GetAudienceToken(ctx, AudienceNetcracker)
+		return err == nil && token == "second"
+	}, time.Second*2, time.Millisecond*20)
+}

@@ -155,6 +155,7 @@ func newTokenWatcher(ctx context.Context, tokensDir string, updateCache func(tok
 	if err != nil {
 		return nil, fmt.Errorf("failed to refresh tokens cache: %w", err)
 	}
+
 	tw.watcher, err = fsnotify.NewWatcher()
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize file watcher: %w", err)
@@ -164,7 +165,23 @@ func newTokenWatcher(ctx context.Context, tokensDir string, updateCache func(tok
 		_ = tw.watcher.Close()
 		return nil, fmt.Errorf("failed to add path %s to file watcher: %w", tw.tokensDir, err)
 	}
+	entries, err := os.ReadDir(tokensDir)
+	if err != nil {
+		_ = tw.watcher.Close()
+		return nil, fmt.Errorf("failed to get dir entries from tokenDir %s: %w", tokensDir, err)
+	}
+	for _, entry := range entries {
+		if !entry.IsDir() {
+			continue
+		}
+		subDir := filepath.Join(tokensDir, entry.Name())
+		if err = tw.watcher.Add(subDir); err != nil {
+			_ = tw.watcher.Close()
+			return nil, fmt.Errorf("failed to add path %s to file watcher: %w", subDir, err)
+		}
+	}
 	go tw.listenFs(ctx, tw.watcher.Events, tw.watcher.Errors)
+
 	return tw, nil
 }
 
