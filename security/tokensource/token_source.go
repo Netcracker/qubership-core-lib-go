@@ -171,7 +171,7 @@ func newTokenWatcher(ctx context.Context, tokensDir string, updateCache func(tok
 		return nil, fmt.Errorf("failed to get dir entries from tokenDir %s: %w", tokensDir, err)
 	}
 	for _, entry := range entries {
-		if !entry.IsDir() {
+		if !entry.IsDir() || strings.HasPrefix(entry.Name(), "..") {
 			continue
 		}
 		subDir := filepath.Join(tokensDir, entry.Name())

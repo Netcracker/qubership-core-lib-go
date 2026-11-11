@@ -409,6 +409,8 @@ func TestAudienceTokensSeparateMounts(t *testing.T) {
 	DefaultAudienceTokensDir = tokensDir
 	audienceDir := filepath.Join(tokensDir, AudienceNetcracker)
 	require.NoError(t, os.Mkdir(audienceDir, 0775))
+	timestampDir := filepath.Join(tokensDir, "..2026_11_11_13_00_00.123456789")
+	require.NoError(t, os.Mkdir(timestampDir, 0775))
 
 	rotate := func(value string) {
 		dataDir, err := os.MkdirTemp(audienceDir, "..tmp")
@@ -425,6 +427,10 @@ func TestAudienceTokensSeparateMounts(t *testing.T) {
 	token, err := GetAudienceToken(ctx, AudienceNetcracker)
 	assert.NoError(t, err)
 	assert.Equal(t, "initial", token)
+
+	tw, err := audienceTokensWatcher.Load().Get()
+	require.NoError(t, err)
+	assert.ElementsMatch(t, []string{tokensDir, audienceDir}, tw.watcher.WatchList())
 
 	rotate("second")
 	assert.Eventually(t, func() bool {
