@@ -432,3 +432,27 @@ func TestAudienceTokensSeparateMounts(t *testing.T) {
 		return err == nil && token == "second"
 	}, time.Second*2, time.Millisecond*20)
 }
+
+func TestNewTokenWatcherTokensDirIsFile(t *testing.T) {
+	tokensFile := filepath.Join(t.TempDir(), "tokens")
+	require.NoError(t, os.WriteFile(tokensFile, []byte("not a dir"), 0644))
+
+	tw, err := newTokenWatcher(t.Context(), tokensFile, func(string) error { return nil }, func() {})
+	assert.Nil(t, tw)
+	assert.ErrorContains(t, err, "failed to get dir entries from tokenDir")
+}
+
+func TestNewTokenWatcherUnreadableAudienceDir(t *testing.T) {
+	if os.Geteuid() == 0 {
+		t.Skip("root can watch any directory")
+	}
+	tokensDir := t.TempDir()
+	audienceDir := filepath.Join(tokensDir, AudienceNetcracker)
+	require.NoError(t, os.Mkdir(audienceDir, 0775))
+	require.NoError(t, os.Chmod(audienceDir, 0))
+	t.Cleanup(func() { _ = os.Chmod(audienceDir, 0775) })
+
+	tw, err := newTokenWatcher(t.Context(), tokensDir, func(string) error { return nil }, func() {})
+	assert.Nil(t, tw)
+	assert.ErrorContains(t, err, "failed to add path "+audienceDir+" to file watcher")
+}
