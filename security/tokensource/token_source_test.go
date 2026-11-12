@@ -169,7 +169,7 @@ func TestNoAudienceTokensDir(t *testing.T) {
 	assert.NoError(t, err)
 
 	_, err = GetAudienceToken(ctx, AudienceNetcracker)
-	assert.ErrorContains(t, err, "failed to create token watcher: failed to refresh tokens cache: failed to get dir entries from tokenDir")
+	assert.ErrorContains(t, err, "failed to create token watcher: failed to add path")
 
 }
 func TestEmptyAudience(t *testing.T) {
