@@ -169,7 +169,7 @@ func TestNoAudienceTokensDir(t *testing.T) {
 	assert.NoError(t, err)
 
 	_, err = GetAudienceToken(ctx, AudienceNetcracker)
-	assert.ErrorContains(t, err, "failed to create token watcher: failed to refresh tokens cache: failed to get dir entries from tokenDir")
+	assert.ErrorContains(t, err, "failed to create token watcher: failed to add path")
 
 }
 func TestEmptyAudience(t *testing.T) {
@@ -398,4 +398,67 @@ func (s *audienceTokensStorage) refreshSymlink() error {
 	}
 	time.Sleep(time.Millisecond * 50)
 	return nil
+}
+
+func TestAudienceTokensSeparateMounts(t *testing.T) {
+	ctx, cancelCtx := context.WithCancel(t.Context())
+	defer func() { cancelCtx(); time.Sleep(time.Millisecond * 10) }()
+	t.Setenv(localdev.EnabledEnv, "")
+
+	tokensDir := t.TempDir()
+	DefaultAudienceTokensDir = tokensDir
+	audienceDir := filepath.Join(tokensDir, AudienceNetcracker)
+	require.NoError(t, os.Mkdir(audienceDir, 0775))
+	timestampDir := filepath.Join(tokensDir, "..2026_11_11_13_00_00.123456789")
+	require.NoError(t, os.Mkdir(timestampDir, 0775))
+
+	rotate := func(value string) {
+		dataDir, err := os.MkdirTemp(audienceDir, "..tmp")
+		require.NoError(t, err)
+		require.NoError(t, os.WriteFile(filepath.Join(dataDir, "token"), []byte(value), 0644))
+		tmpLink := filepath.Join(audienceDir, "..data_tmp")
+		require.NoError(t, os.Symlink(dataDir, tmpLink))
+		require.NoError(t, os.Rename(tmpLink, filepath.Join(audienceDir, "..data")))
+		time.Sleep(time.Millisecond * 50)
+	}
+	rotate("initial")
+	require.NoError(t, os.Symlink(filepath.Join("..data", "token"), filepath.Join(audienceDir, "token")))
+
+	token, err := GetAudienceToken(ctx, AudienceNetcracker)
+	assert.NoError(t, err)
+	assert.Equal(t, "initial", token)
+
+	tw, err := audienceTokensWatcher.Load().Get()
+	require.NoError(t, err)
+	assert.ElementsMatch(t, []string{tokensDir, audienceDir}, tw.watcher.WatchList())
+
+	rotate("second")
+	assert.Eventually(t, func() bool {
+		token, err := GetAudienceToken(ctx, AudienceNetcracker)
+		return err == nil && token == "second"
+	}, time.Second*2, time.Millisecond*20)
+}
+
+func TestNewTokenWatcherTokensDirIsFile(t *testing.T) {
+	tokensFile := filepath.Join(t.TempDir(), "tokens")
+	require.NoError(t, os.WriteFile(tokensFile, []byte("not a dir"), 0644))
+
+	tw, err := newTokenWatcher(t.Context(), tokensFile, func(string) error { return nil }, func() {})
+	assert.Nil(t, tw)
+	assert.ErrorContains(t, err, "failed to get dir entries from tokenDir")
+}
+
+func TestNewTokenWatcherUnreadableAudienceDir(t *testing.T) {
+	if os.Geteuid() == 0 {
+		t.Skip("root can watch any directory")
+	}
+	tokensDir := t.TempDir()
+	audienceDir := filepath.Join(tokensDir, AudienceNetcracker)
+	require.NoError(t, os.Mkdir(audienceDir, 0775))
+	require.NoError(t, os.Chmod(audienceDir, 0))
+	t.Cleanup(func() { _ = os.Chmod(audienceDir, 0775) })
+
+	tw, err := newTokenWatcher(t.Context(), tokensDir, func(string) error { return nil }, func() {})
+	assert.Nil(t, tw)
+	assert.ErrorContains(t, err, "failed to add path "+audienceDir+" to file watcher")
 }
