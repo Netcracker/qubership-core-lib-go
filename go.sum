@@ -1,7 +1,7 @@
 github.com/KimMachineGun/automemlimit v0.7.5 h1:RkbaC0MwhjL1ZuBKunGDjE/ggwAX43DwZrJqVwyveTk=
 github.com/KimMachineGun/automemlimit v0.7.5/go.mod h1:QZxpHaGOQoYvFhv/r4u3U0JTC2ZcOwbSr11UZF46UBM=
-github.com/MicahParks/jwkset v0.11.4 h1:sm6pqlEpa1YDu82Hoxho/O+Y291lPcksNImVIsV74gg=
-github.com/MicahParks/jwkset v0.11.4/go.mod h1:U2oRhRaLgDCLjtpGL2GseNKGmZtLs/3O7p+OZaL5vo0=
+github.com/MicahParks/jwkset v0.11.5 h1:ZyJdQj8fZiTHjOX1aDDw0d8Fw6qGkTle12r9LPeoCEA=
+github.com/MicahParks/jwkset v0.11.5/go.mod h1:U2oRhRaLgDCLjtpGL2GseNKGmZtLs/3O7p+OZaL5vo0=
 github.com/MicahParks/keyfunc/v3 v3.9.2 h1:yWvqmCIWMnyp8tJFR3VmNQRBGmNRJ3cMvN9bcG9Bfbc=
 github.com/MicahParks/keyfunc/v3 v3.9.2/go.mod h1:h8DMhdulFa3yjG1q74FqaehNDekB18HrVCXPl9Raa4I=
 github.com/bits-and-blooms/bitset v1.24.4 h1:95H15Og1clikBrKr/DuzMXkQzECs1M6hhoGXLwLQOZE=
